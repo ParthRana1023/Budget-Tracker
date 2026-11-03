@@ -21,7 +21,8 @@ import {
   Bell,
   PartyPopper,
   BarChart3,
-  LayoutDashboard
+  LayoutDashboard,
+  Download
 } from "lucide-react";
 import FastExpenseModal, { Category } from "./FastExpenseModal";
 import IncomeModal from "./IncomeModal";
@@ -34,6 +35,7 @@ import AlertBanner from "./AlertBanner";
 import SavingsGoalsSection, { SavingsGoal } from "./SavingsGoalsSection";
 import WindfallAllocationModal from "./WindfallAllocationModal";
 import ReportsView from "./ReportsView";
+import RecurringItemsSection from "./RecurringItemsSection";
 import { 
   getPeriodRange, 
   computeCategoryBudgets, 
@@ -41,6 +43,7 @@ import {
   formatINR 
 } from "@/lib/budgetUtils";
 import { getCategoryLimitAlerts, getSavingsTargetAlert, BudgetAlert } from "@/lib/alertUtils";
+import { transactionsToCsv } from "@/lib/csvExport.mjs";
 
 interface DashboardClientProps {
   initialUser: { id: string; email?: string };
@@ -50,6 +53,7 @@ interface DashboardClientProps {
   initialIncomeSources: any[];
   initialSavingsGoals: any[];
   initialContributions: Array<{ goal_id: string; amount: number; date?: string }>;
+  initialRecurringItems: any[];
 }
 
 export default function DashboardClient({
@@ -60,6 +64,7 @@ export default function DashboardClient({
   initialIncomeSources,
   initialSavingsGoals,
   initialContributions,
+  initialRecurringItems,
 }: DashboardClientProps) {
   const router = useRouter();
 
@@ -71,6 +76,7 @@ export default function DashboardClient({
   const [incomeSources, setIncomeSources] = useState<any[]>(initialIncomeSources);
   const [savingsGoals, setSavingsGoals] = useState<any[]>(initialSavingsGoals);
   const [contributions, setContributions] = useState<any[]>(initialContributions);
+  const [recurringItems, setRecurringItems] = useState<any[]>(initialRecurringItems);
   const [settings] = useState(initialSettings);
 
   // Modals state
@@ -97,7 +103,7 @@ export default function DashboardClient({
   const refreshData = async () => {
     const supabase = createClient();
 
-    const [catRes, txRes, incRes, goalRes, contribRes] = await Promise.all([
+    const [catRes, txRes, incRes, goalRes, contribRes, recurringRes] = await Promise.all([
       supabase.from("categories").select("*").eq("user_id", initialUser.id).order("name"),
       supabase
         .from("transactions")
@@ -107,6 +113,7 @@ export default function DashboardClient({
       supabase.from("income_sources").select("*").eq("user_id", initialUser.id),
       supabase.from("savings_goals").select("*").eq("user_id", initialUser.id),
       supabase.from("goal_contributions").select("goal_id, amount, date").eq("user_id", initialUser.id),
+      supabase.from("recurring_items").select("*").eq("user_id", initialUser.id),
     ]);
 
     if (catRes.data) setCategories(catRes.data as any);
@@ -114,6 +121,7 @@ export default function DashboardClient({
     if (incRes.data) setIncomeSources(incRes.data);
     if (goalRes.data) setSavingsGoals(goalRes.data);
     if (contribRes.data) setContributions(contribRes.data);
+    if (recurringRes.data) setRecurringItems(recurringRes.data);
   };
 
   // Safe to spend math
@@ -199,6 +207,17 @@ export default function DashboardClient({
     setTimeout(() => {
       setToastMessage(null);
     }, 6000);
+  };
+
+  const handleExportTransactions = () => {
+    const csv = transactionsToCsv(transactions);
+    const blob = new Blob([`\uFEFF${csv}`], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const download = document.createElement("a");
+    download.href = url;
+    download.download = "savefirst-transactions.csv";
+    download.click();
+    URL.revokeObjectURL(url);
   };
 
   return (
@@ -338,6 +357,15 @@ export default function DashboardClient({
                 >
                   <Settings2 className="w-4 h-4" />
                 </button>
+                <button
+                  id="export-transactions-btn"
+                  onClick={handleExportTransactions}
+                  className="p-2.5 rounded-xl bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 transition-colors shadow-xs"
+                  title="Export transactions as CSV"
+                  aria-label="Export transactions as CSV"
+                >
+                  <Download className="w-4 h-4" />
+                </button>
               </div>
             </div>
 
@@ -425,6 +453,7 @@ export default function DashboardClient({
               userId={initialUser.id}
               onGoalsUpdated={refreshData}
             />
+            <RecurringItemsSection items={recurringItems} transactions={transactions} categories={categories} userId={initialUser.id} onUpdated={refreshData} />
 
             {/* Pacing & Burn Rate Card */}
             <BurnRateCard

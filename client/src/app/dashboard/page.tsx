@@ -91,6 +91,7 @@ export default async function DashboardPage() {
     .from("goal_contributions")
     .select("goal_id, amount, date")
     .eq("user_id", user.id);
+  const { data: recurringItems } = await supabase.from("recurring_items").select("*").eq("user_id", user.id);
 
   return (
     <DashboardClient
@@ -101,6 +102,7 @@ export default async function DashboardPage() {
       initialIncomeSources={incomeSources || []}
       initialSavingsGoals={savingsGoals || []}
       initialContributions={contributions || []}
+      initialRecurringItems={recurringItems || []}
     />
   );
 }
