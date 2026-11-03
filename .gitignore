@@ -43,4 +43,7 @@ Thumbs.db
 # Next.js telemetry & cache
 .next/cache/
 
+# Supabase CLI local state
+supabase/.temp/
+
 /plans
