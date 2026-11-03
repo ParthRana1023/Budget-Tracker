@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { createClient } from "@/utils/supabase/client";
-import { X, Check, Loader2, Sparkles, Calendar, FileText } from "lucide-react";
+import { X, Check, Loader2, Sparkles, Calendar, FileText, AlertTriangle, ShieldAlert } from "lucide-react";
+import { checkExpenseImpact } from "@/lib/alertUtils";
 
 export interface Category {
   id: string;
@@ -17,6 +18,9 @@ interface FastExpenseModalProps {
   categories: Category[];
   userId: string;
   onExpenseAdded: () => void;
+  currentSafeToSpend?: number;
+  recentTransactions?: Array<{ category_id: string | null; amount: number; type: string }>;
+  onAlertTriggered?: (alertMessage: string) => void;
 }
 
 export default function FastExpenseModal({
@@ -25,6 +29,9 @@ export default function FastExpenseModal({
   categories,
   userId,
   onExpenseAdded,
+  currentSafeToSpend = 0,
+  recentTransactions = [],
+  onAlertTriggered,
 }: FastExpenseModalProps) {
   const [amountRupees, setAmountRupees] = useState<string>("");
   const [selectedCategoryId, setSelectedCategoryId] = useState<string>(
@@ -35,6 +42,26 @@ export default function FastExpenseModal({
   const [showDetails, setShowDetails] = useState<boolean>(false);
   const [loading, setLoading] = useState<boolean>(false);
   const [errorMsg, setErrorMsg] = useState<string>("");
+  const [postSubmitWarning, setPostSubmitWarning] = useState<string | null>(null);
+
+  const selectedCategory = useMemo(() => {
+    return categories.find((c) => c.id === selectedCategoryId);
+  }, [categories, selectedCategoryId]);
+
+  // Current spending in this category
+  const currentCategorySpent = useMemo(() => {
+    return recentTransactions
+      .filter((t) => t.type === "expense" && t.category_id === selectedCategoryId)
+      .reduce((sum, t) => sum + Number(t.amount), 0);
+  }, [recentTransactions, selectedCategoryId]);
+
+  // Real-time impact preview calculation
+  const impact = useMemo(() => {
+    const parsed = parseFloat(amountRupees);
+    if (isNaN(parsed) || parsed <= 0) return null;
+    const amountPaise = Math.round(parsed * 100);
+    return checkExpenseImpact(amountPaise, selectedCategory, currentCategorySpent, currentSafeToSpend);
+  }, [amountRupees, selectedCategory, currentCategorySpent, currentSafeToSpend]);
 
   if (!isOpen) return null;
 
@@ -74,6 +101,11 @@ export default function FastExpenseModal({
         throw error;
       }
 
+      // If an alert was triggered by this expense, notify parent
+      if (impact?.message && onAlertTriggered) {
+        onAlertTriggered(impact.message);
+      }
+
       // Reset and trigger refresh
       setAmountRupees("");
       setNote("");
@@ -108,6 +140,24 @@ export default function FastExpenseModal({
           {errorMsg && (
             <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-medium">
               {errorMsg}
+            </div>
+          )}
+
+          {/* Real-time Alert Impact Preview (Phase 4 requirement) */}
+          {impact?.message && (
+            <div
+              className={`p-3 rounded-2xl border text-xs flex items-start gap-2.5 animate-in fade-in ${
+                impact.triggers100 || impact.threatensSavings
+                  ? "bg-rose-50 border-rose-200 text-rose-900"
+                  : "bg-amber-50 border-amber-200 text-amber-900"
+              }`}
+            >
+              {impact.triggers100 || impact.threatensSavings ? (
+                <ShieldAlert className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+              ) : (
+                <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+              )}
+              <span className="font-semibold leading-relaxed">{impact.message}</span>
             </div>
           )}
 
@@ -158,9 +208,17 @@ export default function FastExpenseModal({
 
           {/* TAP 2: Category Selector */}
           <div>
-            <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-2">
-              2. Select Category
-            </label>
+            <div className="flex items-center justify-between mb-2">
+              <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500">
+                2. Select Category
+              </label>
+              {selectedCategory && selectedCategory.monthly_limit > 0 && (
+                <span className="text-[11px] text-slate-500">
+                  Limit: ₹{Math.round(selectedCategory.monthly_limit / 100).toLocaleString("en-IN")}
+                </span>
+              )}
+            </div>
+
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 max-h-48 overflow-y-auto pr-1">
               {categories.map((c) => {
                 const isSelected = selectedCategoryId === c.id;
@@ -246,7 +304,11 @@ export default function FastExpenseModal({
             id="save-expense-btn"
             disabled={loading}
             onClick={() => handleSubmit()}
-            className="flex-[2] py-3 px-4 rounded-xl text-white bg-emerald-600 hover:bg-emerald-700 text-sm font-semibold transition-all shadow-md shadow-emerald-600/25 flex items-center justify-center gap-2 disabled:opacity-60"
+            className={`flex-[2] py-3 px-4 rounded-xl text-white text-sm font-semibold transition-all shadow-md flex items-center justify-center gap-2 disabled:opacity-60 ${
+              impact?.triggers100 || impact?.threatensSavings
+                ? "bg-rose-600 hover:bg-rose-700 shadow-rose-600/25"
+                : "bg-emerald-600 hover:bg-emerald-700 shadow-emerald-600/25"
+            }`}
           >
             {loading ? (
               <>
@@ -265,4 +327,3 @@ export default function FastExpenseModal({
     </div>
   );
 }
-

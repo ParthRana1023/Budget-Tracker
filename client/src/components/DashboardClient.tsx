@@ -17,7 +17,8 @@ import {
   CheckCircle2,
   LogOut,
   Clock,
-  ShieldAlert
+  ShieldAlert,
+  Bell
 } from "lucide-react";
 import FastExpenseModal, { Category } from "./FastExpenseModal";
 import IncomeModal from "./IncomeModal";
@@ -26,12 +27,14 @@ import TransactionList from "./TransactionList";
 import EditTransactionModal, { TransactionItem } from "./EditTransactionModal";
 import CategoryProgress from "./CategoryProgress";
 import BurnRateCard from "./BurnRateCard";
+import AlertBanner from "./AlertBanner";
 import { 
   getPeriodRange, 
   computeCategoryBudgets, 
   computeBurnRate, 
   formatINR 
 } from "@/lib/budgetUtils";
+import { getCategoryLimitAlerts, getSavingsTargetAlert, BudgetAlert } from "@/lib/alertUtils";
 
 interface DashboardClientProps {
   initialUser: { id: string; email?: string };
@@ -62,6 +65,7 @@ export default function DashboardClient({
   const [isIncomeOpen, setIsIncomeOpen] = useState(false);
   const [isCategoryOpen, setIsCategoryOpen] = useState(false);
   const [editingTransaction, setEditingTransaction] = useState<TransactionItem | null>(null);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   // Current period computation based on month_start_day
   const period = useMemo(() => {
@@ -139,8 +143,30 @@ export default function DashboardClient({
     return computeBurnRate(totalFlexibleBudget, flexibleSpent, period);
   }, [totalFlexibleBudget, flexibleSpent, period]);
 
-  // Over-budget alerts count
-  const criticalCategories = categoryBudgets.filter((c) => c.status === "exceeded" || c.status === "danger");
+  // Phase 4: Compute all active alerts (80%, 100%, and Savings Target Threats)
+  const activeAlerts = useMemo(() => {
+    const categoryAlerts = getCategoryLimitAlerts(categories, currentPeriodTransactions);
+    const savingsAlert = getSavingsTargetAlert({
+      confirmedIncome,
+      targetSavings,
+      budgetedFixedBills,
+      paidFixedBills,
+      flexibleSpent,
+      projectedFlexibleTotal: burnRate.projectedEndOfMonth,
+    });
+
+    const allAlerts: BudgetAlert[] = [];
+    if (savingsAlert) allAlerts.push(savingsAlert);
+    allAlerts.push(...categoryAlerts);
+    return allAlerts;
+  }, [categories, currentPeriodTransactions, confirmedIncome, targetSavings, budgetedFixedBills, paidFixedBills, flexibleSpent, burnRate.projectedEndOfMonth]);
+
+  const handleAlertTriggered = (msg: string) => {
+    setToastMessage(msg);
+    setTimeout(() => {
+      setToastMessage(null);
+    }, 6000);
+  };
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col pb-24 sm:pb-12">
@@ -174,6 +200,23 @@ export default function DashboardClient({
 
       {/* Main Container */}
       <main className="flex-1 max-w-6xl w-full mx-auto px-4 sm:px-8 py-6 space-y-6">
+        {/* Instant Toast Notification (Phase 4 requirement: shown immediately when you add an expense) */}
+        {toastMessage && (
+          <div className="fixed top-16 right-4 sm:right-8 z-50 max-w-md p-4 rounded-2xl bg-slate-900 text-white text-xs shadow-2xl border border-slate-700 flex items-start gap-3 animate-in slide-in-from-top-4 duration-200">
+            <Bell className="w-4 h-4 text-amber-400 shrink-0 mt-0.5 animate-bounce" />
+            <div className="flex-1">
+              <span className="font-bold block text-slate-100 mb-0.5">Budget Warning Triggered</span>
+              <p className="text-slate-300 leading-relaxed">{toastMessage}</p>
+            </div>
+            <button
+              onClick={() => setToastMessage(null)}
+              className="text-slate-400 hover:text-white"
+            >
+              ✕
+            </button>
+          </div>
+        )}
+
         {/* Cycle Banner & Action Row */}
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
           <div className="flex items-center gap-2 text-xs font-semibold text-slate-600 bg-white px-3.5 py-2 rounded-xl border border-slate-200 shadow-xs">
@@ -210,21 +253,9 @@ export default function DashboardClient({
           </div>
         </div>
 
-        {/* Critical Alerts Banner (if any category exceeds or approaches limits) */}
-        {criticalCategories.length > 0 && (
-          <div className="p-4 rounded-2xl bg-rose-50 border border-rose-200 text-rose-800 text-xs space-y-1 animate-in fade-in">
-            <div className="flex items-center gap-2 font-bold text-rose-900">
-              <ShieldAlert className="w-4 h-4 text-rose-600" />
-              <span>Budget Limit Alerts ({criticalCategories.length} Categories)</span>
-            </div>
-            <p className="text-rose-700 leading-relaxed">
-              {criticalCategories.map((c) => (
-                <span key={c.id} className="mr-3 font-medium">
-                  • <strong>{c.name}</strong>: {formatINR(c.spent)} of {formatINR(c.monthlyLimit)} ({Math.round(c.percentUsed)}%)
-                </span>
-              ))}
-            </p>
-          </div>
+        {/* Phase 4 Active Alerts Banner (80%, 100%, & Savings Target Threat) */}
+        {activeAlerts.length > 0 && (
+          <AlertBanner alerts={activeAlerts} />
         )}
 
         {/* Hero Safe-To-Spend Card */}
@@ -269,7 +300,7 @@ export default function DashboardClient({
           </div>
         </div>
 
-        {/* Variable Pay Holding Bucket (Phase 3 Requirement: Shown as "Not counted yet") */}
+        {/* Variable Pay Holding Bucket (Shown as "Not counted yet") */}
         <div className="bg-amber-50/70 border border-amber-200/80 rounded-2xl p-4 sm:p-5 flex items-start gap-3.5">
           <div className="w-8 h-8 rounded-lg bg-amber-100 text-amber-800 flex items-center justify-center shrink-0 mt-0.5">
             <AlertCircle className="w-4 h-4" />
@@ -295,7 +326,7 @@ export default function DashboardClient({
           dailyAllowance={dailyAllowance}
         />
 
-        {/* Phase 3 Category Progress Bars Grid */}
+        {/* Category Progress Bars Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <CategoryProgress categoryBudgets={categoryBudgets} type="flexible" />
           <CategoryProgress categoryBudgets={categoryBudgets} type="fixed" />
@@ -320,13 +351,16 @@ export default function DashboardClient({
         </button>
       </div>
 
-      {/* Modals */}
+      {/* Modals with Immediate Alert feedback */}
       <FastExpenseModal
         isOpen={isExpenseOpen}
         onClose={() => setIsExpenseOpen(false)}
         categories={categories}
         userId={initialUser.id}
         onExpenseAdded={refreshData}
+        currentSafeToSpend={safeToSpend}
+        recentTransactions={currentPeriodTransactions}
+        onAlertTriggered={handleAlertTriggered}
       />
 
       <IncomeModal
