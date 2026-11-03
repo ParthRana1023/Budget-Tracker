@@ -1,5 +1,5 @@
 /**
- * Budget period and burn rate utilities for the client.
+ * Budget period, burn rate, and savings goal utilities for the client.
  * All monetary values are in paise (integer minor units).
  */
 
@@ -151,3 +151,40 @@ export function computeBurnRate(
   };
 }
 
+/**
+ * Phase 5: Calculates "Needed per month to hit the target date" for a savings goal.
+ */
+export function calculateNeededPerMonth(
+  targetAmount: number,
+  currentAmount: number,
+  targetDateStr: string | null | undefined,
+  referenceDate: Date = new Date()
+): {
+  neededPerMonth: number;
+  monthsRemaining: number;
+  isPastDeadline: boolean;
+  isCompleted: boolean;
+} {
+  const remaining = Math.max(0, targetAmount - currentAmount);
+  if (remaining <= 0) {
+    return { neededPerMonth: 0, monthsRemaining: 0, isPastDeadline: false, isCompleted: true };
+  }
+
+  if (!targetDateStr) {
+    return { neededPerMonth: Math.round(remaining / 12), monthsRemaining: 12, isPastDeadline: false, isCompleted: false };
+  }
+
+  const targetDate = new Date(targetDateStr);
+  const now = referenceDate;
+
+  const yearDiff = targetDate.getFullYear() - now.getFullYear();
+  const monthDiff = targetDate.getMonth() - now.getMonth();
+  const totalMonths = yearDiff * 12 + monthDiff;
+
+  if (totalMonths <= 0) {
+    return { neededPerMonth: remaining, monthsRemaining: 0, isPastDeadline: true, isCompleted: false };
+  }
+
+  const neededPerMonth = Math.round(remaining / totalMonths);
+  return { neededPerMonth, monthsRemaining: totalMonths, isPastDeadline: false, isCompleted: false };
+}

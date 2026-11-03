@@ -69,9 +69,27 @@ export default async function DashboardPage() {
     .eq("user_id", user.id);
 
   // Fetch savings goals
-  const { data: savingsGoals } = await supabase
+  let { data: savingsGoals } = await supabase
     .from("savings_goals")
     .select("*")
+    .eq("user_id", user.id);
+
+  if (!savingsGoals || savingsGoals.length === 0) {
+    const { data: starterGoal } = await supabase
+      .from("savings_goals")
+      .insert([
+        { user_id: user.id, name: "Emergency Fund", target_amount: 10000000 }, // ₹1,00,000 starter goal
+      ])
+      .select();
+    if (starterGoal) {
+      savingsGoals = starterGoal;
+    }
+  }
+
+  // Fetch goal contributions
+  const { data: contributions } = await supabase
+    .from("goal_contributions")
+    .select("goal_id, amount, date")
     .eq("user_id", user.id);
 
   return (
@@ -82,6 +100,7 @@ export default async function DashboardPage() {
       initialTransactions={(transactions || []) as any}
       initialIncomeSources={incomeSources || []}
       initialSavingsGoals={savingsGoals || []}
+      initialContributions={contributions || []}
     />
   );
 }

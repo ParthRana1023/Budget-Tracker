@@ -18,7 +18,8 @@ import {
   LogOut,
   Clock,
   ShieldAlert,
-  Bell
+  Bell,
+  PartyPopper
 } from "lucide-react";
 import FastExpenseModal, { Category } from "./FastExpenseModal";
 import IncomeModal from "./IncomeModal";
@@ -28,6 +29,8 @@ import EditTransactionModal, { TransactionItem } from "./EditTransactionModal";
 import CategoryProgress from "./CategoryProgress";
 import BurnRateCard from "./BurnRateCard";
 import AlertBanner from "./AlertBanner";
+import SavingsGoalsSection, { SavingsGoal } from "./SavingsGoalsSection";
+import WindfallAllocationModal from "./WindfallAllocationModal";
 import { 
   getPeriodRange, 
   computeCategoryBudgets, 
@@ -43,6 +46,7 @@ interface DashboardClientProps {
   initialTransactions: TransactionItem[];
   initialIncomeSources: any[];
   initialSavingsGoals: any[];
+  initialContributions: Array<{ goal_id: string; amount: number; date?: string }>;
 }
 
 export default function DashboardClient({
@@ -52,12 +56,14 @@ export default function DashboardClient({
   initialTransactions,
   initialIncomeSources,
   initialSavingsGoals,
+  initialContributions,
 }: DashboardClientProps) {
   const router = useRouter();
   const [categories, setCategories] = useState<Category[]>(initialCategories);
   const [transactions, setTransactions] = useState<TransactionItem[]>(initialTransactions);
   const [incomeSources, setIncomeSources] = useState<any[]>(initialIncomeSources);
   const [savingsGoals, setSavingsGoals] = useState<any[]>(initialSavingsGoals);
+  const [contributions, setContributions] = useState<any[]>(initialContributions);
   const [settings] = useState(initialSettings);
 
   // Modals state
@@ -65,6 +71,7 @@ export default function DashboardClient({
   const [isIncomeOpen, setIsIncomeOpen] = useState(false);
   const [isCategoryOpen, setIsCategoryOpen] = useState(false);
   const [editingTransaction, setEditingTransaction] = useState<TransactionItem | null>(null);
+  const [windfallToAllocate, setWindfallToAllocate] = useState<{ id: string; name: string; amount: number } | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   // Current period computation based on month_start_day
@@ -83,7 +90,7 @@ export default function DashboardClient({
   const refreshData = async () => {
     const supabase = createClient();
 
-    const [catRes, txRes, incRes, goalRes] = await Promise.all([
+    const [catRes, txRes, incRes, goalRes, contribRes] = await Promise.all([
       supabase.from("categories").select("*").eq("user_id", initialUser.id).order("name"),
       supabase
         .from("transactions")
@@ -92,12 +99,14 @@ export default function DashboardClient({
         .order("date", { ascending: false }),
       supabase.from("income_sources").select("*").eq("user_id", initialUser.id),
       supabase.from("savings_goals").select("*").eq("user_id", initialUser.id),
+      supabase.from("goal_contributions").select("goal_id, amount, date").eq("user_id", initialUser.id),
     ]);
 
     if (catRes.data) setCategories(catRes.data as any);
     if (txRes.data) setTransactions(txRes.data as any);
     if (incRes.data) setIncomeSources(incRes.data);
     if (goalRes.data) setSavingsGoals(goalRes.data);
+    if (contribRes.data) setContributions(contribRes.data);
   };
 
   // Safe to spend math
@@ -105,10 +114,14 @@ export default function DashboardClient({
     .filter((i) => i.status === "received")
     .reduce((sum, i) => sum + Number(i.amount), 0);
 
-  // Unreceived variable pay (isolated in holding bucket)
-  const unreceivedVariable = incomeSources
-    .filter((i) => i.type === "variable" && i.status === "expected")
-    .reduce((sum, i) => sum + Number(i.amount), 0);
+  // Expected Variable Pay items
+  const expectedVariableSources = incomeSources.filter(
+    (i) => i.type === "variable" && i.status === "expected"
+  );
+  const unreceivedVariable = expectedVariableSources.reduce(
+    (sum, i) => sum + Number(i.amount),
+    0
+  );
 
   const fixedCategories = categories.filter((c) => c.type === "fixed");
   const flexibleCategories = categories.filter((c) => c.type === "flexible");
@@ -126,7 +139,21 @@ export default function DashboardClient({
     .filter((t) => t.type === "expense" && t.category?.type === "flexible")
     .reduce((sum, t) => sum + Number(t.amount), 0);
 
-  const targetSavings = savingsGoals.reduce((sum, g) => sum + (Number(g.target_amount) > 0 ? 1000000 : 0), 0);
+  // Total savings contributions made in this active cycle
+  const startStr = period.startDate.toISOString().split("T")[0];
+  const endStr = period.endDate.toISOString().split("T")[0];
+  const cycleSavingsContributions = contributions
+    .filter((c) => {
+      const d = c.date || "";
+      return d >= startStr && d <= endStr;
+    })
+    .reduce((sum, c) => sum + Number(c.amount), 0);
+
+  // Default baseline savings target if no contributions yet, or actual cycle contributions
+  const targetSavings = Math.max(
+    cycleSavingsContributions,
+    savingsGoals.length > 0 ? 1000000 : 0
+  );
 
   // Core formula: Safe to spend = Confirmed Income − Target Savings − Remaining Unpaid Fixed Bills − Flexible Spent
   const safeToSpend = confirmedIncome - targetSavings - remainingFixedBills - flexibleSpent;
@@ -143,7 +170,7 @@ export default function DashboardClient({
     return computeBurnRate(totalFlexibleBudget, flexibleSpent, period);
   }, [totalFlexibleBudget, flexibleSpent, period]);
 
-  // Phase 4: Compute all active alerts (80%, 100%, and Savings Target Threats)
+  // Compute active alerts
   const activeAlerts = useMemo(() => {
     const categoryAlerts = getCategoryLimitAlerts(categories, currentPeriodTransactions);
     const savingsAlert = getSavingsTargetAlert({
@@ -200,7 +227,7 @@ export default function DashboardClient({
 
       {/* Main Container */}
       <main className="flex-1 max-w-6xl w-full mx-auto px-4 sm:px-8 py-6 space-y-6">
-        {/* Instant Toast Notification (Phase 4 requirement: shown immediately when you add an expense) */}
+        {/* Instant Toast Notification */}
         {toastMessage && (
           <div className="fixed top-16 right-4 sm:right-8 z-50 max-w-md p-4 rounded-2xl bg-slate-900 text-white text-xs shadow-2xl border border-slate-700 flex items-start gap-3 animate-in slide-in-from-top-4 duration-200">
             <Bell className="w-4 h-4 text-amber-400 shrink-0 mt-0.5 animate-bounce" />
@@ -253,7 +280,7 @@ export default function DashboardClient({
           </div>
         </div>
 
-        {/* Phase 4 Active Alerts Banner (80%, 100%, & Savings Target Threat) */}
+        {/* Active Alerts Banner */}
         {activeAlerts.length > 0 && (
           <AlertBanner alerts={activeAlerts} />
         )}
@@ -300,23 +327,43 @@ export default function DashboardClient({
           </div>
         </div>
 
-        {/* Variable Pay Holding Bucket (Shown as "Not counted yet") */}
-        <div className="bg-amber-50/70 border border-amber-200/80 rounded-2xl p-4 sm:p-5 flex items-start gap-3.5">
-          <div className="w-8 h-8 rounded-lg bg-amber-100 text-amber-800 flex items-center justify-center shrink-0 mt-0.5">
-            <AlertCircle className="w-4 h-4" />
-          </div>
-          <div className="flex-1">
-            <div className="flex flex-wrap items-center justify-between gap-1">
-              <h4 className="font-semibold text-slate-900 text-sm">
-                Variable Pay Holding Bucket (Not Counted Yet)
-              </h4>
-              <span className="font-bold text-amber-900 text-sm">{formatINR(unreceivedVariable)}</span>
+        {/* Variable Pay Holding Bucket Banner with Windfall Allocation trigger */}
+        <div className="bg-amber-50/70 border border-amber-200/80 rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <div className="flex items-start gap-3.5">
+            <div className="w-8 h-8 rounded-lg bg-amber-100 text-amber-800 flex items-center justify-center shrink-0 mt-0.5">
+              <AlertCircle className="w-4 h-4" />
             </div>
-            <p className="text-xs text-slate-600 mt-1">
-              Variable year-end bonuses and incentives are tracked as expected and <strong>excluded</strong> from your monthly safe-to-spend until actually deposited into your bank account.
-            </p>
+            <div>
+              <div className="flex items-center gap-2">
+                <h4 className="font-semibold text-slate-900 text-sm">
+                  Variable Pay Holding Bucket (Not Counted Yet)
+                </h4>
+                <span className="font-bold text-amber-900 text-sm">{formatINR(unreceivedVariable)}</span>
+              </div>
+              <p className="text-xs text-slate-600 mt-0.5">
+                Year-end bonuses and variable incentives stay isolated until received.
+              </p>
+            </div>
           </div>
+
+          {expectedVariableSources.length > 0 && (
+            <button
+              onClick={() => setWindfallToAllocate(expectedVariableSources[0])}
+              className="px-3.5 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-semibold shadow-xs flex items-center gap-1.5 transition-colors shrink-0"
+            >
+              <PartyPopper className="w-3.5 h-3.5" />
+              <span>Mark Received & Allocate</span>
+            </button>
+          )}
         </div>
+
+        {/* Phase 5 Savings Goals Section */}
+        <SavingsGoalsSection
+          goals={savingsGoals}
+          contributions={contributions}
+          userId={initialUser.id}
+          onGoalsUpdated={refreshData}
+        />
 
         {/* Pacing & Burn Rate Card */}
         <BurnRateCard
@@ -351,7 +398,7 @@ export default function DashboardClient({
         </button>
       </div>
 
-      {/* Modals with Immediate Alert feedback */}
+      {/* Modals */}
       <FastExpenseModal
         isOpen={isExpenseOpen}
         onClose={() => setIsExpenseOpen(false)}
@@ -384,6 +431,16 @@ export default function DashboardClient({
         transaction={editingTransaction}
         categories={categories}
         onTransactionUpdated={refreshData}
+      />
+
+      {/* Phase 5 Windfall Allocation Modal */}
+      <WindfallAllocationModal
+        isOpen={!!windfallToAllocate}
+        onClose={() => setWindfallToAllocate(null)}
+        incomeSource={windfallToAllocate}
+        savingsGoals={savingsGoals}
+        userId={initialUser.id}
+        onAllocated={refreshData}
       />
     </div>
   );
