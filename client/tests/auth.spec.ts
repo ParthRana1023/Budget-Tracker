@@ -3,7 +3,7 @@ import { test, expect } from "@playwright/test";
 test.describe("Authentication and Landing Flow", () => {
   test("landing page renders hero and navigation links", async ({ page }) => {
     await page.goto("/");
-    await expect(page.locator("text=SafeFirst")).toBeVisible();
+    await expect(page.locator("text=SaveFirst")).toBeVisible();
     await expect(page.locator("text=Savings-First Personal Budgeting")).toBeVisible();
     await expect(page.locator("text=safe to spend")).toBeVisible();
 

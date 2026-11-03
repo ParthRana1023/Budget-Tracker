@@ -91,6 +91,8 @@ export default function DashboardClient({
   const period = useMemo(() => {
     return getPeriodRange(new Date(), settings?.month_start_day || 1);
   }, [settings?.month_start_day]);
+  const startStr = period.startDate.toISOString().split("T")[0];
+  const endStr = period.endDate.toISOString().split("T")[0];
 
   // Filter transactions within active billing cycle
   const currentPeriodTransactions = useMemo(() => {
@@ -107,7 +109,7 @@ export default function DashboardClient({
       supabase.from("categories").select("*").eq("user_id", initialUser.id).order("name"),
       supabase
         .from("transactions")
-        .select("id, category_id, amount, type, date, note, category:categories(name, type)")
+        .select("id, category_id, amount, type, date, note, external_id, category:categories(name, type)")
         .eq("user_id", initialUser.id)
         .order("date", { ascending: false }),
       supabase.from("income_sources").select("*").eq("user_id", initialUser.id),
@@ -126,12 +128,12 @@ export default function DashboardClient({
 
   // Safe to spend math
   const confirmedIncome = incomeSources
-    .filter((i) => i.status === "received")
+    .filter((i) => i.status === "received" && i.received_date >= startStr && i.received_date <= endStr)
     .reduce((sum, i) => sum + Number(i.amount), 0);
 
   // Expected Variable Pay items
   const expectedVariableSources = incomeSources.filter(
-    (i) => i.type === "variable" && i.status === "expected"
+    (i) => i.type === "variable" && i.status === "expected" && i.expected_date >= startStr && i.expected_date <= endStr
   );
   const unreceivedVariable = expectedVariableSources.reduce(
     (sum, i) => sum + Number(i.amount),
@@ -155,8 +157,6 @@ export default function DashboardClient({
     .reduce((sum, t) => sum + Number(t.amount), 0);
 
   // Total savings contributions made in this active cycle
-  const startStr = period.startDate.toISOString().split("T")[0];
-  const endStr = period.endDate.toISOString().split("T")[0];
   const cycleSavingsContributions = contributions
     .filter((c) => {
       const d = c.date || "";
@@ -164,10 +164,7 @@ export default function DashboardClient({
     })
     .reduce((sum, c) => sum + Number(c.amount), 0);
 
-  const targetSavings = Math.max(
-    cycleSavingsContributions,
-    savingsGoals.length > 0 ? 1000000 : 0
-  );
+  const targetSavings = cycleSavingsContributions;
 
   // Core formula: Safe to spend = Confirmed Income − Target Savings − Remaining Unpaid Fixed Bills − Flexible Spent
   const safeToSpend = confirmedIncome - targetSavings - remainingFixedBills - flexibleSpent;

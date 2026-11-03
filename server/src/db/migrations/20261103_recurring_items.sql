@@ -11,3 +11,4 @@ create table if not exists public.recurring_items (
 );
 alter table public.recurring_items enable row level security;
 create policy "Users can manage their own recurring items" on public.recurring_items for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+create unique index if not exists idx_transactions_recurring_month on public.transactions (user_id, external_id) where external_id like 'recurring:%';

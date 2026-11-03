@@ -14,7 +14,7 @@ BEGIN
   insert into public.categories (user_id, name, type, monthly_limit) values
     (v_user_id, 'Rent / Housing', 'fixed', 2500000), -- 25,000 INR
     (v_user_id, 'Utilities & Bills', 'fixed', 500000), -- 5,000 INR
-    (v_user_id, 'EMI & Loans', 'fixed', 1500000), -- 15,000 INR
+    (v_user_id, 'EMI / Loans', 'fixed', 1500000), -- 15,000 INR
     (v_user_id, 'Insurance', 'fixed', 300000), -- 3,000 INR
     (v_user_id, 'Subscriptions', 'fixed', 150000) -- 1,500 INR
   on conflict do nothing;
@@ -23,7 +23,7 @@ BEGIN
   insert into public.categories (user_id, name, type, monthly_limit) values
     (v_user_id, 'Groceries', 'flexible', 1200000), -- 12,000 INR
     (v_user_id, 'Food & Dining Out', 'flexible', 800000), -- 8,000 INR
-    (v_user_id, 'Transport & Fuel', 'flexible', 500000), -- 5,000 INR
+    (v_user_id, 'Transport / Fuel', 'flexible', 500000), -- 5,000 INR
     (v_user_id, 'Shopping', 'flexible', 600000), -- 6,000 INR
     (v_user_id, 'Entertainment', 'flexible', 400000), -- 4,000 INR
     (v_user_id, 'Health', 'flexible', 300000), -- 3,000 INR

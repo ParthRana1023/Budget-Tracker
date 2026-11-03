@@ -1,8 +1,8 @@
 import { createServerClient } from "@supabase/ssr";
 import { type NextRequest, NextResponse } from "next/server";
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "https://clfeauivpjqwkbsqcwiq.supabase.co";
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || "sb_publishable_qUCtsDH2mNhVuzP1aV9Dqg_uXW2wiGk";
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!;
 
 export const updateSession = async (request: NextRequest) => {
   let supabaseResponse = NextResponse.next({
@@ -38,7 +38,7 @@ export const updateSession = async (request: NextRequest) => {
 
   // If user is not signed in and trying to access protected routes, redirect to /login
   const isAuthPage = request.nextUrl.pathname.startsWith("/login") || request.nextUrl.pathname.startsWith("/signup");
-  const isPublicPage = request.nextUrl.pathname === "/" || request.nextUrl.pathname.startsWith("/api");
+  const isPublicPage = request.nextUrl.pathname === "/" || request.nextUrl.pathname.startsWith("/api") || request.nextUrl.pathname.startsWith("/auth/");
 
   if (!user && !isAuthPage && !isPublicPage) {
     const url = request.nextUrl.clone();

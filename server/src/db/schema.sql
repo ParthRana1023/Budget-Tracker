@@ -127,6 +127,22 @@ create policy "Users can manage their own goal contributions"
   using (auth.uid() = user_id)
   with check (auth.uid() = user_id);
 
+-- 7. RECURRING ITEMS TABLE
+create table if not exists public.recurring_items (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users(id) on delete cascade,
+  name text not null,
+  amount bigint not null check (amount > 0),
+  type text not null check (type in ('expense', 'income')),
+  category_id uuid references public.categories(id) on delete set null,
+  day_of_month smallint not null check (day_of_month between 1 and 28),
+  active boolean not null default true,
+  created_at timestamptz not null default now()
+);
+alter table public.recurring_items enable row level security;
+create policy "Users can manage their own recurring items" on public.recurring_items for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+create unique index if not exists idx_transactions_recurring_month on public.transactions (user_id, external_id) where external_id like 'recurring:%';
+
 -- AUTOMATIC SEED FUNCTION FOR NEW USERS
 create or replace function public.handle_new_user()
 returns trigger as $$
@@ -141,7 +157,7 @@ begin
   insert into public.categories (user_id, name, type, monthly_limit) values
     (new.id, 'Rent / Housing', 'fixed', 0),
     (new.id, 'Utilities & Bills', 'fixed', 0),
-    (new.id, 'EMI & Loans', 'fixed', 0),
+    (new.id, 'EMI / Loans', 'fixed', 0),
     (new.id, 'Insurance', 'fixed', 0),
     (new.id, 'Subscriptions', 'fixed', 0);
 
@@ -149,7 +165,7 @@ begin
   insert into public.categories (user_id, name, type, monthly_limit) values
     (new.id, 'Groceries', 'flexible', 0),
     (new.id, 'Food & Dining Out', 'flexible', 0),
-    (new.id, 'Transport & Fuel', 'flexible', 0),
+    (new.id, 'Transport / Fuel', 'flexible', 0),
     (new.id, 'Shopping', 'flexible', 0),
     (new.id, 'Entertainment', 'flexible', 0),
     (new.id, 'Health', 'flexible', 0),

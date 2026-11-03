@@ -12,6 +12,7 @@ export interface TransactionItem {
   type: "expense" | "income" | "savings_transfer";
   date: string;
   note: string | null;
+  external_id?: string | null;
   category?: { name: string; type: "fixed" | "flexible" } | null;
 }
 
