@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/utils/supabase/client";
 import { 
@@ -15,13 +15,23 @@ import {
   Sparkles,
   Wallet,
   CheckCircle2,
-  LogOut
+  LogOut,
+  Clock,
+  ShieldAlert
 } from "lucide-react";
 import FastExpenseModal, { Category } from "./FastExpenseModal";
 import IncomeModal from "./IncomeModal";
 import CategoryManagementModal from "./CategoryManagementModal";
 import TransactionList from "./TransactionList";
 import EditTransactionModal, { TransactionItem } from "./EditTransactionModal";
+import CategoryProgress from "./CategoryProgress";
+import BurnRateCard from "./BurnRateCard";
+import { 
+  getPeriodRange, 
+  computeCategoryBudgets, 
+  computeBurnRate, 
+  formatINR 
+} from "@/lib/budgetUtils";
 
 interface DashboardClientProps {
   initialUser: { id: string; email?: string };
@@ -53,6 +63,18 @@ export default function DashboardClient({
   const [isCategoryOpen, setIsCategoryOpen] = useState(false);
   const [editingTransaction, setEditingTransaction] = useState<TransactionItem | null>(null);
 
+  // Current period computation based on month_start_day
+  const period = useMemo(() => {
+    return getPeriodRange(new Date(), settings?.month_start_day || 1);
+  }, [settings?.month_start_day]);
+
+  // Filter transactions within active billing cycle
+  const currentPeriodTransactions = useMemo(() => {
+    const startStr = period.startDate.toISOString().split("T")[0];
+    const endStr = period.endDate.toISOString().split("T")[0];
+    return transactions.filter((t) => t.date >= startStr && t.date <= endStr);
+  }, [transactions, period]);
+
   // Function to refresh state from Supabase
   const refreshData = async () => {
     const supabase = createClient();
@@ -79,6 +101,7 @@ export default function DashboardClient({
     .filter((i) => i.status === "received")
     .reduce((sum, i) => sum + Number(i.amount), 0);
 
+  // Unreceived variable pay (isolated in holding bucket)
   const unreceivedVariable = incomeSources
     .filter((i) => i.type === "variable" && i.status === "expected")
     .reduce((sum, i) => sum + Number(i.amount), 0);
@@ -88,14 +111,14 @@ export default function DashboardClient({
 
   const budgetedFixedBills = fixedCategories.reduce((sum, c) => sum + Number(c.monthly_limit), 0);
 
-  // Spent so far
-  const paidFixedBills = transactions
+  // Current cycle spent figures
+  const paidFixedBills = currentPeriodTransactions
     .filter((t) => t.type === "expense" && t.category?.type === "fixed")
     .reduce((sum, t) => sum + Number(t.amount), 0);
 
   const remainingFixedBills = Math.max(0, budgetedFixedBills - paidFixedBills);
 
-  const flexibleSpent = transactions
+  const flexibleSpent = currentPeriodTransactions
     .filter((t) => t.type === "expense" && t.category?.type === "flexible")
     .reduce((sum, t) => sum + Number(t.amount), 0);
 
@@ -103,17 +126,26 @@ export default function DashboardClient({
 
   // Core formula: Safe to spend = Confirmed Income − Target Savings − Remaining Unpaid Fixed Bills − Flexible Spent
   const safeToSpend = confirmedIncome - targetSavings - remainingFixedBills - flexibleSpent;
-  const daysInPeriod = 30;
-  const dailyAllowance = safeToSpend > 0 ? Math.floor(safeToSpend / daysInPeriod) : 0;
+  const dailyAllowance = safeToSpend > 0 ? Math.floor(safeToSpend / period.daysRemaining) : 0;
 
-  const formatINR = (paise: number) => {
-    return `₹${Math.round(paise / 100).toLocaleString("en-IN")}`;
-  };
+  // Compute per-category progress
+  const categoryBudgets = useMemo(() => {
+    return computeCategoryBudgets(categories, currentPeriodTransactions);
+  }, [categories, currentPeriodTransactions]);
+
+  // Compute flexible budget burn rate metrics
+  const totalFlexibleBudget = flexibleCategories.reduce((sum, c) => sum + Number(c.monthly_limit), 0);
+  const burnRate = useMemo(() => {
+    return computeBurnRate(totalFlexibleBudget, flexibleSpent, period);
+  }, [totalFlexibleBudget, flexibleSpent, period]);
+
+  // Over-budget alerts count
+  const criticalCategories = categoryBudgets.filter((c) => c.status === "exceeded" || c.status === "danger");
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col pb-24 sm:pb-12">
       {/* Top Navbar */}
-      <header className="bg-white border-b border-slate-200 px-4 sm:px-8 py-3 sticky top-0 z-40 flex items-center justify-between">
+      <header className="bg-white border-b border-slate-200 px-4 sm:px-8 py-3.5 sticky top-0 z-40 flex items-center justify-between">
         <div className="flex items-center gap-2.5">
           <div className="w-8 h-8 rounded-xl bg-emerald-600 flex items-center justify-center text-white shadow-xs">
             <PiggyBank className="w-5 h-5" />
@@ -142,13 +174,20 @@ export default function DashboardClient({
 
       {/* Main Container */}
       <main className="flex-1 max-w-6xl w-full mx-auto px-4 sm:px-8 py-6 space-y-6">
-        {/* Quick Action Buttons Row */}
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="flex items-center gap-2">
+        {/* Cycle Banner & Action Row */}
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+          <div className="flex items-center gap-2 text-xs font-semibold text-slate-600 bg-white px-3.5 py-2 rounded-xl border border-slate-200 shadow-xs">
+            <Calendar className="w-4 h-4 text-emerald-600" />
+            <span>
+              Active Cycle: <strong>{period.periodLabel}</strong> ({period.daysRemaining} days left)
+            </span>
+          </div>
+
+          <div className="flex items-center gap-2 w-full sm:w-auto">
             <button
               id="open-fast-expense-btn"
               onClick={() => setIsExpenseOpen(true)}
-              className="px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs sm:text-sm shadow-md shadow-emerald-600/25 flex items-center gap-2 transition-all transform hover:-translate-y-0.5"
+              className="flex-1 sm:flex-initial px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs sm:text-sm shadow-md shadow-emerald-600/25 flex items-center justify-center gap-2 transition-all transform hover:-translate-y-0.5"
             >
               <Plus className="w-4 h-4" />
               <span>3-Tap Expense</span>
@@ -156,21 +195,37 @@ export default function DashboardClient({
             <button
               id="open-income-btn"
               onClick={() => setIsIncomeOpen(true)}
-              className="px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs sm:text-sm shadow-md shadow-blue-600/25 flex items-center gap-2 transition-all"
+              className="flex-1 sm:flex-initial px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs sm:text-sm shadow-md shadow-blue-600/25 flex items-center justify-center gap-2 transition-all"
             >
               <ArrowDownLeft className="w-4 h-4" />
               <span>Record Income</span>
             </button>
+            <button
+              onClick={() => setIsCategoryOpen(true)}
+              className="p-2.5 rounded-xl bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 transition-colors shadow-xs"
+              title="Manage Categories"
+            >
+              <Settings2 className="w-4 h-4" />
+            </button>
           </div>
-
-          <button
-            onClick={() => setIsCategoryOpen(true)}
-            className="px-3.5 py-2 rounded-xl bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 font-semibold text-xs flex items-center gap-1.5 transition-colors shadow-xs"
-          >
-            <Settings2 className="w-3.5 h-3.5" />
-            <span>Manage Categories</span>
-          </button>
         </div>
+
+        {/* Critical Alerts Banner (if any category exceeds or approaches limits) */}
+        {criticalCategories.length > 0 && (
+          <div className="p-4 rounded-2xl bg-rose-50 border border-rose-200 text-rose-800 text-xs space-y-1 animate-in fade-in">
+            <div className="flex items-center gap-2 font-bold text-rose-900">
+              <ShieldAlert className="w-4 h-4 text-rose-600" />
+              <span>Budget Limit Alerts ({criticalCategories.length} Categories)</span>
+            </div>
+            <p className="text-rose-700 leading-relaxed">
+              {criticalCategories.map((c) => (
+                <span key={c.id} className="mr-3 font-medium">
+                  • <strong>{c.name}</strong>: {formatINR(c.spent)} of {formatINR(c.monthlyLimit)} ({Math.round(c.percentUsed)}%)
+                </span>
+              ))}
+            </p>
+          </div>
+        )}
 
         {/* Hero Safe-To-Spend Card */}
         <div className="bg-gradient-to-br from-emerald-800 via-emerald-700 to-teal-800 text-white rounded-3xl p-6 sm:p-8 shadow-xl shadow-emerald-950/10 relative overflow-hidden">
@@ -180,7 +235,7 @@ export default function DashboardClient({
                 Safe To Spend Remaining
               </span>
               <span className="px-2.5 py-0.5 rounded-full bg-emerald-600/40 text-emerald-100 text-[11px] backdrop-blur-md border border-emerald-400/20">
-                Cycle starts day {settings?.month_start_day || 1}
+                Savings Deducted First
               </span>
             </div>
 
@@ -189,7 +244,7 @@ export default function DashboardClient({
             </div>
 
             <p className="text-emerald-100/90 text-sm max-w-lg mb-6">
-              Daily allowance: <strong className="text-white font-bold">{formatINR(dailyAllowance)} / day</strong> for the remaining {daysInPeriod} days.
+              Daily allowance: <strong className="text-white font-bold">{formatINR(dailyAllowance)} / day</strong> for the next {period.daysRemaining} days.
             </p>
 
             {/* Formula Breakdown */}
@@ -214,23 +269,39 @@ export default function DashboardClient({
           </div>
         </div>
 
-        {/* Variable Pay Holding Bucket Banner */}
+        {/* Variable Pay Holding Bucket (Phase 3 Requirement: Shown as "Not counted yet") */}
         <div className="bg-amber-50/70 border border-amber-200/80 rounded-2xl p-4 sm:p-5 flex items-start gap-3.5">
           <div className="w-8 h-8 rounded-lg bg-amber-100 text-amber-800 flex items-center justify-center shrink-0 mt-0.5">
             <AlertCircle className="w-4 h-4" />
           </div>
           <div className="flex-1">
-            <div className="flex items-center justify-between">
-              <h4 className="font-semibold text-slate-900 text-sm">Variable Pay Holding Bucket</h4>
+            <div className="flex flex-wrap items-center justify-between gap-1">
+              <h4 className="font-semibold text-slate-900 text-sm">
+                Variable Pay Holding Bucket (Not Counted Yet)
+              </h4>
               <span className="font-bold text-amber-900 text-sm">{formatINR(unreceivedVariable)}</span>
             </div>
             <p className="text-xs text-slate-600 mt-1">
-              Variable year-end bonuses and incentives are tracked as expected and <strong>excluded</strong> from your monthly safe-to-spend until deposited.
+              Variable year-end bonuses and incentives are tracked as expected and <strong>excluded</strong> from your monthly safe-to-spend until actually deposited into your bank account.
             </p>
           </div>
         </div>
 
-        {/* Transaction History & Filters (Phase 2 core) */}
+        {/* Pacing & Burn Rate Card */}
+        <BurnRateCard
+          period={period}
+          burnRate={burnRate}
+          safeToSpend={safeToSpend}
+          dailyAllowance={dailyAllowance}
+        />
+
+        {/* Phase 3 Category Progress Bars Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <CategoryProgress categoryBudgets={categoryBudgets} type="flexible" />
+          <CategoryProgress categoryBudgets={categoryBudgets} type="fixed" />
+        </div>
+
+        {/* Transaction History & Filters */}
         <TransactionList
           transactions={transactions}
           categories={categories}
@@ -283,4 +354,3 @@ export default function DashboardClient({
     </div>
   );
 }
-
