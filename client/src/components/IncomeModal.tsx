@@ -47,31 +47,22 @@ export default function IncomeModal({
       const supabase = createClient();
       const amountPaise = Math.round(parsedAmount * 100);
 
-      const { error } = await supabase.from("income_sources").insert({
+      const { error } = status === "received" ? await supabase.rpc("record_received_income", {
+        p_name: name.trim(), p_amount: amountPaise, p_date: date, p_type: type,
+      }) : await supabase.from("income_sources").insert({
         user_id: userId,
         name: name.trim(),
         type,
-        status,
+        status: "expected",
         amount: amountPaise,
         expected_date: status === "expected" ? date : null,
-        received_date: status === "received" ? date : null,
+        received_date: null,
       });
 
       if (error) {
         throw error;
       }
 
-      // Also if status === 'received', log a transaction of type 'income' so transaction history reflects it!
-      if (status === "received") {
-        await supabase.from("transactions").insert({
-          user_id: userId,
-          amount: amountPaise,
-          type: "income",
-          date,
-          note: `Income: ${name.trim()}`,
-          source: "manual",
-        });
-      }
 
       setAmountRupees("");
       setName("Monthly Salary");
