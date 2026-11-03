@@ -77,53 +77,15 @@ export default function WindfallAllocationModal({
     try {
       const supabase = createClient();
       const today = new Date().toISOString().split("T")[0];
-
-      // 1. Mark income source as received
-      const { error: incError } = await supabase
-        .from("income_sources")
-        .update({
-          status: "received",
-          received_date: today,
-        })
-        .eq("id", incomeSource.id);
-
-      if (incError) throw incError;
-
-      // 2. If savings allocated, credit goal contributions & log transaction
-      if (savingsAmount > 0 && selectedGoalId) {
-        const sPaise = Math.round(savingsAmount * 100);
-        const { data: sTx } = await supabase
-          .from("transactions")
-          .insert({
-            user_id: userId,
-            amount: sPaise,
-            type: "savings_transfer",
-            date: today,
-            note: `Windfall allocation (${incomeSource.name}) to savings goal`,
-            source: "manual",
-          })
-          .select()
-          .single();
-
-        await supabase.from("goal_contributions").insert({
-          user_id: userId,
-          goal_id: selectedGoalId,
-          transaction_id: sTx?.id || null,
-          amount: sPaise,
-          date: today,
-        });
-      }
-
-      // 3. Log income transaction for the windfall
-      await supabase.from("transactions").insert({
-        user_id: userId,
-        amount: totalPaise,
-        type: "income",
-        date: today,
-        note: `Received Variable Pay: ${incomeSource.name} (Split: ${formatINR(savingsAmount * 100)} Savings, ${formatINR(annualExpensesAmount * 100)} Annual, ${formatINR(discretionaryAmount * 100)} Fun)`,
-        source: "manual",
+      const { error: allocationError } = await supabase.rpc("allocate_windfall", {
+        p_income_id: incomeSource.id,
+        p_goal_id: selectedGoalId || null,
+        p_savings: Math.round(savingsAmount * 100),
+        p_total: totalPaise,
+        p_date: today,
+        p_note: `Received Variable Pay: ${incomeSource.name}`,
       });
-
+      if (allocationError) throw allocationError;
       onAllocated();
       onClose();
     } catch (err: any) {

@@ -151,31 +151,7 @@ export default function SavingsGoalsSection({
       const supabase = createClient();
       const amountPaise = Math.round(amount * 100);
 
-      // 1. Log transaction as savings_transfer
-      const { data: tx, error: txError } = await supabase
-        .from("transactions")
-        .insert({
-          user_id: userId,
-          amount: amountPaise,
-          type: "savings_transfer",
-          date: contribDate || new Date().toISOString().split("T")[0],
-          note: `Contribution to ${contributeGoal.name}${contribNote ? `: ${contribNote.trim()}` : ""}`,
-          source: "manual",
-        })
-        .select()
-        .single();
-
-      if (txError) throw txError;
-
-      // 2. Insert goal contribution
-      const { error: contribError } = await supabase.from("goal_contributions").insert({
-        user_id: userId,
-        goal_id: contributeGoal.id,
-        transaction_id: tx?.id || null,
-        amount: amountPaise,
-        date: contribDate || new Date().toISOString().split("T")[0],
-      });
-
+      const { error: contribError } = await supabase.rpc("record_goal_contribution", { p_goal_id: contributeGoal.id, p_amount: amountPaise, p_date: contribDate || new Date().toISOString().split("T")[0], p_note: `Contribution to ${contributeGoal.name}${contribNote ? `: ${contribNote.trim()}` : ""}` });
       if (contribError) throw contribError;
 
       setContribAmount("");
