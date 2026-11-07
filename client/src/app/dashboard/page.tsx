@@ -1,4 +1,5 @@
 import { createClient } from "@/utils/supabase/server";
+import { STARTER_CATEGORIES } from "@/lib/starterCategories.mjs";
 import { redirect } from "next/navigation";
 import DashboardClient from "@/components/DashboardClient";
 
@@ -27,11 +28,19 @@ export default async function DashboardPage() {
     .eq("user_id", user.id)
     .order("name", { ascending: true });
 
-  // A user with no categories at all (e.g. signed up before the starter set
-  // existed) gets the starter set. The list lives in ONE place, the database
-  // function ensure_starter_categories(), so limits and names can't drift.
+  // A user with no categories at all gets the starter set. The database function
+  // ensure_starter_categories() is preferred; if it is not installed yet (migration
+  // not applied) or fails, insert the same list directly so the user is never left
+  // with an empty dashboard. Limits start at 0 = "no limit set".
   if (!categories || categories.length === 0) {
-    await supabase.rpc("ensure_starter_categories");
+    const { error: rpcError } = await supabase.rpc("ensure_starter_categories");
+    if (rpcError) {
+      console.error("ensure_starter_categories failed, inserting starters directly:", rpcError.message);
+      const { error: insertError } = await supabase
+        .from("categories")
+        .insert(STARTER_CATEGORIES.map((c) => ({ user_id: user.id, name: c.name, type: c.type, monthly_limit: 0 })));
+      if (insertError) console.error("Could not insert starter categories:", insertError.message);
+    }
     const { data: seeded } = await supabase
       .from("categories")
       .select("*")
