@@ -27,16 +27,22 @@ interface WindfallAllocationModalProps {
   onAllocated: () => void;
 }
 
-export default function WindfallAllocationModal({
-  isOpen,
+type WindfallAllocationModalContentProps = Omit<WindfallAllocationModalProps, "incomeSource"> & {
+  incomeSource: { id: string; name: string; amount: number };
+};
+
+export default function WindfallAllocationModal(props: WindfallAllocationModalProps) {
+  if (!props.isOpen || !props.incomeSource) return null;
+  return <WindfallAllocationModalContent key={props.incomeSource.id} {...props} incomeSource={props.incomeSource} />;
+}
+
+function WindfallAllocationModalContent({
   onClose,
   incomeSource,
   savingsGoals,
   userId,
   onAllocated,
-}: WindfallAllocationModalProps) {
-  if (!isOpen || !incomeSource) return null;
-
+}: WindfallAllocationModalContentProps) {
   const totalPaise = Number(incomeSource.amount);
   const totalRupees = Math.round(totalPaise / 100);
 

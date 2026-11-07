@@ -114,12 +114,22 @@ export default function SavingsGoalsSection({
       const initContrib = parseFloat(initialContribution);
       if (!isNaN(initContrib) && initContrib > 0 && goalData) {
         const initPaise = Math.round(initContrib * 100);
-        await supabase.from("goal_contributions").insert({
+        const { error: contributionError } = await supabase.from("goal_contributions").insert({
           user_id: userId,
           goal_id: goalData.id,
           amount: initPaise,
           date: toLocalDateString(),
         });
+        if (contributionError) {
+          const { error: rollbackError } = await supabase
+            .from("savings_goals")
+            .delete()
+            .eq("id", goalData.id);
+          if (rollbackError) {
+            throw new Error(`Goal was created, but its initial contribution failed (${contributionError.message}). Please delete the goal or add the contribution manually.`);
+          }
+          throw contributionError;
+        }
       }
 
       setNewGoalName("");
@@ -232,7 +242,11 @@ export default function SavingsGoalsSection({
                         {goal.target_date && (
                           <span className="text-[10px] text-slate-500 flex items-center gap-1 mt-0.5">
                             <Calendar className="w-3 h-3 text-slate-400" />
-                            Target: {new Date(goal.target_date).toLocaleDateString("en-IN", { month: "short", year: "numeric" })}
+                            Target: {new Date(
+                              Number(goal.target_date.slice(0, 4)),
+                              Number(goal.target_date.slice(5, 7)) - 1,
+                              Number(goal.target_date.slice(8, 10))
+                            ).toLocaleDateString("en-IN", { month: "short", year: "numeric" })}
                           </span>
                         )}
                       </div>

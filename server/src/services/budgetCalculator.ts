@@ -60,26 +60,25 @@ export function calculateSafeToSpend(input: BudgetSummaryInput): BudgetSummaryRe
  * Calculates period start and end dates based on user's month_start_day setting
  */
 export function getPeriodRange(referenceDate: Date, monthStartDay: number = 1): { startDate: Date; endDate: Date; daysRemaining: number } {
+  const clampedStart = Math.min(Math.max(1, Math.trunc(monthStartDay) || 1), 28);
   const year = referenceDate.getFullYear();
   const month = referenceDate.getMonth();
   const day = referenceDate.getDate();
 
   let startDate: Date;
   let endDate: Date;
-
-  if (day >= monthStartDay) {
-    startDate = new Date(year, month, monthStartDay);
-    // End date is day before monthStartDay of next month
-    endDate = new Date(year, month + 1, monthStartDay - 1, 23, 59, 59, 999);
+  if (day >= clampedStart) {
+    startDate = new Date(year, month, clampedStart);
+    endDate = new Date(year, month + 1, clampedStart - 1, 23, 59, 59, 999);
   } else {
-    // Current date is before monthStartDay, so period started in previous month
-    startDate = new Date(year, month - 1, monthStartDay);
-    endDate = new Date(year, month, monthStartDay - 1, 23, 59, 59, 999);
+    startDate = new Date(year, month - 1, clampedStart);
+    endDate = new Date(year, month, clampedStart - 1, 23, 59, 59, 999);
   }
 
-  const msPerDay = 1000 * 60 * 60 * 24;
-  const daysRemaining = Math.max(1, Math.ceil((endDate.getTime() - referenceDate.getTime()) / msPerDay));
+  const utcDay = (date: Date) => Date.UTC(date.getFullYear(), date.getMonth(), date.getDate());
+  const totalDays = Math.round((utcDay(endDate) - utcDay(startDate)) / 86400000) + 1;
+  const daysElapsed = Math.round((utcDay(referenceDate) - utcDay(startDate)) / 86400000) + 1;
+  const daysRemaining = Math.max(1, totalDays - daysElapsed + 1);
 
   return { startDate, endDate, daysRemaining };
 }
-

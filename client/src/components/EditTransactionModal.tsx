@@ -24,14 +24,23 @@ interface EditTransactionModalProps {
   onTransactionUpdated: () => void;
 }
 
-export default function EditTransactionModal({
-  isOpen,
+type EditTransactionModalContentProps = Omit<EditTransactionModalProps, "transaction"> & {
+  transaction: TransactionItem;
+};
+
+export default function EditTransactionModal(props: EditTransactionModalProps) {
+  if (!props.isOpen || !props.transaction) return null;
+  return <EditTransactionModalContent key={props.transaction.id} {...props} transaction={props.transaction} />;
+}
+
+function EditTransactionModalContent({
   onClose,
   transaction,
   categories,
   onTransactionUpdated,
-}: EditTransactionModalProps) {
-  if (!isOpen || !transaction) return null;
+}: EditTransactionModalContentProps) {
+  // The wrapper conditionally mounts this component, so hooks are never skipped
+  // between open/closed renders and form state resets for a different transaction.
 
   const [amountRupees, setAmountRupees] = useState<string>(
     (transaction.amount / 100).toString()
@@ -59,16 +68,13 @@ export default function EditTransactionModal({
       const supabase = createClient();
       const amountPaise = Math.round(parsedAmount * 100);
 
-      const { error } = await supabase
-        .from("transactions")
-        .update({
-          amount: amountPaise,
-          category_id: categoryId || null,
-          date,
-          note: note.trim() || null,
-        })
-        .eq("id", transaction.id);
-
+      const { error } = await supabase.rpc("update_financial_transaction", {
+        p_transaction_id: transaction.id,
+        p_amount: amountPaise,
+        p_date: date,
+        p_category_id: categoryId || null,
+        p_note: note.trim() || null,
+      });
       if (error) throw error;
 
       onTransactionUpdated();
@@ -88,12 +94,18 @@ export default function EditTransactionModal({
 
     try {
       const supabase = createClient();
-      const { error } = await supabase
-        .from("transactions")
-        .delete()
-        .eq("id", transaction.id);
-
-      if (error) throw error;
+      if (transaction.external_id?.startsWith("recurring:")) {
+        const { error } = await supabase.rpc("undo_recurring_post", {
+          p_transaction_id: transaction.id,
+        });
+        if (error) throw error;
+      } else {
+        const { error } = await supabase
+          .from("transactions")
+          .delete()
+          .eq("id", transaction.id);
+        if (error) throw error;
+      }
 
       onTransactionUpdated();
       onClose();
