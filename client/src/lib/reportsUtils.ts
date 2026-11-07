@@ -7,6 +7,7 @@
  */
 
 import { formatINR } from "./budgetUtils";
+import { toLocalMonthKey } from "./periods.mjs";
 
 export interface CategorySpendShare {
   categoryId: string;
@@ -106,7 +107,7 @@ export function computeMonthlyTrends(
 
   for (let i = numMonths - 1; i >= 0; i--) {
     const d = new Date(referenceDate.getFullYear(), referenceDate.getMonth() - i, 1);
-    const monthKey = d.toISOString().slice(0, 7); // YYYY-MM
+    const monthKey = toLocalMonthKey(d); // YYYY-MM (local; toISOString would shift it a month in UTC+ zones)
     const monthLabel = d.toLocaleDateString("en-IN", { month: "short", year: "numeric" });
 
     // 1. Income in this month

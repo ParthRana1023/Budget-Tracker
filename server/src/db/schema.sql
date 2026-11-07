@@ -144,41 +144,89 @@ create policy "Users can manage their own recurring items" on public.recurring_i
 create unique index if not exists idx_transactions_recurring_month on public.transactions (user_id, external_id) where external_id like 'recurring:%';
 
 -- AUTOMATIC SEED FUNCTION FOR NEW USERS
-create or replace function public.handle_new_user()
-returns trigger as $$
+-- Canonical starter categories.
+--
+-- ensure_starter_categories(user) is the single source of truth for the 13
+-- starter categories. It is idempotent and safe to run any number of times:
+--   1. Renames the two legacy labels ("EMI & Loans", "Transport & Fuel") to the
+--      canonical ones, but ONLY when the canonical label is not already in use
+--      for that user (otherwise the user would end up with duplicates).
+--   2. Inserts any starter category the user does not already have, matched on
+--      name (case-insensitive) so a category the user re-typed is never
+--      duplicated. Starter limits are 0 = "no limit set yet".
+--
+-- It is SECURITY INVOKER on purpose: when an authenticated user calls it, row
+-- level security restricts it to their own rows. The signup trigger and the
+-- backfill below run as the table owner, which is why they can seed any user.
+create or replace function public.ensure_starter_categories(p_user_id uuid default auth.uid())
+returns integer
+language plpgsql
+security invoker
+set search_path = public
+as $$
+declare
+  v_inserted integer;
 begin
-  -- 1. Create default settings
+  if p_user_id is null then
+    raise exception 'Not authenticated';
+  end if;
+
+  update public.categories c
+     set name = 'EMI / Loans'
+   where c.user_id = p_user_id and c.name = 'EMI & Loans' and c.type = 'fixed'
+     and not exists (
+       select 1 from public.categories x
+        where x.user_id = p_user_id and lower(x.name) = 'emi / loans'
+     );
+
+  update public.categories c
+     set name = 'Transport / Fuel'
+   where c.user_id = p_user_id and c.name = 'Transport & Fuel' and c.type = 'flexible'
+     and not exists (
+       select 1 from public.categories x
+        where x.user_id = p_user_id and lower(x.name) = 'transport / fuel'
+     );
+
+  insert into public.categories (user_id, name, type, monthly_limit)
+  select p_user_id, s.name, s.type, 0
+    from (values
+      ('Rent / Housing', 'fixed'), ('Utilities & Bills', 'fixed'), ('EMI / Loans', 'fixed'),
+      ('Insurance', 'fixed'), ('Subscriptions', 'fixed'),
+      ('Groceries', 'flexible'), ('Food & Dining Out', 'flexible'), ('Transport / Fuel', 'flexible'),
+      ('Shopping', 'flexible'), ('Entertainment', 'flexible'), ('Health', 'flexible'),
+      ('Travel', 'flexible'), ('Miscellaneous', 'flexible')
+    ) as s(name, type)
+   where not exists (
+     select 1 from public.categories c
+      where c.user_id = p_user_id and lower(c.name) = lower(s.name)
+   );
+
+  get diagnostics v_inserted = row_count;
+  return v_inserted;
+end;
+$$;
+
+-- New users get the same starter set through the same function.
+create or replace function public.handle_new_user()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
   insert into public.user_settings (user_id, currency, month_start_day)
   values (new.id, 'INR', 1)
   on conflict (user_id) do nothing;
 
-  -- 2. Seed starter categories
-  -- Fixed categories
-  insert into public.categories (user_id, name, type, monthly_limit) values
-    (new.id, 'Rent / Housing', 'fixed', 0),
-    (new.id, 'Utilities & Bills', 'fixed', 0),
-    (new.id, 'EMI / Loans', 'fixed', 0),
-    (new.id, 'Insurance', 'fixed', 0),
-    (new.id, 'Subscriptions', 'fixed', 0);
+  perform public.ensure_starter_categories(new.id);
 
-  -- Flexible categories
-  insert into public.categories (user_id, name, type, monthly_limit) values
-    (new.id, 'Groceries', 'flexible', 0),
-    (new.id, 'Food & Dining Out', 'flexible', 0),
-    (new.id, 'Transport / Fuel', 'flexible', 0),
-    (new.id, 'Shopping', 'flexible', 0),
-    (new.id, 'Entertainment', 'flexible', 0),
-    (new.id, 'Health', 'flexible', 0),
-    (new.id, 'Travel', 'flexible', 0),
-    (new.id, 'Miscellaneous', 'flexible', 0);
-
-  -- 3. Default Emergency Fund goal
-  insert into public.savings_goals (user_id, name, target_amount) values
-    (new.id, 'Emergency Fund', 10000000); -- Default 1,00,000 INR
+  insert into public.savings_goals (user_id, name, target_amount)
+  values (new.id, 'Emergency Fund', 10000000);
 
   return new;
 end;
-$$ language plpgsql security definer;
+$$;
+
 
 -- Trigger on user creation in auth.users
 drop trigger if exists on_auth_user_created on auth.users;

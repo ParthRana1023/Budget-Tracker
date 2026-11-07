@@ -1,6 +1,6 @@
 {
   "name": "budget-tracker-client",
-  "version": "0.10.0",
+  "version": "0.11.0",
   "description": "Frontend web client for Personal Budget Tracker, built with Next.js 16.4.4, Tailwind CSS, and Supabase SSR.",
   "private": true,
   "license": "MIT",
@@ -11,7 +11,8 @@
     "lint": "tsc --noEmit",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
-    "test:e2e:report": "playwright show-report"
+    "test:e2e:report": "playwright show-report",
+    "test:unit": "node scripts/run-unit-tests.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.5.2",

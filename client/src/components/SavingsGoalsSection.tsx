@@ -19,6 +19,7 @@ import {
   Coins
 } from "lucide-react";
 import { formatINR, calculateNeededPerMonth } from "@/lib/budgetUtils";
+import { toLocalDateString } from "@/lib/periods.mjs";
 
 export interface SavingsGoal {
   id: string;
@@ -54,7 +55,7 @@ export default function SavingsGoalsSection({
 
   // Form states for Contribution
   const [contribAmount, setContribAmount] = useState("");
-  const [contribDate, setContribDate] = useState(new Date().toISOString().split("T")[0]);
+  const [contribDate, setContribDate] = useState(toLocalDateString());
   const [contribNote, setContribNote] = useState("");
 
   const [loading, setLoading] = useState(false);
@@ -117,7 +118,7 @@ export default function SavingsGoalsSection({
           user_id: userId,
           goal_id: goalData.id,
           amount: initPaise,
-          date: new Date().toISOString().split("T")[0],
+          date: toLocalDateString(),
         });
       }
 
@@ -151,7 +152,7 @@ export default function SavingsGoalsSection({
       const supabase = createClient();
       const amountPaise = Math.round(amount * 100);
 
-      const { error: contribError } = await supabase.rpc("record_goal_contribution", { p_goal_id: contributeGoal.id, p_amount: amountPaise, p_date: contribDate || new Date().toISOString().split("T")[0], p_note: `Contribution to ${contributeGoal.name}${contribNote ? `: ${contribNote.trim()}` : ""}` });
+      const { error: contribError } = await supabase.rpc("record_goal_contribution", { p_goal_id: contributeGoal.id, p_amount: amountPaise, p_date: contribDate || toLocalDateString(), p_note: `Contribution to ${contributeGoal.name}${contribNote ? `: ${contribNote.trim()}` : ""}` });
       if (contribError) throw contribError;
 
       setContribAmount("");

@@ -27,32 +27,17 @@ export default async function DashboardPage() {
     .eq("user_id", user.id)
     .order("name", { ascending: true });
 
-  // If no categories exist yet for this user, insert starter categories dynamically
+  // A user with no categories at all (e.g. signed up before the starter set
+  // existed) gets the starter set. The list lives in ONE place, the database
+  // function ensure_starter_categories(), so limits and names can't drift.
   if (!categories || categories.length === 0) {
-    const defaultCategories = [
-      { user_id: user.id, name: "Rent / Housing", type: "fixed", monthly_limit: 2500000 },
-      { user_id: user.id, name: "Utilities & Bills", type: "fixed", monthly_limit: 500000 },
-      { user_id: user.id, name: "EMI / Loans", type: "fixed", monthly_limit: 1500000 },
-      { user_id: user.id, name: "Insurance", type: "fixed", monthly_limit: 300000 },
-      { user_id: user.id, name: "Subscriptions", type: "fixed", monthly_limit: 150000 },
-      { user_id: user.id, name: "Groceries", type: "flexible", monthly_limit: 1200000 },
-      { user_id: user.id, name: "Food & Dining Out", type: "flexible", monthly_limit: 800000 },
-      { user_id: user.id, name: "Transport / Fuel", type: "flexible", monthly_limit: 500000 },
-      { user_id: user.id, name: "Shopping", type: "flexible", monthly_limit: 600000 },
-      { user_id: user.id, name: "Entertainment", type: "flexible", monthly_limit: 400000 },
-      { user_id: user.id, name: "Health", type: "flexible", monthly_limit: 300000 },
-      { user_id: user.id, name: "Travel", type: "flexible", monthly_limit: 500000 },
-      { user_id: user.id, name: "Miscellaneous", type: "flexible", monthly_limit: 200000 },
-    ];
-
-    const { data: inserted } = await supabase
+    await supabase.rpc("ensure_starter_categories");
+    const { data: seeded } = await supabase
       .from("categories")
-      .insert(defaultCategories)
-      .select();
-
-    if (inserted) {
-      categories = inserted;
-    }
+      .select("*")
+      .eq("user_id", user.id)
+      .order("name", { ascending: true });
+    if (seeded) categories = seeded;
   }
 
   // Fetch transactions with category join

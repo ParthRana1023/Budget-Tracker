@@ -1,6 +1,6 @@
 {
   "name": "budget-tracker-server",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Backend API and budget calculation services for Personal Budget Tracker, built with Node.js, Express, and Supabase.",
   "private": true,
   "license": "MIT",

@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { createClient } from "@/utils/supabase/client";
 import { X, Check, Loader2, AlertCircle, Calendar } from "lucide-react";
+import { toLocalDateString } from "@/lib/periods.mjs";
 
 interface IncomeModalProps {
   isOpen: boolean;
@@ -21,7 +22,7 @@ export default function IncomeModal({
   const [amountRupees, setAmountRupees] = useState<string>("");
   const [type, setType] = useState<"salary" | "variable" | "other">("salary");
   const [status, setStatus] = useState<"expected" | "received">("received");
-  const [date, setDate] = useState<string>(new Date().toISOString().split("T")[0]);
+  const [date, setDate] = useState<string>(toLocalDateString());
   const [loading, setLoading] = useState<boolean>(false);
   const [errorMsg, setErrorMsg] = useState<string>("");
 

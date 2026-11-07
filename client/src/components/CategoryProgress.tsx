@@ -121,12 +121,12 @@ export default function CategoryProgress({ categoryBudgets, type }: CategoryProg
                   <span className="text-xs font-bold text-slate-800 tabular-nums">
                     {formatINR(cat.spent)}
                   </span>
-                  <span className="text-[11px] text-slate-400"> / {formatINR(cat.monthlyLimit)}</span>
+                  {cat.hasLimit && <span className="text-[11px] text-slate-400"> / {formatINR(cat.monthlyLimit)}</span>}
                 </div>
               </div>
 
               {/* Progress bar */}
-              {cat.monthlyLimit > 0 && (
+              {cat.hasLimit && (
                 <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
                   <div
                     className={`h-full rounded-full transition-all duration-500 ${colors.bar}`}
@@ -137,7 +137,9 @@ export default function CategoryProgress({ categoryBudgets, type }: CategoryProg
 
               {/* Remaining or overspent */}
               <div className="text-[11px] text-slate-500">
-                {cat.remaining >= 0 ? (
+                {!cat.hasLimit ? (
+                  <span className="italic">No limit set</span>
+                ) : cat.remaining >= 0 ? (
                   <span>{formatINR(cat.remaining)} remaining</span>
                 ) : (
                   <span className="text-rose-600 font-semibold">

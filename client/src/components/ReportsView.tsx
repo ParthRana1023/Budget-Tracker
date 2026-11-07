@@ -23,6 +23,7 @@ import {
   computeYearlySummary,
   MonthSummary
 } from "@/lib/reportsUtils";
+import { toLocalMonthKey } from "@/lib/periods.mjs";
 
 interface ReportsViewProps {
   transactions: any[];
@@ -48,7 +49,7 @@ export default function ReportsView({
 
   // Selected active month for category breakdown (defaults to latest month)
   const [activeMonthKey, setActiveMonthKey] = useState<string>(
-    monthlyTrends[monthlyTrends.length - 1]?.monthKey || new Date().toISOString().slice(0, 7)
+    monthlyTrends[monthlyTrends.length - 1]?.monthKey || toLocalMonthKey()
   );
 
   // Category breakdown for selected month

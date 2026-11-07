@@ -91,15 +91,13 @@ export default function DashboardClient({
   const period = useMemo(() => {
     return getPeriodRange(new Date(), settings?.month_start_day || 1);
   }, [settings?.month_start_day]);
-  const startStr = period.startDate.toISOString().split("T")[0];
-  const endStr = period.endDate.toISOString().split("T")[0];
+  const { startStr, endStr } = period; // local YYYY-MM-DD, inclusive
 
   // Filter transactions within active billing cycle
-  const currentPeriodTransactions = useMemo(() => {
-    const startStr = period.startDate.toISOString().split("T")[0];
-    const endStr = period.endDate.toISOString().split("T")[0];
-    return transactions.filter((t) => t.date >= startStr && t.date <= endStr);
-  }, [transactions, period]);
+  const currentPeriodTransactions = useMemo(
+    () => transactions.filter((t) => t.date >= period.startStr && t.date <= period.endStr),
+    [transactions, period]
+  );
 
   // Function to refresh state from Supabase
   const refreshData = async () => {

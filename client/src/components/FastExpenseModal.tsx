@@ -4,6 +4,7 @@ import { useState, useMemo } from "react";
 import { createClient } from "@/utils/supabase/client";
 import { X, Check, Loader2, Sparkles, Calendar, FileText, AlertTriangle, ShieldAlert } from "lucide-react";
 import { checkExpenseImpact } from "@/lib/alertUtils";
+import { toLocalDateString } from "@/lib/periods.mjs";
 
 export interface Category {
   id: string;
@@ -37,7 +38,7 @@ export default function FastExpenseModal({
   const [selectedCategoryId, setSelectedCategoryId] = useState<string>(
     categories[0]?.id || ""
   );
-  const [date, setDate] = useState<string>(new Date().toISOString().split("T")[0]);
+  const [date, setDate] = useState<string>(toLocalDateString());
   const [note, setNote] = useState<string>("");
   const [showDetails, setShowDetails] = useState<boolean>(false);
   const [loading, setLoading] = useState<boolean>(false);
@@ -92,7 +93,7 @@ export default function FastExpenseModal({
         category_id: selectedCategoryId,
         amount: amountPaise,
         type: "expense",
-        date: date || new Date().toISOString().split("T")[0],
+        date: date || toLocalDateString(),
         note: note.trim() || null,
         source: "manual",
       });

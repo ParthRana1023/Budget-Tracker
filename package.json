@@ -1,6 +1,6 @@
 {
   "name": "personal-budget-tracker",
-  "version": "0.12.0",
+  "version": "0.13.0",
   "description": "Savings-first personal budget tracker with live Safe-to-Spend calculations, variable pay isolation, and fast 3-tap expense logging.",
   "private": true,
   "author": "Parth Rana",
@@ -32,7 +32,8 @@
     "build:server": "npm run build --workspace=server",
     "start:client": "npm run start --workspace=client",
     "start:server": "npm run start --workspace=server",
-    "test": "npm run test:e2e",
+    "test": "npm run test:unit && npm run test:e2e",
+    "test:unit": "npm run test:unit --workspace=client",
     "test:e2e": "npm run test:e2e --workspace=client",
     "test:db": "supabase test db",
     "lint": "npm run lint --workspace=client"

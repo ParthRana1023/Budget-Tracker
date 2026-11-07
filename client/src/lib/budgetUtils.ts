@@ -10,43 +10,12 @@ export interface PeriodRange {
   daysElapsed: number;
   daysRemaining: number;
   periodLabel: string; // e.g. "3 Nov – 2 Dec 2026"
+  startStr: string; // inclusive local YYYY-MM-DD, for comparing against `date` columns
+  endStr: string; // inclusive local YYYY-MM-DD
 }
 
-/**
- * Compute the current billing cycle based on the user's month_start_day.
- * Handles edge cases like months with fewer days (clamps to month end).
- */
-export function getPeriodRange(
-  referenceDate: Date = new Date(),
-  monthStartDay: number = 1
-): PeriodRange {
-  const clampedStart = Math.min(Math.max(1, monthStartDay), 28);
-  const year = referenceDate.getFullYear();
-  const month = referenceDate.getMonth();
-  const day = referenceDate.getDate();
-
-  let startDate: Date;
-  let endDate: Date;
-
-  if (day >= clampedStart) {
-    startDate = new Date(year, month, clampedStart);
-    endDate = new Date(year, month + 1, clampedStart - 1, 23, 59, 59, 999);
-  } else {
-    startDate = new Date(year, month - 1, clampedStart);
-    endDate = new Date(year, month, clampedStart - 1, 23, 59, 59, 999);
-  }
-
-  const msPerDay = 1000 * 60 * 60 * 24;
-  const totalDays = Math.max(1, Math.round((endDate.getTime() - startDate.getTime()) / msPerDay) + 1);
-  const daysElapsed = Math.max(0, Math.floor((referenceDate.getTime() - startDate.getTime()) / msPerDay)) + 1;
-  const daysRemaining = Math.max(1, totalDays - daysElapsed + 1);
-
-  const fmt = (d: Date) =>
-    d.toLocaleDateString("en-IN", { day: "numeric", month: "short" });
-  const periodLabel = `${fmt(startDate)} – ${fmt(endDate)} ${endDate.getFullYear()}`;
-
-  return { startDate, endDate, totalDays, daysElapsed, daysRemaining, periodLabel };
-}
+// Implemented in periods.mjs so it can be unit-tested under several timezones.
+export { getPeriodRange, toLocalDateString, toLocalMonthKey } from "./periods.mjs";
 
 /**
  * Format paise as INR string.
@@ -77,42 +46,12 @@ export interface CategoryBudgetStatus {
   spent: number; // paise
   remaining: number; // paise
   percentUsed: number; // 0-100+
+  hasLimit: boolean; // false when monthlyLimit is 0 ("no limit set"): never over budget
   status: "safe" | "warning" | "danger" | "exceeded";
 }
 
-/**
- * Compute per-category budget status by matching transactions to category limits.
- */
-export function computeCategoryBudgets(
-  categories: Array<{ id: string; name: string; type: "fixed" | "flexible"; monthly_limit: number }>,
-  transactions: Array<{ category_id: string | null; amount: number; type: string }>
-): CategoryBudgetStatus[] {
-  return categories.map((cat) => {
-    const spent = transactions
-      .filter((t) => t.type === "expense" && t.category_id === cat.id)
-      .reduce((sum, t) => sum + Number(t.amount), 0);
-
-    const monthlyLimit = Number(cat.monthly_limit);
-    const remaining = monthlyLimit - spent;
-    const percentUsed = monthlyLimit > 0 ? (spent / monthlyLimit) * 100 : (spent > 0 ? 100 : 0);
-
-    let status: CategoryBudgetStatus["status"] = "safe";
-    if (percentUsed >= 100) status = "exceeded";
-    else if (percentUsed >= 90) status = "danger";
-    else if (percentUsed >= 75) status = "warning";
-
-    return {
-      id: cat.id,
-      name: cat.name,
-      type: cat.type as "fixed" | "flexible",
-      monthlyLimit,
-      spent,
-      remaining,
-      percentUsed,
-      status,
-    };
-  });
-}
+// Implemented in categoryBudgets.mjs so it can be unit-tested.
+export { computeCategoryBudgets } from "./categoryBudgets.mjs";
 
 export interface BurnRateMetrics {
   totalBudget: number; // paise – total flexible budget for the period

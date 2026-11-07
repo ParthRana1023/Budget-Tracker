@@ -16,6 +16,7 @@ import {
   AlertCircle
 } from "lucide-react";
 import { formatINR } from "@/lib/budgetUtils";
+import { toLocalDateString } from "@/lib/periods.mjs";
 
 interface WindfallAllocationModalProps {
   isOpen: boolean;
@@ -76,7 +77,7 @@ export default function WindfallAllocationModal({
 
     try {
       const supabase = createClient();
-      const today = new Date().toISOString().split("T")[0];
+      const today = toLocalDateString();
       const { error: allocationError } = await supabase.rpc("allocate_windfall", {
         p_income_id: incomeSource.id,
         p_goal_id: selectedGoalId || null,
