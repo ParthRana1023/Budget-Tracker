@@ -14,3 +14,118 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
+
+/* Dark theme overrides for the existing Tailwind utility-based UI. */
+html.dark {
+  color-scheme: dark;
+  --background: #0b1220;
+  --foreground: #e2e8f0;
+}
+
+html.dark body {
+  color: var(--foreground);
+  background: var(--background);
+}
+
+html.dark .bg-white,
+html.dark [class~="bg-white/80"] {
+  background-color: #111c2e !important;
+}
+html.dark .bg-slate-50 { background-color: #0b1220 !important; }
+html.dark .bg-slate-100 { background-color: #1e293b !important; }
+html.dark .bg-slate-200 { background-color: #334155 !important; }
+html.dark .bg-slate-800 { background-color: #172235 !important; }
+html.dark .bg-slate-900 { background-color: #0f172a !important; }
+
+html.dark .text-slate-900,
+html.dark .text-slate-800 { color: #f1f5f9 !important; }
+html.dark .text-slate-700 { color: #e2e8f0 !important; }
+html.dark .text-slate-600 { color: #cbd5e1 !important; }
+html.dark .text-slate-500 { color: #94a3b8 !important; }
+html.dark .text-slate-400 { color: #94a3b8 !important; }
+
+html.dark .border-slate-100,
+html.dark .border-slate-200,
+html.dark .border-slate-300 { border-color: #334155 !important; }
+html.dark .border-slate-400 { border-color: #475569 !important; }
+
+html.dark [class~="hover:bg-slate-50"]:hover { background-color: #1e293b !important; }
+html.dark [class~="hover:bg-slate-100"]:hover { background-color: #334155 !important; }
+html.dark [class~="hover:text-slate-900"]:hover,
+html.dark [class~="hover:text-slate-800"]:hover { color: #f8fafc !important; }
+
+/* Keep form controls readable even when their component styles are inline. */
+html.dark input,
+html.dark select,
+html.dark textarea {
+  color-scheme: dark;
+  background-color: #111c2e;
+  color: #e2e8f0;
+  border-color: #475569;
+}
+html.dark input::placeholder,
+html.dark textarea::placeholder { color: #94a3b8; }
+html.dark option { background-color: #111c2e; color: #e2e8f0; }
+
+html.dark .shadow-xs,
+html.dark .shadow-sm,
+html.dark .shadow-md,
+html.dark .shadow-lg,
+html.dark .shadow-xl { --tw-shadow-color: rgb(0 0 0 / 0.28); }
+
+/* Muted semantic surfaces used by alerts, category tiles, and landing cards. */
+html.dark .bg-emerald-50,
+html.dark .bg-emerald-100 { background-color: #12352f !important; }
+html.dark .bg-blue-50,
+html.dark .bg-blue-100 { background-color: #172f4a !important; }
+html.dark .bg-purple-50,
+html.dark .bg-purple-100 { background-color: #30234a !important; }
+html.dark .bg-amber-50,
+html.dark .bg-amber-100,
+html.dark [class~="bg-amber-50/70"] { background-color: #3b2d17 !important; }
+html.dark .bg-rose-50,
+html.dark .bg-rose-100 { background-color: #3b202b !important; }
+
+html.dark .text-amber-900,
+html.dark .text-amber-950,
+html.dark .text-emerald-900,
+html.dark .text-purple-950,
+html.dark .text-rose-900,
+html.dark .text-rose-950 { color: #f1f5f9 !important; }
+html.dark .text-amber-800,
+html.dark .text-blue-800,
+html.dark .text-purple-800,
+html.dark .text-rose-800 { color: #e2e8f0 !important; }
+
+
+/* Preserve dark surfaces for Tailwind utilities that include alpha opacity.
+   Without these rules, cards such as savings goals and report rows remain
+   pale/washed out while their text switches to dark-theme foreground colors. */
+html.dark [class*="bg-slate-50/"],
+html.dark [class*="bg-slate-100/"],
+html.dark [class*="bg-slate-200/"] {
+  background-color: #1e293b !important;
+}
+html.dark [class*="bg-white/"] {
+  background-color: #111c2e !important;
+}
+html.dark [class*="bg-emerald-50/"],
+html.dark [class*="bg-emerald-100/"] {
+  background-color: #12352f !important;
+}
+html.dark [class*="bg-blue-50/"],
+html.dark [class*="bg-blue-100/"] {
+  background-color: #172f4a !important;
+}
+html.dark [class*="bg-purple-50/"],
+html.dark [class*="bg-purple-100/"] {
+  background-color: #30234a !important;
+}
+html.dark [class*="bg-amber-50/"],
+html.dark [class*="bg-amber-100/"] {
+  background-color: #3b2d17 !important;
+}
+html.dark [class*="bg-rose-50/"],
+html.dark [class*="bg-rose-100/"] {
+  background-color: #3b202b !important;
+}

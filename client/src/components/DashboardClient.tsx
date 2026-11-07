@@ -24,6 +24,7 @@ import {
   LayoutDashboard,
   Download
 } from "lucide-react";
+import ThemeToggle from "./ThemeToggle";
 import FastExpenseModal, { Category } from "./FastExpenseModal";
 import IncomeModal from "./IncomeModal";
 import CategoryManagementModal from "./CategoryManagementModal";
@@ -316,6 +317,7 @@ export default function DashboardClient({
         </div>
 
         <div className="flex items-center gap-3">
+          <ThemeToggle />
           <span className="text-xs text-slate-600 hidden md:inline truncate max-w-xs font-medium">
             {initialUser.email}
           </span>
