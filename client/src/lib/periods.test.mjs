@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { getPeriodRange, toLocalDateString, toLocalMonthKey } from "./periods.mjs";
+import { getPeriodRange, msUntilNextLocalMidnight, toLocalDateString, toLocalMonthKey } from "./periods.mjs";
 
 // These tests are timezone-sensitive by design. `npm run test:unit` runs this file
 // under several TZ values (see scripts/run-unit-tests.mjs); the assertions must hold
@@ -86,4 +86,16 @@ test("string bounds include both boundary days when filtering by date", () => {
   const p = getPeriodRange(at(2026, 11, 15), 1);
   const dates = ["2026-10-31", "2026-11-01", "2026-11-30", "2026-12-01"];
   assert.deepEqual(dates.filter((d) => d >= p.startStr && d <= p.endStr), ["2026-11-01", "2026-11-30"]);
+});
+
+test("msUntilNextLocalMidnight counts to the end of the LOCAL day", () => {
+  assert.equal(msUntilNextLocalMidnight(at(2026, 11, 7, 23, 59, 30)), 30_000);
+  assert.equal(msUntilNextLocalMidnight(at(2026, 11, 7, 12, 0, 0)), 12 * 3_600_000);
+  // A full day when it is exactly midnight; 23h/25h on DST-change days in zones that have them.
+  const day = new Date(2026, 10, 2).getTime() - new Date(2026, 10, 1).getTime();
+  assert.equal(msUntilNextLocalMidnight(at(2026, 11, 1, 0, 0, 0)), day);
+  assert.ok(day >= 23 * 3_600_000 && day <= 25 * 3_600_000);
+  // Month and year roll-over.
+  assert.equal(msUntilNextLocalMidnight(at(2026, 12, 31, 23, 0, 0)), 3_600_000);
+  assert.equal(toLocalDateString(new Date(at(2026, 12, 31, 23, 0, 0).getTime() + msUntilNextLocalMidnight(at(2026, 12, 31, 23, 0, 0)))), "2027-01-01");
 });

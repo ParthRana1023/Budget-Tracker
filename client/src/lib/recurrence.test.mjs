@@ -1,53 +1,60 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { isRecurringItemDue, recurringExternalId, rupeesToPaise, validateRecurringForm } from "./recurrence.mjs";
+import { formatShortDate, mergeAutoRecorded, parseOptionalDay, recurringKey, scheduleLabel, suggestRecurring } from "./recurrence.mjs";
 
-test("marks an active item due once its scheduled day arrives without a matching posting", () => {
-  assert.equal(isRecurringItemDue({ active: true, day_of_month: 5, id: "rent" }, [], new Date("2026-11-05T12:00:00")), true);
-  assert.equal(isRecurringItemDue({ active: true, day_of_month: 5, id: "rent" }, [{ external_id: "recurring:rent:2026-11" }], new Date("2026-11-05T12:00:00")), false);
+test("recurringKey matches the SQL key: recurring:<id>:<YYYY-MM>", () => {
+  assert.equal(recurringKey("abc", "2026-11-03"), "recurring:abc:2026-11");
+  assert.equal(recurringKey("abc", "2026-12-31"), "recurring:abc:2026-12");
 });
 
-test("not due before its day, when paused, or once posted this month; due again next month", () => {
-  const item = { active: true, day_of_month: 10, id: "x" };
-  assert.equal(isRecurringItemDue(item, [], new Date(2026, 10, 9, 23, 59)), false);
-  assert.equal(isRecurringItemDue(item, [], new Date(2026, 10, 10, 0, 0)), true);
-  assert.equal(isRecurringItemDue({ ...item, active: false }, [], new Date(2026, 10, 20)), false);
-  const posted = [{ external_id: "recurring:x:2026-11" }];
-  assert.equal(isRecurringItemDue(item, posted, new Date(2026, 10, 30)), false);
-  assert.equal(isRecurringItemDue(item, posted, new Date(2026, 11, 10)), true);
+test("parseOptionalDay: blank means suggestion-only, otherwise 1-28", () => {
+  assert.deepEqual(parseOptionalDay(""), { value: null });
+  assert.deepEqual(parseOptionalDay("   "), { value: null });
+  assert.deepEqual(parseOptionalDay(undefined), { value: null });
+  assert.deepEqual(parseOptionalDay("1"), { value: 1 });
+  assert.deepEqual(parseOptionalDay(" 28 "), { value: 28 });
+  for (const bad of ["0", "29", "31", "-1", "1.5", "abc", "1e1", "100"]) {
+    assert.ok(parseOptionalDay(bad).error, `should reject ${JSON.stringify(bad)}`);
+  }
 });
 
-test("posting key uses the LOCAL month (1st of the month shortly after midnight)", () => {
-  // 1 Nov 00:30 local. A UTC-derived key would say 2026-10 in IST.
-  assert.equal(recurringExternalId("x", new Date(2026, 10, 1, 0, 30)), "recurring:x:2026-11");
-  assert.equal(isRecurringItemDue({ active: true, day_of_month: 1, id: "x" }, [{ external_id: "recurring:x:2026-10" }], new Date(2026, 10, 1, 0, 30)), true);
+const item = (id, name, type, day, extra = {}) => ({ id, name, type, day_of_month: day, active: true, ...extra });
+
+test("suggestRecurring: only the requested type, paused items hidden", () => {
+  const items = [item("1", "Rent", "expense", 5), item("2", "Salary", "income", 1), item("3", "Old", "expense", 2, { active: false })];
+  assert.deepEqual(suggestRecurring(items, "expense", [], "2026-11-03").map((s) => s.item.name), ["Rent"]);
+  assert.deepEqual(suggestRecurring(items, "income", [], "2026-11-03").map((s) => s.item.name), ["Salary"]);
 });
 
-test("rupeesToPaise parses exact amounts and rejects junk", () => {
-  assert.equal(rupeesToPaise("999"), 99900);
-  assert.equal(rupeesToPaise("999.5"), 99950);
-  assert.equal(rupeesToPaise("1.15"), 115);
-  assert.equal(rupeesToPaise("0.07"), 7);
-  assert.equal(rupeesToPaise(" 12 "), 1200);
-  for (const bad of ["", "0", "0.00", "-5", "abc", "1.234", "1e3", "1,000", null, undefined]) assert.equal(rupeesToPaise(bad), null, `should reject ${JSON.stringify(bad)}`);
+test("suggestRecurring flags items already recorded in the entry's month, and lists them last", () => {
+  const items = [item("1", "Rent", "expense", 5), item("2", "Gym", "expense", 10), item("3", "Netflix", "expense", null)];
+  const txns = [{ external_id: "recurring:1:2026-11" }, { external_id: null }, {}];
+  const result = suggestRecurring(items, "expense", txns, "2026-11-20");
+  assert.deepEqual(result.map((s) => [s.item.name, s.recorded]), [["Gym", false], ["Netflix", false], ["Rent", true]]);
+  // The same schedule is NOT recorded in a different month.
+  assert.equal(suggestRecurring(items, "expense", txns, "2026-12-01").find((s) => s.item.name === "Rent").recorded, false);
 });
 
-test("validateRecurringForm: expense requires a category, income ignores it", () => {
-  assert.deepEqual(validateRecurringForm({ name: " Rent ", amount: "25000", day: "1", type: "expense", categoryId: "c1" }), {
-    value: { name: "Rent", amount: 2500000, type: "expense", day_of_month: 1, category_id: "c1" },
-  });
-  assert.match(validateRecurringForm({ name: "Rent", amount: "25000", day: "1", type: "expense", categoryId: "" }).error, /category/i);
-  assert.deepEqual(validateRecurringForm({ name: "Salary", amount: "80000", day: "28", type: "income", categoryId: "stale-selection" }), {
-    value: { name: "Salary", amount: 8000000, type: "income", day_of_month: 28, category_id: null },
-  });
+test("suggestRecurring orders by day, suggestion-only last, then name", () => {
+  const items = [item("a", "Zeta", "expense", 20), item("b", "Alpha", "expense", null), item("c", "Beta", "expense", 3), item("d", "Aardvark", "expense", 3)];
+  assert.deepEqual(suggestRecurring(items, "expense", [], "2026-11-01").map((s) => s.item.name), ["Aardvark", "Beta", "Zeta", "Alpha"]);
 });
 
-test("validateRecurringForm rejects bad name, amount, day and type", () => {
-  const ok = { name: "A", amount: "10", day: "5", type: "expense", categoryId: "c" };
-  assert.ok(validateRecurringForm({ ...ok, name: "  " }).error);
-  assert.ok(validateRecurringForm({ ...ok, amount: "0" }).error);
-  assert.ok(validateRecurringForm({ ...ok, day: "0" }).error);
-  assert.ok(validateRecurringForm({ ...ok, day: "29" }).error);
-  assert.ok(validateRecurringForm({ ...ok, day: "1.5" }).error);
-  assert.ok(validateRecurringForm({ ...ok, type: "transfer" }).error);
+test("scheduleLabel", () => {
+  assert.equal(scheduleLabel({ day_of_month: 5 }), "auto-records after day 5");
+  assert.equal(scheduleLabel({ day_of_month: null }), "suggestion only");
+});
+
+test("mergeAutoRecorded maps database rows and ignores an occurrence it already has", () => {
+  const row = { transaction_id: "t1", item_id: "i1", item_name: "Rent", item_type: "expense", amount_paise: "2500000", occurred_on: "2026-11-05" };
+  const first = mergeAutoRecorded([], [row]);
+  assert.deepEqual(first, [{ transactionId: "t1", itemId: "i1", name: "Rent", type: "expense", amount: 2500000, date: "2026-11-05" }]);
+  assert.equal(mergeAutoRecorded(first, [row]), first); // same array back: nothing new, no re-render
+  assert.equal(mergeAutoRecorded(first, [{ ...row, transaction_id: "t2" }]).length, 2);
+  assert.deepEqual(mergeAutoRecorded([], []), []);
+});
+
+test("formatShortDate does not shift the day across timezones", () => {
+  assert.match(formatShortDate("2026-11-01"), /^1 Nov/);
+  assert.match(formatShortDate("2026-12-31"), /^31 Dec/);
 });

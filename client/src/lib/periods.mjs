@@ -67,3 +67,12 @@ export function getPeriodRange(referenceDate = new Date(), monthStartDay = 1) {
     periodLabel,
   };
 }
+
+/**
+ * Milliseconds from `now` until the next local midnight, i.e. the end of the
+ * user's day. Built from local calendar fields, so it is right on 23h / 25h DST days.
+ */
+export function msUntilNextLocalMidnight(now = new Date()) {
+  const next = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 0, 0, 0, 0);
+  return next.getTime() - now.getTime();
+}

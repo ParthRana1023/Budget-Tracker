@@ -1,15 +1,23 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { createClient } from "@/utils/supabase/client";
 import { X, Check, Loader2, AlertCircle, Calendar } from "lucide-react";
 import { toLocalDateString } from "@/lib/periods.mjs";
+import { parseOptionalDay, suggestRecurring } from "@/lib/recurrence.mjs";
+import type { RecurringItem } from "@/lib/recurringTypes";
+import RecurringSuggestions from "./RecurringSuggestions";
+import RecurringOptions from "./RecurringOptions";
 
 interface IncomeModalProps {
   isOpen: boolean;
   onClose: () => void;
   userId: string;
   onIncomeAdded: () => void;
+  /** Recurring schedules, offered as suggestions at the top of the pop-up. */
+  recurringItems?: RecurringItem[];
+  /** All transactions (with external_id) so already-recorded months are not suggested again. */
+  allTransactions?: Array<{ external_id?: string | null }>;
 }
 
 export default function IncomeModal({
@@ -17,6 +25,8 @@ export default function IncomeModal({
   onClose,
   userId,
   onIncomeAdded,
+  recurringItems = [],
+  allTransactions = [],
 }: IncomeModalProps) {
   const [name, setName] = useState<string>("Monthly Salary");
   const [amountRupees, setAmountRupees] = useState<string>("");
@@ -26,7 +36,43 @@ export default function IncomeModal({
   const [loading, setLoading] = useState<boolean>(false);
   const [errorMsg, setErrorMsg] = useState<string>("");
 
+  // Recurring: a suggestion the user picked, the "repeat monthly" checkbox, and its optional auto day.
+  const [selectedItem, setSelectedItem] = useState<RecurringItem | null>(null);
+  const [makeRecurring, setMakeRecurring] = useState<boolean>(false);
+  const [recurringDay, setRecurringDay] = useState<string>("");
+  const [updateItem, setUpdateItem] = useState<boolean>(false);
+  const [recurringError, setRecurringError] = useState<string>("");
+
+  const suggestions = useMemo(
+    () => suggestRecurring(recurringItems, "income", allTransactions, date || toLocalDateString()),
+    [recurringItems, allTransactions, date]
+  );
+
   if (!isOpen) return null;
+
+  const resetRecurring = () => {
+    setSelectedItem(null);
+    setMakeRecurring(false);
+    setRecurringDay("");
+    setUpdateItem(false);
+    setRecurringError("");
+  };
+
+  // Tapping a suggestion fills the form from the schedule (nothing is saved yet).
+  const pickItem = (item: RecurringItem) => {
+    setSelectedItem(item);
+    setMakeRecurring(false);
+    setUpdateItem(false);
+    setRecurringError("");
+    setName(item.name);
+    setAmountRupees(String(item.amount / 100));
+    setType(item.income_type);
+    setStatus("received"); // a recurring item is income that has arrived
+    setRecurringDay(item.day_of_month ? String(item.day_of_month) : "");
+  };
+
+  // Recurring only applies to income that has been received; "expected later" is already a placeholder.
+  const recurringMode = status === "received" && (selectedItem !== null || makeRecurring);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -41,6 +87,17 @@ export default function IncomeModal({
       return;
     }
 
+    let recurringDayValue: number | null = null;
+    if (recurringMode && (selectedItem ? updateItem : makeRecurring)) {
+      const parsedDay = parseOptionalDay(recurringDay);
+      if ("error" in parsedDay) {
+        setRecurringError(parsedDay.error);
+        return;
+      }
+      recurringDayValue = parsedDay.value;
+    }
+    setRecurringError("");
+
     setLoading(true);
     setErrorMsg("");
 
@@ -48,7 +105,21 @@ export default function IncomeModal({
       const supabase = createClient();
       const amountPaise = Math.round(parsedAmount * 100);
 
-      const { error } = status === "received" ? await supabase.rpc("record_received_income", {
+      const { error } = recurringMode
+        ? // One atomic call: records this income and creates/links the recurring schedule.
+          await supabase.rpc("record_entry_with_recurring", {
+            p_type: "income",
+            p_amount: amountPaise,
+            p_date: date || toLocalDateString(),
+            p_category_id: null,
+            p_note: name.trim(),
+            p_item_id: selectedItem?.id ?? null,
+            p_make_recurring: selectedItem ? false : makeRecurring,
+            p_day: recurringDayValue,
+            p_update_item: selectedItem ? updateItem : false,
+            p_income_type: type,
+          })
+        : status === "received" ? await supabase.rpc("record_received_income", {
         p_name: name.trim(), p_amount: amountPaise, p_date: date, p_type: type,
       }) : await supabase.from("income_sources").insert({
         user_id: userId,
@@ -61,12 +132,15 @@ export default function IncomeModal({
       });
 
       if (error) {
+        if (error.code === "23505") {
+          throw new Error("This recurring income is already recorded for that month.");
+        }
         throw error;
       }
 
-
       setAmountRupees("");
       setName("Monthly Salary");
+      resetRecurring();
       onIncomeAdded();
       onClose();
     } catch (err: any) {
@@ -77,7 +151,7 @@ export default function IncomeModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-150">
+    <div role="dialog" aria-label="Record income" data-testid="income-modal" className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-150">
       <div className="bg-white w-full max-w-lg rounded-t-3xl sm:rounded-3xl shadow-2xl border border-slate-100 overflow-hidden max-h-[90vh] flex flex-col">
         {/* Header */}
         <div className="p-4 px-6 border-b border-slate-100 flex items-center justify-between">
@@ -100,6 +174,14 @@ export default function IncomeModal({
               {errorMsg}
             </div>
           )}
+
+          <RecurringSuggestions
+            suggestions={suggestions}
+            selectedId={selectedItem?.id ?? null}
+            onPick={pickItem}
+            onClear={resetRecurring}
+            onChanged={onIncomeAdded}
+          />
 
           <div>
             <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1.5">
@@ -214,6 +296,19 @@ export default function IncomeModal({
               className="w-full px-3.5 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs"
             />
           </div>
+
+          {status === "received" && (
+            <RecurringOptions
+              selectedItem={selectedItem}
+              checked={makeRecurring}
+              onCheckedChange={setMakeRecurring}
+              day={recurringDay}
+              onDayChange={setRecurringDay}
+              updateItem={updateItem}
+              onUpdateItemChange={setUpdateItem}
+              error={recurringError}
+            />
+          )}
 
           <div className="pt-2 flex items-center gap-3">
             <button

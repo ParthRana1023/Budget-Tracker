@@ -5,6 +5,10 @@ import { createClient } from "@/utils/supabase/client";
 import { X, Check, Loader2, Sparkles, Calendar, FileText, AlertTriangle, ShieldAlert } from "lucide-react";
 import { checkExpenseImpact } from "@/lib/alertUtils";
 import { toLocalDateString } from "@/lib/periods.mjs";
+import { parseOptionalDay, suggestRecurring } from "@/lib/recurrence.mjs";
+import type { RecurringItem } from "@/lib/recurringTypes";
+import RecurringSuggestions from "./RecurringSuggestions";
+import RecurringOptions from "./RecurringOptions";
 
 export interface Category {
   id: string;
@@ -22,6 +26,10 @@ interface FastExpenseModalProps {
   currentSafeToSpend?: number;
   recentTransactions?: Array<{ category_id: string | null; amount: number; type: string }>;
   onAlertTriggered?: (alertMessage: string) => void;
+  /** Recurring schedules, offered as suggestions at the top of the pop-up. */
+  recurringItems?: RecurringItem[];
+  /** All transactions (with external_id) so already-recorded months are not suggested again. */
+  allTransactions?: Array<{ external_id?: string | null }>;
 }
 
 export default function FastExpenseModal({
@@ -33,6 +41,8 @@ export default function FastExpenseModal({
   currentSafeToSpend = 0,
   recentTransactions = [],
   onAlertTriggered,
+  recurringItems = [],
+  allTransactions = [],
 }: FastExpenseModalProps) {
   const [amountRupees, setAmountRupees] = useState<string>("");
   const [selectedCategoryId, setSelectedCategoryId] = useState<string>(
@@ -44,6 +54,18 @@ export default function FastExpenseModal({
   const [loading, setLoading] = useState<boolean>(false);
   const [errorMsg, setErrorMsg] = useState<string>("");
   const [postSubmitWarning, setPostSubmitWarning] = useState<string | null>(null);
+
+  // Recurring: a suggestion the user picked, the "repeat monthly" checkbox, and its optional auto day.
+  const [selectedItem, setSelectedItem] = useState<RecurringItem | null>(null);
+  const [makeRecurring, setMakeRecurring] = useState<boolean>(false);
+  const [recurringDay, setRecurringDay] = useState<string>("");
+  const [updateItem, setUpdateItem] = useState<boolean>(false);
+  const [recurringError, setRecurringError] = useState<string>("");
+
+  const suggestions = useMemo(
+    () => suggestRecurring(recurringItems, "expense", allTransactions, date || toLocalDateString()),
+    [recurringItems, allTransactions, date]
+  );
 
   const selectedCategory = useMemo(() => {
     return categories.find((c) => c.id === selectedCategoryId);
@@ -66,6 +88,27 @@ export default function FastExpenseModal({
 
   if (!isOpen) return null;
 
+  const resetRecurring = () => {
+    setSelectedItem(null);
+    setMakeRecurring(false);
+    setRecurringDay("");
+    setUpdateItem(false);
+    setRecurringError("");
+  };
+
+  // Tapping a suggestion fills the form from the schedule (nothing is saved yet).
+  const pickItem = (item: RecurringItem) => {
+    setSelectedItem(item);
+    setMakeRecurring(false);
+    setUpdateItem(false);
+    setRecurringError("");
+    setAmountRupees(String(item.amount / 100));
+    setNote(item.name);
+    setRecurringDay(item.day_of_month ? String(item.day_of_month) : "");
+    if (item.category_id && categories.some((c) => c.id === item.category_id)) setSelectedCategoryId(item.category_id);
+    setShowDetails(true);
+  };
+
   const quickAmounts = [100, 250, 500, 1000, 2000];
 
   const handleSubmit = async (e?: React.FormEvent) => {
@@ -81,6 +124,19 @@ export default function FastExpenseModal({
       return;
     }
 
+    // Recurring: validate the optional auto-record day only when it will actually be used.
+    const recurringMode = selectedItem !== null || makeRecurring;
+    let recurringDayValue: number | null = null;
+    if (recurringMode && (selectedItem ? updateItem : makeRecurring)) {
+      const parsedDay = parseOptionalDay(recurringDay);
+      if ("error" in parsedDay) {
+        setRecurringError(parsedDay.error);
+        return;
+      }
+      recurringDayValue = parsedDay.value;
+    }
+    setRecurringError("");
+
     setLoading(true);
     setErrorMsg("");
 
@@ -88,17 +144,33 @@ export default function FastExpenseModal({
       const supabase = createClient();
       const amountPaise = Math.round(parsedAmount * 100);
 
-      const { error } = await supabase.from("transactions").insert({
-        user_id: userId,
-        category_id: selectedCategoryId,
-        amount: amountPaise,
-        type: "expense",
-        date: date || toLocalDateString(),
-        note: note.trim() || null,
-        source: "manual",
-      });
+      const { error } = recurringMode
+        ? // One atomic call: records this entry and creates/links the recurring schedule.
+          await supabase.rpc("record_entry_with_recurring", {
+            p_type: "expense",
+            p_amount: amountPaise,
+            p_date: date || toLocalDateString(),
+            p_category_id: selectedCategoryId,
+            p_note: note.trim() || null,
+            p_item_id: selectedItem?.id ?? null,
+            p_make_recurring: selectedItem ? false : makeRecurring,
+            p_day: recurringDayValue,
+            p_update_item: selectedItem ? updateItem : false,
+          })
+        : await supabase.from("transactions").insert({
+            user_id: userId,
+            category_id: selectedCategoryId,
+            amount: amountPaise,
+            type: "expense",
+            date: date || toLocalDateString(),
+            note: note.trim() || null,
+            source: "manual",
+          });
 
       if (error) {
+        if (error.code === "23505") {
+          throw new Error("This recurring item is already recorded for that month.");
+        }
         throw error;
       }
 
@@ -110,6 +182,7 @@ export default function FastExpenseModal({
       // Reset and trigger refresh
       setAmountRupees("");
       setNote("");
+      resetRecurring();
       onExpenseAdded();
       onClose();
     } catch (err: any) {
@@ -120,7 +193,7 @@ export default function FastExpenseModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-150">
+    <div role="dialog" aria-label="Log expense" data-testid="expense-modal" className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-150">
       <div className="bg-white w-full max-w-lg rounded-t-3xl sm:rounded-3xl shadow-2xl border border-slate-100 overflow-hidden max-h-[90vh] flex flex-col">
         {/* Header */}
         <div className="p-4 px-6 border-b border-slate-100 flex items-center justify-between">
@@ -161,6 +234,14 @@ export default function FastExpenseModal({
               <span className="font-semibold leading-relaxed">{impact.message}</span>
             </div>
           )}
+
+          <RecurringSuggestions
+            suggestions={suggestions}
+            selectedId={selectedItem?.id ?? null}
+            onPick={pickItem}
+            onClear={resetRecurring}
+            onChanged={onExpenseAdded}
+          />
 
           {/* TAP 1: Amount Input */}
           <div>
@@ -227,6 +308,9 @@ export default function FastExpenseModal({
                   <button
                     key={c.id}
                     type="button"
+                    data-testid="expense-category"
+                    data-name={c.name}
+                    aria-pressed={isSelected}
                     onClick={() => setSelectedCategoryId(c.id)}
                     className={`p-3 rounded-xl border text-left text-xs font-medium transition-all flex flex-col justify-between ${
                       isSelected
@@ -289,6 +373,17 @@ export default function FastExpenseModal({
               </div>
             )}
           </div>
+
+          <RecurringOptions
+            selectedItem={selectedItem}
+            checked={makeRecurring}
+            onCheckedChange={setMakeRecurring}
+            day={recurringDay}
+            onDayChange={setRecurringDay}
+            updateItem={updateItem}
+            onUpdateItemChange={setUpdateItem}
+            error={recurringError}
+          />
         </div>
 
         {/* TAP 3: Submit Action */}

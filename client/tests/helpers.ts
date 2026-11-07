@@ -43,3 +43,15 @@ export async function categoryNames(page: Page): Promise<string[]> {
   const names = await page.getByTestId("category-row").evaluateAll((rows) => rows.map((r) => (r as HTMLElement).dataset.name ?? ""));
   return names.sort((a, b) => a.localeCompare(b));
 }
+
+/** YYYY-MM-DD in the browser's (= this machine's) local calendar, like the app does. */
+export function localDate(d: Date): string {
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
+/** The 15th of last month, a date that is certainly in the past and in a different month. */
+export function lastMonth15th(): string {
+  const now = new Date();
+  return localDate(new Date(now.getFullYear(), now.getMonth() - 1, 15));
+}
