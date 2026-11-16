@@ -44,9 +44,11 @@ import type { AutoRecordedEntry, RecurringItem } from "@/lib/recurringTypes";
 import { 
   getPeriodRange, 
   computeCategoryBudgets, 
-  computeBurnRate, 
-  formatINR 
+  formatINR
 } from "@/lib/budgetUtils";
+import { computeMonthlyTrends } from "@/lib/reportsUtils";
+import { computeSpendingPace } from "@/lib/spendingPace.mjs";
+import { generateInsights } from "@/lib/insights.mjs";
 import { getCategoryLimitAlerts, getSavingsTargetAlert, BudgetAlert } from "@/lib/alertUtils";
 import { transactionsToCsv } from "@/lib/csvExport.mjs";
 
@@ -213,9 +215,21 @@ export default function DashboardClient({
 
   // Compute flexible budget burn rate metrics
   const totalFlexibleBudget = flexibleCategories.reduce((sum, c) => sum + Number(c.monthly_limit), 0);
-  const burnRate = useMemo(() => {
-    return computeBurnRate(totalFlexibleBudget, flexibleSpent, period);
-  }, [totalFlexibleBudget, flexibleSpent, period]);
+  // Cumulative pace for the cycle; its burnRate is the same computeBurnRate result the Pacing card uses.
+  const pace = useMemo(
+    () => computeSpendingPace({ flexibleBudget: totalFlexibleBudget, cycleTransactions: currentPeriodTransactions, period }),
+    [totalFlexibleBudget, currentPeriodTransactions, period]
+  );
+  const burnRate = pace.burnRate;
+
+  // Deterministic insights: current cycle + the last 6 completed calendar months.
+  const insights = useMemo(() => {
+    const now = new Date();
+    const completedMonths = computeMonthlyTrends(
+      transactions, incomeSources, contributions, 6, new Date(now.getFullYear(), now.getMonth() - 1, 1)
+    );
+    return generateInsights({ categoryBudgets, period, pace, completedMonths });
+  }, [transactions, incomeSources, contributions, categoryBudgets, period, pace]);
 
   // Compute active alerts
   const activeAlerts = useMemo(() => {
@@ -517,6 +531,7 @@ export default function DashboardClient({
             categories={categories}
             incomeSources={incomeSources}
             contributions={contributions}
+            insights={insights}
           />
         )}
       </main>

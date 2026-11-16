@@ -102,6 +102,30 @@ export default function ChartCard({
   );
 }
 
+/** Plain table for a chart's Table view. First column is left-aligned, the rest right-aligned. */
+export function ChartTable({ headers, rows }: { headers: string[]; rows: ReactNode[][] }) {
+  return (
+    <table className="w-full text-left">
+      <thead>
+        <tr className="text-slate-500 border-b border-slate-200">
+          {headers.map((h, i) => (
+            <th key={h} className={`py-1.5 px-2 font-semibold ${i ? "text-right" : ""}`}>{h}</th>
+          ))}
+        </tr>
+      </thead>
+      <tbody>
+        {rows.map((row, r) => (
+          <tr key={r} className="border-b border-slate-100 text-slate-700">
+            {row.map((cell, i) => (
+              <td key={i} className={`py-1.5 px-2 ${i ? "text-right tabular-nums" : "font-medium"}`}>{cell}</td>
+            ))}
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  );
+}
+
 /** Shared tooltip styling + INR values. Spread onto <Tooltip {...inrTooltipProps} />. */
 export const inrTooltipProps = {
   formatter: (value: unknown) => formatINR(Number(value)),
