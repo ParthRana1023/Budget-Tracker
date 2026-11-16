@@ -6,6 +6,7 @@
  */
 
 import { formatINR } from "./budgetUtils";
+import { calculateSafeToSpend } from "./safeToSpend.mjs";
 
 export type AlertSeverity = "warning" | "danger" | "critical";
 
@@ -98,8 +99,14 @@ export function getSavingsTargetAlert(input: SavingsThreatInput): BudgetAlert | 
 
   if (targetSavings <= 0) return null;
 
-  const unpaidFixed = Math.max(0, budgetedFixedBills - paidFixedBills);
-  const safeToSpend = confirmedIncome - targetSavings - unpaidFixed - flexibleSpent;
+  const { remainingFixedBills: unpaidFixed, safeToSpend } = calculateSafeToSpend({
+    confirmedIncome,
+    targetSavings,
+    budgetedFixedBills,
+    paidFixedBills,
+    flexibleSpent,
+    daysRemaining: 1, // allowance is not used here
+  });
 
   // Actual deficit currently dipping into savings
   if (safeToSpend < 0) {

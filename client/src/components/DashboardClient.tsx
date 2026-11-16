@@ -39,6 +39,7 @@ import ReportsView from "./ReportsView";
 import RecurringAutoRecordedAlert from "./RecurringAutoRecordedAlert";
 import { toLocalDateString, msUntilNextLocalMidnight } from "@/lib/periods.mjs";
 import { mergeAutoRecorded } from "@/lib/recurrence.mjs";
+import { calculateSafeToSpend, computeCycleBudgetInputs } from "@/lib/safeToSpend.mjs";
 import type { AutoRecordedEntry, RecurringItem } from "@/lib/recurringTypes";
 import { 
   getPeriodRange, 
@@ -183,49 +184,27 @@ export default function DashboardClient({
     return null;
   };
 
-  // Safe to spend math
-  const confirmedIncome = incomeSources
-    .filter((i) => i.status === "received" && i.received_date >= startStr && i.received_date <= endStr)
-    .reduce((sum, i) => sum + Number(i.amount), 0);
-
-  // Expected Variable Pay items
-  const expectedVariableSources = incomeSources.filter(
-    (i) => i.type === "variable" && i.status === "expected" && i.expected_date >= startStr && i.expected_date <= endStr
-  );
-  const unreceivedVariable = expectedVariableSources.reduce(
-    (sum, i) => sum + Number(i.amount),
-    0
-  );
-
-  const fixedCategories = categories.filter((c) => c.type === "fixed");
+  // Safe to spend math (shared with the planner/simulator via lib/safeToSpend.mjs)
+  const {
+    confirmedIncome,
+    expectedVariableSources,
+    unreceivedVariable,
+    budgetedFixedBills,
+    paidFixedBills,
+    flexibleSpent,
+    targetSavings,
+  } = computeCycleBudgetInputs({ incomeSources, contributions, categories, cycleTransactions: currentPeriodTransactions, startStr, endStr });
   const flexibleCategories = categories.filter((c) => c.type === "flexible");
 
-  const budgetedFixedBills = fixedCategories.reduce((sum, c) => sum + Number(c.monthly_limit), 0);
-
-  // Current cycle spent figures
-  const paidFixedBills = currentPeriodTransactions
-    .filter((t) => t.type === "expense" && t.category?.type === "fixed")
-    .reduce((sum, t) => sum + Number(t.amount), 0);
-
-  const remainingFixedBills = Math.max(0, budgetedFixedBills - paidFixedBills);
-
-  const flexibleSpent = currentPeriodTransactions
-    .filter((t) => t.type === "expense" && t.category?.type === "flexible")
-    .reduce((sum, t) => sum + Number(t.amount), 0);
-
-  // Total savings contributions made in this active cycle
-  const cycleSavingsContributions = contributions
-    .filter((c) => {
-      const d = c.date || "";
-      return d >= startStr && d <= endStr;
-    })
-    .reduce((sum, c) => sum + Number(c.amount), 0);
-
-  const targetSavings = cycleSavingsContributions;
-
   // Core formula: Safe to spend = Confirmed Income − Target Savings − Remaining Unpaid Fixed Bills − Flexible Spent
-  const safeToSpend = confirmedIncome - targetSavings - remainingFixedBills - flexibleSpent;
-  const dailyAllowance = safeToSpend > 0 ? Math.floor(safeToSpend / period.daysRemaining) : 0;
+  const { remainingFixedBills, safeToSpend, dailyAllowance } = calculateSafeToSpend({
+    confirmedIncome,
+    targetSavings,
+    budgetedFixedBills,
+    paidFixedBills,
+    flexibleSpent,
+    daysRemaining: period.daysRemaining,
+  });
 
   // Compute per-category progress
   const categoryBudgets = useMemo(() => {

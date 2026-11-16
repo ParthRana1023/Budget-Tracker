@@ -3,6 +3,24 @@
 :root {
   --background: #f8fafc;
   --foreground: #0f172a;
+
+  /* Chart tokens. Categorical slots are used in this fixed order (validated for
+     colour-blind separation against the card surface); never cycle or reorder them. */
+  --chart-1: #2a78d6; /* blue */
+  --chart-2: #eb6834; /* orange */
+  --chart-3: #1baf7a; /* aqua */
+  --chart-4: #eda100; /* yellow */
+  --chart-5: #e87ba4; /* magenta */
+  --chart-6: #008300; /* green */
+  --chart-good: #0ca30c;
+  --chart-warning: #fab219;
+  --chart-serious: #ec835a;
+  --chart-critical: #d03b3b;
+  --chart-ink: #0f172a;
+  --chart-muted: #64748b;
+  --chart-grid: #e2e8f0;
+  --chart-axis: #cbd5e1;
+  --chart-surface: #ffffff;
 }
 
 body {
@@ -20,6 +38,19 @@ html.dark {
   color-scheme: dark;
   --background: #0b1220;
   --foreground: #e2e8f0;
+
+  /* Same hues stepped for the dark card surface (#111c2e), not an automatic flip. */
+  --chart-1: #3987e5;
+  --chart-2: #d95926;
+  --chart-3: #199e70;
+  --chart-4: #c98500;
+  --chart-5: #d55181;
+  --chart-6: #0ca30c;
+  --chart-ink: #f1f5f9;
+  --chart-muted: #94a3b8;
+  --chart-grid: #1e293b;
+  --chart-axis: #334155;
+  --chart-surface: #111c2e;
 }
 
 html.dark body {
