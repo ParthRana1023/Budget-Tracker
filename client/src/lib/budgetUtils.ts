@@ -17,26 +17,8 @@ export interface PeriodRange {
 // Implemented in periods.mjs so it can be unit-tested under several timezones.
 export { getPeriodRange, toLocalDateString, toLocalMonthKey } from "./periods.mjs";
 
-/**
- * Format paise as INR string.
- */
-export function formatINR(paise: number): string {
-  const rupees = paise / 100;
-  if (Math.abs(rupees) >= 100000) {
-    return `₹${(rupees / 100000).toFixed(1)}L`;
-  }
-  return `₹${Math.round(rupees).toLocaleString("en-IN")}`;
-}
-
-/**
- * Format paise as decimal INR string (for detailed views).
- */
-export function formatINRDecimal(paise: number): string {
-  return `₹${(paise / 100).toLocaleString("en-IN", {
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 2,
-  })}`;
-}
+// Implemented in money.mjs so plain-JS modules and tests can format INR too.
+export { formatINR, formatINRDecimal } from "./money.mjs";
 
 export interface CategoryBudgetStatus {
   id: string;
@@ -64,31 +46,8 @@ export interface BurnRateMetrics {
   isOnTrack: boolean;
 }
 
-/**
- * Compute daily burn rate and linear projections.
- */
-export function computeBurnRate(
-  flexibleBudget: number,
-  flexibleSpent: number,
-  period: PeriodRange
-): BurnRateMetrics {
-  const expectedDailyRate = flexibleBudget > 0 ? Math.round(flexibleBudget / period.totalDays) : 0;
-  const actualDailyRate = period.daysElapsed > 0 ? Math.round(flexibleSpent / period.daysElapsed) : 0;
-  const expectedSpentByNow = expectedDailyRate * period.daysElapsed;
-  const burnRatio = expectedSpentByNow > 0 ? flexibleSpent / expectedSpentByNow : 0;
-  const projectedEndOfMonth = actualDailyRate * period.totalDays;
-
-  return {
-    totalBudget: flexibleBudget,
-    totalSpent: flexibleSpent,
-    expectedSpentByNow,
-    actualDailyRate,
-    expectedDailyRate,
-    burnRatio,
-    projectedEndOfMonth,
-    isOnTrack: burnRatio <= 1.1,
-  };
-}
+// Implemented in burnRate.mjs so the spending-pace chart logic can build on it under unit tests.
+export { computeBurnRate } from "./burnRate.mjs";
 
 // Implemented in a plain JS module so date-only behavior can be tested across timezones.
 export { calculateNeededPerMonth } from "./goalMetrics.mjs";
