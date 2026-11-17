@@ -18,7 +18,8 @@ export async function signUpFreshUser(page: Page): Promise<string> {
   await page.click("#signup-submit-btn");
 
   await page.waitForURL("**/dashboard", { timeout: 20_000 });
-  await expect(page.getByTestId("recurring-section")).toBeVisible({ timeout: 20_000 });
+  // The dashboard has loaded once its category controls render (the old recurring section no longer exists).
+  await expect(page.getByTitle("Manage Categories")).toBeVisible({ timeout: 20_000 });
   return email;
 }
 
