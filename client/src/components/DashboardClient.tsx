@@ -38,11 +38,9 @@ import AlertBanner from "./AlertBanner";
 import SavingsGoalsSection, { SavingsGoal } from "./SavingsGoalsSection";
 import WindfallAllocationModal from "./WindfallAllocationModal";
 import ReportsView from "./ReportsView";
-import RecurringAutoRecordedAlert from "./RecurringAutoRecordedAlert";
-import { toLocalDateString, msUntilNextLocalMidnight } from "@/lib/periods.mjs";
-import { mergeAutoRecorded } from "@/lib/recurrence.mjs";
+import { toLocalDateString } from "@/lib/periods.mjs";
 import { calculateSafeToSpend, computeCycleBudgetInputs } from "@/lib/safeToSpend.mjs";
-import type { AutoRecordedEntry, RecurringItem } from "@/lib/recurringTypes";
+import type { RecurringItem } from "@/lib/recurringTypes";
 import { 
   getPeriodRange, 
   computeCategoryBudgets, 
@@ -105,7 +103,6 @@ export default function DashboardClient({
   const [editingTransaction, setEditingTransaction] = useState<TransactionItem | null>(null);
   const [windfallToAllocate, setWindfallToAllocate] = useState<{ id: string; name: string; amount: number } | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
-  const [autoRecorded, setAutoRecorded] = useState<AutoRecordedEntry[]>([]);
 
   // Current period computation based on month_start_day
   const period = useMemo(() => {
@@ -151,60 +148,6 @@ export default function DashboardClient({
         .order("cycle_start", { ascending: true });
       if (plansRes.data) setPlans(plansRes.data as unknown as BudgetPlanRow[]);
     }
-  };
-
-  // ---- Recurring items: record occurrences whose day has ended -------------
-  // The database does the recording (process_due_recurring); this just asks it, using the
-  // user's LOCAL date, and shows an alert for whatever it recorded. It runs when the app
-  // opens, when the tab becomes visible again, and at every local midnight (end of day)
-  // while the app stays open. Calling it again is always safe: it never records twice.
-  const refreshRef = useRef(refreshData);
-  refreshRef.current = refreshData;
-
-  useEffect(() => {
-    let cancelled = false;
-    let timer: ReturnType<typeof setTimeout> | undefined;
-
-    const processRecurring = async () => {
-      const { data, error } = await createClient().rpc("process_due_recurring", { p_today: toLocalDateString() });
-      if (cancelled) return;
-      if (error) {
-        console.error("process_due_recurring failed:", error.message);
-        return;
-      }
-      if (data && data.length > 0) {
-        setAutoRecorded((prev) => mergeAutoRecorded(prev, data));
-        await refreshRef.current();
-      }
-    };
-
-    const scheduleMidnight = () => {
-      timer = setTimeout(async () => {
-        await processRecurring();
-        if (!cancelled) scheduleMidnight();
-      }, msUntilNextLocalMidnight() + 1000);
-    };
-    const onVisible = () => {
-      if (document.visibilityState === "visible") processRecurring();
-    };
-
-    processRecurring();
-    scheduleMidnight();
-    document.addEventListener("visibilitychange", onVisible);
-    return () => {
-      cancelled = true;
-      if (timer) clearTimeout(timer);
-      document.removeEventListener("visibilitychange", onVisible);
-    };
-  }, []);
-
-  // Undo an automatic record: removes it and stops it coming back for that month.
-  const undoAutoRecorded = async (entry: AutoRecordedEntry): Promise<string | null> => {
-    const { error } = await createClient().rpc("undo_recurring_post", { p_transaction_id: entry.transactionId });
-    if (error) return error.message;
-    setAutoRecorded((prev) => prev.filter((e) => e.transactionId !== entry.transactionId));
-    await refreshData();
-    return null;
   };
 
   // Safe to spend math (shared with the planner/simulator via lib/safeToSpend.mjs)
@@ -687,8 +630,6 @@ export default function DashboardClient({
         userId={initialUser.id}
         onAllocated={refreshData}
       />
-
-      <RecurringAutoRecordedAlert entries={autoRecorded} onUndo={undoAutoRecorded} onDismiss={() => setAutoRecorded([])} />
     </div>
   );
 }

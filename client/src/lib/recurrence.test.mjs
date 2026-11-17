@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { formatShortDate, mergeAutoRecorded, parseOptionalDay, recurringKey, scheduleLabel, suggestRecurring } from "./recurrence.mjs";
+import { formatShortDate, parseOptionalDay, recurringKey, scheduleLabel, suggestRecurring } from "./recurrence.mjs";
 
 test("recurringKey matches the SQL key: recurring:<id>:<YYYY-MM>", () => {
   assert.equal(recurringKey("abc", "2026-11-03"), "recurring:abc:2026-11");
@@ -41,17 +41,8 @@ test("suggestRecurring orders by day, suggestion-only last, then name", () => {
 });
 
 test("scheduleLabel", () => {
-  assert.equal(scheduleLabel({ day_of_month: 5 }), "auto-records after day 5");
+  assert.equal(scheduleLabel({ day_of_month: 5 }), "due on day 5");
   assert.equal(scheduleLabel({ day_of_month: null }), "suggestion only");
-});
-
-test("mergeAutoRecorded maps database rows and ignores an occurrence it already has", () => {
-  const row = { transaction_id: "t1", item_id: "i1", item_name: "Rent", item_type: "expense", amount_paise: "2500000", occurred_on: "2026-11-05" };
-  const first = mergeAutoRecorded([], [row]);
-  assert.deepEqual(first, [{ transactionId: "t1", itemId: "i1", name: "Rent", type: "expense", amount: 2500000, date: "2026-11-05" }]);
-  assert.equal(mergeAutoRecorded(first, [row]), first); // same array back: nothing new, no re-render
-  assert.equal(mergeAutoRecorded(first, [{ ...row, transaction_id: "t2" }]).length, 2);
-  assert.deepEqual(mergeAutoRecorded([], []), []);
 });
 
 test("formatShortDate does not shift the day across timezones", () => {

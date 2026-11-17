@@ -1,4 +1,4 @@
-// Budget plan rows (supabase/migrations/20261117000000_budget_plans.sql). Amounts in paise.
+// Budget plan rows (server/supabase/migrations/20261117000000_budget_plans.sql). Amounts in paise.
 
 export interface BudgetPlanRow {
   id: string;

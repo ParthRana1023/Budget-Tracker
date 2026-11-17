@@ -59,7 +59,7 @@ select is((select count(*)::integer from public.transactions where type = 'incom
 -- proves the earlier writes in the same call are rolled back too.
 select throws_ok(
   $$select public.allocate_windfall('e1000000-0000-0000-0000-000000000003', '99999999-9999-9999-9999-999999999999', 100000, 500000, '2026-11-03', 'probe')$$,
-  '23503', null, 'failure: an unknown goal id is rejected');
+  'P0001', 'Savings goal not found', 'failure: an unknown goal id is rejected');
 select is((select status from public.income_sources where id = 'e1000000-0000-0000-0000-000000000003'),
   'expected', 'failure: the income source is NOT left marked received');
 select is((select received_date from public.income_sources where id = 'e1000000-0000-0000-0000-000000000003'),

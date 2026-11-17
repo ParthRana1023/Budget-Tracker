@@ -44,7 +44,7 @@ Thumbs.db
 .next/cache/
 
 # Supabase CLI local state
-supabase/.temp/
+server/supabase/.temp/
 
 /plans
 /.playwright-mcp

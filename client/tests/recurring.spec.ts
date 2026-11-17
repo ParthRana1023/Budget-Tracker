@@ -2,7 +2,7 @@ import { test, expect, Page } from "@playwright/test";
 import { lastMonth15th, signUpFreshUser } from "./helpers";
 
 // Recurring income / expenses live inside the expense and income pop-ups: a checkbox,
-// suggestions at the top, and an optional day for automatic recording. There is no
+// suggestions at the top, and an optional due day (never recorded automatically). There is no
 // separate recurring section.
 
 const expenseModal = (page: Page) => page.getByTestId("expense-modal");
@@ -110,7 +110,7 @@ test.describe("Recurring items in the expense / income pop-ups", () => {
     await expect(incomeModal(page).getByTestId("recurring-checkbox")).toHaveCount(0);
   });
 
-  test("an out-of-range auto-record day is rejected and nothing is saved", async ({ page }) => {
+  test("an out-of-range due day is rejected and nothing is saved", async ({ page }) => {
     await signUpFreshUser(page);
     await logExpense(page, { amount: "500", category: "Subscriptions", note: "Netflix", recurring: true, day: "29" });
 
@@ -136,56 +136,13 @@ test.describe("Recurring items in the expense / income pop-ups", () => {
     await expect(suggestion(page, "Gym")).toHaveCount(0); // really deleted, not hidden
   });
 
-  test.describe("automatic recording at the end of the scheduled day", () => {
-    // Needs "day 1 of this month has ended", i.e. today is the 2nd or later.
-    test.skip(new Date().getDate() < 2, "day 1 has not ended yet today");
+  // Design handoff: recurring items never record themselves; a due item waits for Record.
+  test("a recurring item past its day is never recorded on its own", async ({ page }) => {
+    await signUpFreshUser(page);
+    await logExpense(page, { amount: "25000", category: "Rent / Housing", note: "Rent", date: lastMonth15th(), recurring: true, day: "1" });
 
-    test("a recurring expense is recorded automatically, an alert appears, and Undo removes it for good", async ({ page }) => {
-      await signUpFreshUser(page);
-      await logExpense(page, { amount: "25000", category: "Rent / Housing", note: "Rent", date: lastMonth15th(), recurring: true, day: "1" });
-
-      // The automatic recorder runs when the app opens.
-      await page.reload();
-      const alert = page.getByTestId("recurring-auto-alert");
-      await expect(alert).toBeVisible();
-      await expect(alert).toContainText("recorded automatically");
-      await expect(alert.locator('[data-testid="recurring-auto-entry"][data-name="Rent"]')).toContainText("₹25,000");
-      await expect(page.getByText("Recurring: Rent")).toBeVisible();
-
-      await alert.getByTestId("recurring-auto-undo").click();
-      await expect(alert).toHaveCount(0);
-      await expect(page.getByText("Recurring: Rent")).toHaveCount(0);
-
-      // The undo sticks: opening the app again does not put it back.
-      await page.reload();
-      await expect(page.getByTestId("recurring-auto-alert")).toHaveCount(0);
-      await expect(page.getByText("Recurring: Rent")).toHaveCount(0);
-    });
-
-    test("a recurring income is recorded automatically too", async ({ page }) => {
-      await signUpFreshUser(page);
-      await logIncome(page, { name: "Salary", amount: "80000", date: lastMonth15th(), recurring: true, day: "1" });
-
-      await page.reload();
-      const entry = page.locator('[data-testid="recurring-auto-entry"][data-name="Salary"]');
-      await expect(entry).toBeVisible();
-      await expect(entry).toContainText("+₹80,000");
-      await expect(page.getByText("Recurring: Salary")).toBeVisible();
-
-      await entry.getByTestId("recurring-auto-undo").click();
-      await expect(entry).toHaveCount(0);
-      await expect(page.getByText("Recurring: Salary")).toHaveCount(0);
-    });
-
-    test("dismissing the alert hides it without undoing anything", async ({ page }) => {
-      await signUpFreshUser(page);
-      await logExpense(page, { amount: "700", category: "Subscriptions", note: "Cloud storage", date: lastMonth15th(), recurring: true, day: "1" });
-
-      await page.reload();
-      await expect(page.getByTestId("recurring-auto-alert")).toBeVisible();
-      await page.getByTestId("recurring-auto-dismiss").click();
-      await expect(page.getByTestId("recurring-auto-alert")).toHaveCount(0);
-      await expect(page.getByText("Recurring: Cloud storage")).toBeVisible(); // still recorded
-    });
+    await page.reload();
+    await expect(page.getByTestId("recurring-auto-alert")).toHaveCount(0);
+    await expect(page.getByText("Recurring: Rent")).toHaveCount(0);
   });
 });

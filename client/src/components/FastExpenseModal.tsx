@@ -124,7 +124,7 @@ export default function FastExpenseModal({
       return;
     }
 
-    // Recurring: validate the optional auto-record day only when it will actually be used.
+    // Recurring: validate the optional due day only when it will actually be used.
     const recurringMode = selectedItem !== null || makeRecurring;
     let recurringDayValue: number | null = null;
     if (recurringMode && (selectedItem ? updateItem : makeRecurring)) {

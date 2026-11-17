@@ -6,7 +6,7 @@ export function recurringKey(itemId, dateStr) {
 }
 
 /**
- * Parse the optional "auto-record on day" input.
+ * Parse the optional "due on day" input.
  * Blank = no automatic day (suggestion only). Otherwise a whole number 1-28.
  * @returns {{ value: number | null } | { error: string }}
  */
@@ -47,26 +47,7 @@ export function suggestRecurring(items, type, transactions, entryDate) {
 
 /** Short description of when a schedule is recorded. */
 export function scheduleLabel(item) {
-  return item.day_of_month ? `auto-records after day ${item.day_of_month}` : "suggestion only";
-}
-
-/**
- * Rows returned by process_due_recurring() -> alert entries. The same occurrence can
- * be reported twice (dev double-mount, two tabs), so merge by transaction id.
- */
-export function mergeAutoRecorded(existing, rows) {
-  const seen = new Set(existing.map((e) => e.transactionId));
-  const added = rows
-    .filter((r) => !seen.has(r.transaction_id))
-    .map((r) => ({
-      transactionId: r.transaction_id,
-      itemId: r.item_id,
-      name: r.item_name,
-      type: r.item_type,
-      amount: Number(r.amount_paise),
-      date: r.occurred_on,
-    }));
-  return added.length ? [...existing, ...added] : existing;
+  return item.day_of_month ? `due on day ${item.day_of_month}` : "suggestion only";
 }
 
 /** 'YYYY-MM-DD' -> '5 Nov', without going through UTC. */

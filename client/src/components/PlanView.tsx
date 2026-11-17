@@ -363,7 +363,7 @@ export default function PlanView(props: PlanViewProps) {
         <div className="p-4 rounded-2xl border border-amber-300 bg-amber-50 text-xs text-amber-900 flex gap-2">
           <Database className="w-4 h-4 shrink-0 mt-0.5" />
           <p>
-            Saving plans needs a one-time database update. Run <code className="break-all">supabase/migrations/20261117000000_budget_plans.sql</code> in the
+            Saving plans needs a one-time database update. Run <code className="break-all">server/supabase/migrations/20261117000000_budget_plans.sql</code> in the
             Supabase SQL Editor. Until then you can still simulate changes; they just cannot be saved.
           </p>
         </div>

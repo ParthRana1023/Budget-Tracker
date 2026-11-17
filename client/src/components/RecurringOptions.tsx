@@ -5,7 +5,7 @@ import type { RecurringItem } from "@/lib/recurringTypes";
 
 /**
  * The recurring checkbox in the expense / income pop-ups.
- *  - Nothing picked: "Repeat every month" + an optional auto-record day.
+ *  - Nothing picked: "Repeat every month" + an optional due day.
  *  - A recurring suggestion picked: shows which one, with an option to update it
  *    with the values currently in the form.
  * The checkbox only describes what to do; nothing is counted until the date arrives
@@ -33,7 +33,7 @@ export default function RecurringOptions({
   const dayInput = (
     <div>
       <label className="block text-[11px] font-medium text-slate-600 mb-1" htmlFor="recurring-day">
-        Record automatically on day (1–28) <span className="text-slate-400">— optional</span>
+        Due on day (1–28) <span className="text-slate-400">— optional</span>
       </label>
       <input
         id="recurring-day"

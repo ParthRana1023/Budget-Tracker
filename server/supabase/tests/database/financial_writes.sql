@@ -83,7 +83,7 @@ select is(
 
 select throws_ok(
   $$select public.record_goal_contribution('33333333-3333-3333-3333-333333333333', 10000, '2026-11-02', 'should roll back')$$,
-  '23503', null,
+  'P0001', 'Savings goal not found',
   'a contribution with a missing goal fails'
 );
 select is(

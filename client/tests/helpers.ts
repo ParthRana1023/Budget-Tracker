@@ -2,8 +2,8 @@ import { expect, Page } from "@playwright/test";
 
 /**
  * These specs sign up a brand-new user per test, so they need a real Supabase
- * backend with e-mail confirmation DISABLED (the default for `supabase start`,
- * see supabase/config.toml: [auth.email] enable_confirmations = false) and the
+ * backend with e-mail confirmation DISABLED (the default for `supabase start --workdir server`,
+ * see server/supabase/config.toml: [auth.email] enable_confirmations = false) and the
  * client's .env pointing at it. They cannot run against a mocked backend because
  * the dashboard loads its data on the server.
  */

@@ -1,5 +1,5 @@
 // End-to-end check of the analytics, planning and goal features on a real Supabase
-// (needs `supabase start` + migrations, like the other specs).
+// (needs `supabase start --workdir server` + migrations, like the other specs).
 import { test, expect, Page } from "@playwright/test";
 import { signUpFreshUser, openCategoryModal } from "./helpers";
 

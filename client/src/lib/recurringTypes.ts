@@ -5,18 +5,11 @@ export interface RecurringItem {
   amount: number;
   type: "expense" | "income";
   category_id: string | null;
-  /** 1-28 = recorded automatically once that day has ended; null = only suggested, never automatic. */
+  /** 1-28 = due that day (added only when the user taps Record); null = no set day, only suggested. */
   day_of_month: number | null;
+  /** 'YYYY-MM' the user chose "Skip this month" for; null = not skipped. */
+  skip_month?: string | null;
   active: boolean;
   income_type: "salary" | "variable" | "other";
 }
 
-/** One occurrence the database recorded automatically (shown in the alert, with Undo). */
-export interface AutoRecordedEntry {
-  transactionId: string;
-  itemId: string;
-  name: string;
-  type: "expense" | "income";
-  amount: number;
-  date: string; // YYYY-MM-DD, the scheduled day
-}
