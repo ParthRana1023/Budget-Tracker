@@ -85,3 +85,19 @@ export function analyzeGoal({ targetAmount, targetDate, contributions, reference
     status,
   };
 }
+
+/**
+ * The dashboard's on-track bar for an unfinished goal with a future target date
+ * (design handoff): solid = saved, striped = where the current monthly pace gets to
+ * by the target month, plus a tag. Null when there is no bar to show.
+ * @param {ReturnType<typeof analyzeGoal>} goal
+ * @returns {{ projected: number, tag: "on_track" | "nothing_yet" | "late", monthsLate: number } | null}
+ */
+export function goalTrack(goal) {
+  if (goal.status === "completed" || !goal.hasTargetDate || goal.isPastDeadline || !(goal.targetAmount > 0)) return null;
+  const months = goal.monthsRemaining, pace = goal.monthlyPace;
+  const projected = Math.min(goal.targetAmount, goal.current + pace * months);
+  if (pace >= goal.requiredMonthly) return { projected, tag: "on_track", monthsLate: 0 };
+  if (!(pace > 0)) return { projected, tag: "nothing_yet", monthsLate: 0 };
+  return { projected, tag: "late", monthsLate: Math.max(1, Math.ceil(goal.remaining / pace) - months) };
+}

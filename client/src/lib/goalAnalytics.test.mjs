@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { analyzeGoal, simulateGoalCompletion } from "./goalAnalytics.mjs";
+import { analyzeGoal, goalTrack, simulateGoalCompletion } from "./goalAnalytics.mjs";
 
 const ref = new Date(2026, 10, 16, 12); // 16 Nov 2026
 
@@ -60,4 +60,18 @@ test("simulator projects the completion month", () => {
     { monthsToGo: 3, completionMonthKey: "2027-02", completionLabel: undefined }
   );
   assert.equal(simulateGoalCompletion(25_000, 0, ref), null);
+});
+
+test("goalTrack: on-track bar tag and projection", () => {
+  const goal = (contributions, targetDate = "2027-05-31") => analyzeGoal({ targetAmount: 100_000, targetDate, contributions, referenceDate: ref });
+  const steady = goalTrack(goal([{ amount: 15_000, date: "2026-09-20" }, { amount: 15_000, date: "2026-10-20" }, { amount: 15_000, date: "2026-11-10" }]));
+  assert.equal(steady.tag, "on_track");
+  assert.equal(steady.projected, 100_000, "projection is capped at the target");
+  const slow = goalTrack(goal([{ amount: 3_000, date: "2026-09-01" }, { amount: 3_000, date: "2026-10-01" }, { amount: 3_000, date: "2026-11-01" }]));
+  assert.equal(slow.tag, "late");
+  assert.ok(slow.monthsLate >= 1);
+  assert.ok(slow.projected < 100_000);
+  assert.equal(goalTrack(goal([])).tag, "nothing_yet");
+  assert.equal(goalTrack(goal([{ amount: 100_000, date: "2026-11-01" }])), null, "finished goal: no bar");
+  assert.equal(goalTrack(goal([], null)), null, "no target date: no bar");
 });

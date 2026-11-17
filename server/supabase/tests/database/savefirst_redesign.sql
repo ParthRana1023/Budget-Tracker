@@ -56,8 +56,8 @@ select is((select count(*)::int from public.categories where is_active), 0, 'rej
 -- ================================================================ annual bills reserve
 select public.allocate_windfall('a1000000-0000-0000-0000-000000000001', (select goal_a from fixture),
   300000, 1000000, '2026-11-12', 'Bonus', 200000);
-select is((select amount from public.transactions where type = 'reserve_transfer'), 200000::bigint, 'the reserve part is its own reserve transfer');
-select is((select amount from public.transactions where type = 'savings_transfer'), 300000::bigint, 'the savings part still goes to the goal');
+select is((select amount || '|' || source from public.transactions where type = 'reserve_transfer'), '200000|windfall', 'the reserve part is its own reserve transfer, marked as windfall');
+select is((select amount || '|' || source from public.transactions where type = 'savings_transfer'), '300000|windfall', 'the savings part goes to the goal, marked as windfall (not regular savings)');
 select is((select amount from public.transactions where type = 'income'), 1000000::bigint, 'the full windfall is recorded as income');
 select throws_ok($$select public.allocate_windfall('a1000000-0000-0000-0000-000000000002', (select goal_a from fixture), 600000, 1000000, '2026-11-12', 'Probe', 500000)$$,
   'P0001', 'Reserve allocation must be between 0 and what is left after savings', 'savings + reserve above the windfall rejected');

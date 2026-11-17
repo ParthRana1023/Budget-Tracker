@@ -38,7 +38,8 @@ drop function if exists public.process_due_recurring(date);
 
 -- ---------------------------------------------------------------- windfall with reserve
 -- Split a received windfall: p_savings to a goal, p_reserve to the annual bills reserve,
--- the rest stays in safe to spend. Also restores the baseline's checks that the
+-- the rest stays in safe to spend. Both parts are marked source = 'windfall' so the
+-- app keeps them apart from the regular monthly savings target. Also restores the baseline's checks that the
 -- financial_integrity rewrite lost: only an EXPECTED income can be allocated (no double
 -- counting on a second submit) and the specific error messages.
 drop function if exists public.allocate_windfall(uuid, uuid, bigint, bigint, date, text);
@@ -85,7 +86,7 @@ begin
       raise exception 'Savings goal not found';
     end if;
     insert into public.transactions(user_id, amount, type, date, note, source)
-    values(auth.uid(), p_savings, 'savings_transfer', p_date, 'Windfall savings allocation', 'manual')
+    values(auth.uid(), p_savings, 'savings_transfer', p_date, 'Windfall savings allocation', 'windfall')
     returning id into v_tx;
     insert into public.goal_contributions(user_id, goal_id, transaction_id, amount, date)
     values(auth.uid(), p_goal_id, v_tx, p_savings, p_date);
@@ -93,7 +94,7 @@ begin
 
   if p_reserve > 0 then
     insert into public.transactions(user_id, amount, type, date, note, source)
-    values(auth.uid(), p_reserve, 'reserve_transfer', p_date, 'Annual & irregular bills reserve', 'manual');
+    values(auth.uid(), p_reserve, 'reserve_transfer', p_date, 'Annual & irregular bills reserve', 'windfall');
   end if;
 
   insert into public.transactions(user_id, amount, type, date, note, source)
