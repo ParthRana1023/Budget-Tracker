@@ -18,7 +18,9 @@ import {
   Loader2,
   Coins
 } from "lucide-react";
-import { formatINR, calculateNeededPerMonth } from "@/lib/budgetUtils";
+import { formatINR } from "@/lib/budgetUtils";
+import { analyzeGoal } from "@/lib/goalAnalytics.mjs";
+import GoalAnalytics from "./GoalAnalytics";
 import { toLocalDateString } from "@/lib/periods.mjs";
 
 export interface SavingsGoal {
@@ -32,7 +34,7 @@ export interface SavingsGoal {
 
 interface SavingsGoalsSectionProps {
   goals: SavingsGoal[];
-  contributions: Array<{ goal_id: string; amount: number }>;
+  contributions: Array<{ goal_id: string; amount: number; date?: string | null }>;
   userId: string;
   onGoalsUpdated: () => void;
 }
@@ -63,21 +65,19 @@ export default function SavingsGoalsSection({
 
   // Calculate current saved amount per goal from contributions
   const goalsWithCalculations = goals.map((goal) => {
-    const totalContributed = contributions
-      .filter((c) => c.goal_id === goal.id)
-      .reduce((sum, c) => sum + Number(c.amount), 0);
-
-    const percent = goal.target_amount > 0 
-      ? Math.min(100, (totalContributed / goal.target_amount) * 100) 
-      : 0;
-
-    const metrics = calculateNeededPerMonth(goal.target_amount, totalContributed, goal.target_date);
+    // analyzeGoal wraps calculateNeededPerMonth and adds pace, ETA and status.
+    const analytics = analyzeGoal({
+      targetAmount: Number(goal.target_amount),
+      targetDate: goal.target_date ?? null,
+      contributions: contributions.filter((c) => c.goal_id === goal.id),
+    });
 
     return {
       ...goal,
-      current_amount: totalContributed,
-      percent,
-      metrics,
+      current_amount: analytics.current,
+      percent: analytics.percent,
+      metrics: { neededPerMonth: analytics.requiredMonthly, monthsRemaining: analytics.monthsRemaining },
+      analytics,
     };
   });
 
@@ -280,6 +280,8 @@ export default function SavingsGoalsSection({
                       style={{ width: `${goal.percent}%` }}
                     />
                   </div>
+
+                  <GoalAnalytics analytics={goal.analytics} />
                 </div>
 
                 {/* Footer: Needed Per Month & Quick Contribute */}
