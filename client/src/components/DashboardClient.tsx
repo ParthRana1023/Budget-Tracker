@@ -48,6 +48,10 @@ import {
 } from "@/lib/budgetUtils";
 import { computeMonthlyTrends } from "@/lib/reportsUtils";
 import { computeSpendingPace } from "@/lib/spendingPace.mjs";
+import { computeUpcomingObligations } from "@/lib/upcomingObligations.mjs";
+import SpendingPaceChart from "./SpendingPaceChart";
+import BudgetVsActualChart from "./BudgetVsActualChart";
+import UpcomingObligations from "./UpcomingObligations";
 import { generateInsights } from "@/lib/insights.mjs";
 import { getCategoryLimitAlerts, getSavingsTargetAlert, BudgetAlert } from "@/lib/alertUtils";
 import { transactionsToCsv } from "@/lib/csvExport.mjs";
@@ -221,6 +225,26 @@ export default function DashboardClient({
     [totalFlexibleBudget, currentPeriodTransactions, period]
   );
   const burnRate = pace.burnRate;
+
+  const obligations = useMemo(
+    () =>
+      computeUpcomingObligations({
+        recurringItems,
+        categories,
+        transactions,
+        period,
+        today: toLocalDateString(),
+      }),
+    [recurringItems, categories, transactions, period]
+  );
+
+  // Budget chart -> transaction list: filter to the category and bring the list into view.
+  const [txCategoryFilter, setTxCategoryFilter] = useState<string>("all");
+  const transactionListRef = useRef<HTMLDivElement>(null);
+  const inspectCategory = (categoryId: string) => {
+    setTxCategoryFilter(categoryId);
+    transactionListRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
 
   // Deterministic insights: current cycle + the last 6 completed calendar months.
   const insights = useMemo(() => {
@@ -510,6 +534,12 @@ export default function DashboardClient({
               dailyAllowance={dailyAllowance}
             />
 
+            <SpendingPaceChart pace={pace} periodLabel={period.periodLabel} />
+
+            <UpcomingObligations obligations={obligations} periodLabel={period.periodLabel} />
+
+            <BudgetVsActualChart categoryBudgets={categoryBudgets} onSelectCategory={inspectCategory} />
+
             {/* Category Progress Bars Grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <CategoryProgress categoryBudgets={categoryBudgets} type="flexible" />
@@ -517,12 +547,16 @@ export default function DashboardClient({
             </div>
 
             {/* Transaction History & Filters */}
-            <TransactionList
-              transactions={transactions}
-              categories={categories}
-              onEditTransaction={(item) => setEditingTransaction(item)}
-              onOpenFastExpense={() => setIsExpenseOpen(true)}
-            />
+            <div ref={transactionListRef} className="scroll-mt-20">
+              <TransactionList
+                transactions={transactions}
+                categories={categories}
+                onEditTransaction={(item) => setEditingTransaction(item)}
+                onOpenFastExpense={() => setIsExpenseOpen(true)}
+                selectedCategory={txCategoryFilter}
+                onSelectedCategoryChange={setTxCategoryFilter}
+              />
+            </div>
           </>
         ) : (
           /* VIEW 2: PHASE 6 REPORTS & TREND ANALYTICS */

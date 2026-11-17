@@ -19,6 +19,9 @@ interface TransactionListProps {
   categories: Category[];
   onEditTransaction: (item: TransactionItem) => void;
   onOpenFastExpense: () => void;
+  /** Optional controlled category filter ("all" or a category id), e.g. set from the budget chart. */
+  selectedCategory?: string;
+  onSelectedCategoryChange?: (categoryId: string) => void;
 }
 
 export default function TransactionList({
@@ -26,9 +29,13 @@ export default function TransactionList({
   categories,
   onEditTransaction,
   onOpenFastExpense,
+  selectedCategory: controlledCategory,
+  onSelectedCategoryChange,
 }: TransactionListProps) {
   const [searchTerm, setSearchTerm] = useState<string>("");
-  const [selectedCategory, setSelectedCategory] = useState<string>("all");
+  const [localCategory, setLocalCategory] = useState<string>("all");
+  const selectedCategory = controlledCategory ?? localCategory;
+  const setSelectedCategory = onSelectedCategoryChange ?? setLocalCategory;
   const [selectedType, setSelectedType] = useState<string>("all");
 
   const filteredTransactions = useMemo(() => {

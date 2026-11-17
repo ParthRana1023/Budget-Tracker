@@ -151,5 +151,8 @@ export const axisProps = {
 /** Y/X axis showing paise as compact INR (₹12.5k, ₹1.2L). */
 export const inrAxisProps = { ...axisProps, tickFormatter: (v: number) => formatINRCompact(v), width: 56 };
 
-/** Shared legend text styling. */
-export const legendProps = { wrapperStyle: { fontSize: 11, color: CHROME.muted } };
+/** Shared legend styling. Labels use text ink, not the series colour (light series fail text contrast). */
+export const legendProps = {
+  wrapperStyle: { fontSize: 11 },
+  formatter: (value: unknown) => <span style={{ color: CHROME.muted }}>{String(value)}</span>,
+};
