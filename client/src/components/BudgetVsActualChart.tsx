@@ -6,7 +6,7 @@ import ChartCard, { ChartTable, axisProps, inrAxisProps, inrTooltipProps, legend
 import { formatINR, type CategoryBudgetStatus } from "@/lib/budgetUtils";
 import { CHROME, SERIES, STATUS } from "@/lib/chartTheme.mjs";
 
-// computeCategoryBudgets statuses: warning >= 75%, danger >= 90%, exceeded >= 100%.
+// computeCategoryBudgets statuses: warning >= 75%, danger >= 90%, exceeded = spent more than the limit.
 const STATUS_LABEL: Record<CategoryBudgetStatus["status"], { label: string; icon: React.ReactNode }> = {
   safe: { label: "Within budget", icon: <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" /> },
   warning: { label: "Approaching limit", icon: <TrendingUp className="w-3.5 h-3.5 text-amber-600" /> },

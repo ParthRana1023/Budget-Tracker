@@ -1,6 +1,49 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { simulateBudget, compareBudgets } from "./budgetSimulator.mjs";
+import { simulateBudget, compareBudgets, buildPlanScenario } from "./budgetSimulator.mjs";
+
+test("plan scenario: a saved plan wins, missing categories fall back to live limits", () => {
+  const s = buildPlanScenario({
+    plan: { expected_regular_income: 9_000_000, expected_variable_income: 500_000, planned_savings: 2_000_000, categories: [{ category_id: "shop", planned_limit: 700_000 }] },
+    categories: [{ id: "shop", name: "Shopping", type: "flexible", monthly_limit: 1_000_000 }, { id: "rent", name: "Rent", type: "fixed", monthly_limit: 3_000_000 }],
+    recurringItems: [{ amount: 1, type: "income" }],
+    history: [],
+    expectedVariableInCycle: 999,
+    totalDays: 31,
+  });
+  assert.equal(s.source, "plan");
+  assert.equal(s.regularIncome, 9_000_000);
+  assert.equal(s.expectedVariableIncome, 500_000);
+  assert.deepEqual(s.categories.map((c) => [c.id, c.amount]), [["shop", 700_000], ["rent", 3_000_000]]);
+});
+
+test("plan scenario without a plan: recurring salary, else latest regular income; average savings", () => {
+  const base = {
+    plan: null,
+    categories: [{ id: "shop", name: "Shopping", type: "flexible", monthly_limit: 1_000_000 }],
+    history: [
+      { regularIncome: 8_000_000, savingsContributions: 1_000_000 },
+      { regularIncome: 0, savingsContributions: 0 },
+      { regularIncome: 8_500_000, savingsContributions: 2_000_000 },
+    ],
+    expectedVariableInCycle: 300_000,
+    totalDays: 30,
+  };
+  const withSalary = buildPlanScenario({
+    ...base,
+    recurringItems: [
+      { amount: 9_000_000, type: "income", income_type: "salary" },
+      { amount: 5_000_000, type: "income", income_type: "variable" },
+      { amount: 7_000_000, type: "income", income_type: "salary", active: false },
+    ],
+  });
+  assert.equal(withSalary.source, "current");
+  assert.equal(withSalary.regularIncome, 9_000_000);
+  assert.equal(withSalary.plannedSavings, 1_500_000);
+  assert.equal(withSalary.expectedVariableIncome, 300_000);
+
+  assert.equal(buildPlanScenario({ ...base, recurringItems: [] }).regularIncome, 8_500_000);
+});
 
 const base = {
   regularIncome: 10_000_000, // ₹1,00,000

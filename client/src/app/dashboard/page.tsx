@@ -2,6 +2,7 @@ import { createClient } from "@/utils/supabase/server";
 import { STARTER_CATEGORIES } from "@/lib/starterCategories.mjs";
 import { redirect } from "next/navigation";
 import DashboardClient from "@/components/DashboardClient";
+import { BUDGET_PLAN_SELECT, isMissingPlansTable, type BudgetPlanRow } from "@/lib/budgetPlans";
 
 export default async function DashboardPage() {
   const supabase = await createClient();
@@ -96,6 +97,15 @@ export default async function DashboardPage() {
   const { data: recurringItems, error: recurringError } = await supabase.from("recurring_items").select("*").eq("user_id", user.id);
   if (recurringError) throw new Error(`Could not load your recurring items: ${recurringError.message}`);
 
+  // Budget plans are optional until the budget_plans migration is run.
+  const { data: plans, error: plansError } = await supabase
+    .from("budget_plans")
+    .select(BUDGET_PLAN_SELECT)
+    .eq("user_id", user.id)
+    .order("cycle_start", { ascending: true });
+  const plansAvailable = !isMissingPlansTable(plansError);
+  if (plansError && plansAvailable) throw new Error(`Could not load your budget plans: ${plansError.message}`);
+
   return (
     <DashboardClient
       initialUser={{ id: user.id, email: user.email }}
@@ -106,6 +116,8 @@ export default async function DashboardPage() {
       initialSavingsGoals={savingsGoals || []}
       initialContributions={contributions || []}
       initialRecurringItems={recurringItems || []}
+      initialPlans={(plans || []) as unknown as BudgetPlanRow[]}
+      plansAvailable={plansAvailable}
     />
   );
 }

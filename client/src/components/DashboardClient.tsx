@@ -22,15 +22,17 @@ import {
   PartyPopper,
   BarChart3,
   LayoutDashboard,
-  Download
+  Download,
+  ClipboardList
 } from "lucide-react";
+import PlanView from "./PlanView";
+import { BUDGET_PLAN_SELECT, type BudgetPlanRow } from "@/lib/budgetPlans";
 import ThemeToggle from "./ThemeToggle";
 import FastExpenseModal, { Category } from "./FastExpenseModal";
 import IncomeModal from "./IncomeModal";
 import CategoryManagementModal from "./CategoryManagementModal";
 import TransactionList from "./TransactionList";
 import EditTransactionModal, { TransactionItem } from "./EditTransactionModal";
-import CategoryProgress from "./CategoryProgress";
 import BurnRateCard from "./BurnRateCard";
 import AlertBanner from "./AlertBanner";
 import SavingsGoalsSection, { SavingsGoal } from "./SavingsGoalsSection";
@@ -65,6 +67,9 @@ interface DashboardClientProps {
   initialSavingsGoals: any[];
   initialContributions: Array<{ goal_id: string; amount: number; date?: string }>;
   initialRecurringItems: any[];
+  initialPlans: BudgetPlanRow[];
+  /** False until the budget_plans migration has been run. */
+  plansAvailable: boolean;
 }
 
 export default function DashboardClient({
@@ -76,11 +81,14 @@ export default function DashboardClient({
   initialSavingsGoals,
   initialContributions,
   initialRecurringItems,
+  initialPlans,
+  plansAvailable,
 }: DashboardClientProps) {
   const router = useRouter();
 
   // Navigation tab: 'dashboard' vs 'reports'
-  const [activeTab, setActiveTab] = useState<"dashboard" | "reports">("dashboard");
+  const [activeTab, setActiveTab] = useState<"dashboard" | "reports" | "plan">("dashboard");
+  const [plans, setPlans] = useState<BudgetPlanRow[]>(initialPlans);
 
   const [categories, setCategories] = useState<Category[]>(initialCategories);
   const [transactions, setTransactions] = useState<TransactionItem[]>(initialTransactions);
@@ -134,6 +142,15 @@ export default function DashboardClient({
     if (goalRes.data) setSavingsGoals(goalRes.data);
     if (contribRes.data) setContributions(contribRes.data);
     if (recurringRes.data) setRecurringItems(recurringRes.data as RecurringItem[]);
+
+    if (plansAvailable) {
+      const plansRes = await supabase
+        .from("budget_plans")
+        .select(BUDGET_PLAN_SELECT)
+        .eq("user_id", initialUser.id)
+        .order("cycle_start", { ascending: true });
+      if (plansRes.data) setPlans(plansRes.data as unknown as BudgetPlanRow[]);
+    }
   };
 
   // ---- Recurring items: record occurrences whose day has ended -------------
@@ -238,6 +255,13 @@ export default function DashboardClient({
     [recurringItems, categories, transactions, period]
   );
 
+  // Target savings rate for Reports: the plan for the current cycle, else the next saved plan.
+  const targetSavingsRate = useMemo(() => {
+    const plan = plans.find((p) => p.cycle_start === startStr) ?? plans.find((p) => p.cycle_start > startStr);
+    const income = Number(plan?.expected_regular_income ?? 0);
+    return plan && income > 0 ? (Number(plan.planned_savings) / income) * 100 : null;
+  }, [plans, startStr]);
+
   // Budget chart -> transaction list: filter to the category and bring the list into view.
   const [txCategoryFilter, setTxCategoryFilter] = useState<string>("all");
   const transactionListRef = useRef<HTMLDivElement>(null);
@@ -330,6 +354,17 @@ export default function DashboardClient({
               <BarChart3 className="w-3.5 h-3.5" />
               <span>Reports & Trends</span>
             </button>
+            <button
+              onClick={() => setActiveTab("plan")}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all ${
+                activeTab === "plan"
+                  ? "bg-white text-emerald-700 shadow-xs"
+                  : "text-slate-600 hover:text-slate-900"
+              }`}
+            >
+              <ClipboardList className="w-3.5 h-3.5" />
+              <span>Plan</span>
+            </button>
           </nav>
         </div>
 
@@ -371,6 +406,16 @@ export default function DashboardClient({
           }`}
         >
           Reports & Trends
+        </button>
+        <button
+          onClick={() => setActiveTab("plan")}
+          className={`flex-1 py-2 text-xs font-semibold border-b-2 text-center transition-all ${
+            activeTab === "plan"
+              ? "border-emerald-600 text-emerald-700"
+              : "border-transparent text-slate-500 hover:text-slate-800"
+          }`}
+        >
+          Plan
         </button>
       </div>
 
@@ -540,12 +585,6 @@ export default function DashboardClient({
 
             <BudgetVsActualChart categoryBudgets={categoryBudgets} onSelectCategory={inspectCategory} />
 
-            {/* Category Progress Bars Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <CategoryProgress categoryBudgets={categoryBudgets} type="flexible" />
-              <CategoryProgress categoryBudgets={categoryBudgets} type="fixed" />
-            </div>
-
             {/* Transaction History & Filters */}
             <div ref={transactionListRef} className="scroll-mt-20">
               <TransactionList
@@ -558,7 +597,7 @@ export default function DashboardClient({
               />
             </div>
           </>
-        ) : (
+        ) : activeTab === "reports" ? (
           /* VIEW 2: PHASE 6 REPORTS & TREND ANALYTICS */
           <ReportsView
             transactions={transactions}
@@ -566,6 +605,24 @@ export default function DashboardClient({
             incomeSources={incomeSources}
             contributions={contributions}
             insights={insights}
+            targetSavingsRate={targetSavingsRate}
+          />
+        ) : (
+          /* VIEW 3: BUDGET PLANNER, WHAT-IF SIMULATOR & FORECAST */
+          <PlanView
+            categories={categories}
+            recurringItems={recurringItems}
+            incomeSources={incomeSources}
+            transactions={transactions}
+            contributions={contributions}
+            monthStartDay={settings?.month_start_day || 1}
+            period={period}
+            categoryBudgets={categoryBudgets}
+            actualIncomeThisCycle={confirmedIncome}
+            recurringFixedTotal={obligations.totals.fixed}
+            plans={plans}
+            plansAvailable={plansAvailable}
+            onChanged={refreshData}
           />
         )}
       </main>

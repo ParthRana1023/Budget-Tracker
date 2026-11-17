@@ -15,13 +15,14 @@ test("a category with no limit set is never over budget, however much is spent",
   assert.equal(r.spent, 123456);
 });
 
-test("status thresholds: 74% safe, 75% warning, 90% danger, 100% exceeded", () => {
+test("status thresholds: 74% safe, 75% warning, 90% danger, over 100% exceeded", () => {
   assert.equal(one(10000, 7499).status, "safe");
   assert.equal(one(10000, 7500).status, "warning");
   assert.equal(one(10000, 8999).status, "warning");
   assert.equal(one(10000, 9000).status, "danger");
   assert.equal(one(10000, 9999).status, "danger");
-  assert.equal(one(10000, 10000).status, "exceeded");
+  assert.equal(one(10000, 10000).status, "danger"); // exactly the limit (e.g. rent paid in full) is not over budget
+  assert.equal(one(10000, 10001).status, "exceeded");
   assert.equal(one(10000, 15000).status, "exceeded");
 });
 

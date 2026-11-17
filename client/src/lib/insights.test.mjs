@@ -9,7 +9,7 @@ const calmPace = {
 };
 const cat = (id, limit, spent) => {
   const percentUsed = limit > 0 ? (spent / limit) * 100 : 0;
-  const status = limit <= 0 ? "safe" : percentUsed >= 100 ? "exceeded" : percentUsed >= 90 ? "danger" : percentUsed >= 75 ? "warning" : "safe";
+  const status = limit <= 0 ? "safe" : spent > limit ? "exceeded" : percentUsed >= 90 ? "danger" : percentUsed >= 75 ? "warning" : "safe";
   return { id, name: id, type: "flexible", monthlyLimit: limit, spent, remaining: limit - spent, percentUsed, hasLimit: limit > 0, status };
 };
 const month = (label, reg, flex, sav) => ({

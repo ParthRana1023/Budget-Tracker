@@ -50,7 +50,7 @@ export function getCategoryLimitAlerts(
 
     const percentUsed = (spent / limit) * 100;
 
-    if (percentUsed >= 100) {
+    if (spent > limit) {
       const overAmount = spent - limit;
       alerts.push({
         id: `cat-100-${cat.id}`,
@@ -160,7 +160,7 @@ export function checkExpenseImpact(
   const percentBefore = limit > 0 ? (currentCategorySpent / limit) * 100 : 0;
   const percentAfter = limit > 0 ? (spentAfter / limit) * 100 : 0;
 
-  const triggers100 = limit > 0 && percentAfter >= 100;
+  const triggers100 = limit > 0 && spentAfter > limit; // reaching the limit exactly is not exceeding it
   const triggers80 = limit > 0 && percentAfter >= 80 && percentBefore < 80;
   const threatensSavings = safeAfter < 0;
 

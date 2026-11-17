@@ -50,6 +50,53 @@ export function simulateBudget({ regularIncome, plannedSavings, categories, tota
 }
 
 /**
+ * Starting point for planning a cycle. A saved plan wins; otherwise current limits, with
+ * income from active recurring salary (else the latest month's regular income) and savings
+ * from the recent average. Expected variable income is returned apart and never added in.
+ *
+ * @param {{
+ *   plan: null | { expected_regular_income: number, expected_variable_income: number, planned_savings: number, categories?: Array<{ category_id: string, planned_limit: number }> },
+ *   categories: Array<{ id: string, name: string, type: string, monthly_limit: number }>,
+ *   recurringItems: Array<{ amount: number, type: string, active?: boolean, income_type?: string }>,
+ *   history: Array<{ regularIncome: number, savingsContributions: number }>,
+ *   expectedVariableInCycle: number,
+ *   totalDays: number
+ * }} input history = completed months, oldest first
+ * @returns {BudgetScenario & { expectedVariableIncome: number, source: "plan" | "current" }}
+ */
+export function buildPlanScenario({ plan, categories, recurringItems, history, expectedVariableInCycle, totalDays }) {
+  const toCategories = (/** @type {(c: { id: string, monthly_limit: number }) => number} */ amountOf) =>
+    categories.map((c) => ({ id: c.id, name: c.name, type: /** @type {"fixed" | "flexible"} */ (c.type === "fixed" ? "fixed" : "flexible"), amount: amountOf(c) }));
+
+  if (plan) {
+    const limits = new Map((plan.categories ?? []).map((c) => [c.category_id, Number(c.planned_limit)]));
+    return {
+      regularIncome: Number(plan.expected_regular_income),
+      plannedSavings: Number(plan.planned_savings),
+      expectedVariableIncome: Number(plan.expected_variable_income),
+      categories: toCategories((c) => limits.get(c.id) ?? Number(c.monthly_limit)),
+      totalDays,
+      source: "plan",
+    };
+  }
+
+  const recurringSalary = recurringItems
+    .filter((r) => r.type === "income" && r.active !== false && r.income_type !== "variable")
+    .reduce((s, r) => s + Number(r.amount), 0);
+  const latestIncome = [...history].reverse().find((m) => m.regularIncome > 0)?.regularIncome ?? 0;
+  const saved = history.map((m) => m.savingsContributions).filter((v) => v > 0);
+
+  return {
+    regularIncome: recurringSalary || latestIncome,
+    plannedSavings: saved.length ? Math.round(saved.reduce((s, v) => s + v, 0) / saved.length) : 0,
+    expectedVariableIncome: expectedVariableInCycle,
+    categories: toCategories((c) => Number(c.monthly_limit)),
+    totalDays,
+    source: "current",
+  };
+}
+
+/**
  * Original vs proposed scenario, with per-metric deltas and the categories that changed.
  * @param {BudgetScenario} base
  * @param {BudgetScenario} proposed

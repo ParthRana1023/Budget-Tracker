@@ -26,7 +26,7 @@ export function computeCategoryBudgets(categories, transactions) {
 
     let status = "safe";
     if (hasLimit) {
-      if (percentUsed >= 100) status = "exceeded";
+      if (spent > monthlyLimit) status = "exceeded"; // spending exactly the limit is not over budget
       else if (percentUsed >= 90) status = "danger";
       else if (percentUsed >= 75) status = "warning";
     }
