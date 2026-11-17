@@ -2,36 +2,36 @@
 
 import { useEffect, useState } from "react";
 import { Moon, Sun } from "lucide-react";
-
-const THEME_KEY = "savefirst-theme";
+import { applyTheme, THEME_KEY, type Theme } from "@/lib/theme";
 
 export default function ThemeToggle() {
-  const [isDark, setIsDark] = useState(false);
-  const [ready, setReady] = useState(false);
+  const [theme, setTheme] = useState<Theme>("dark");
 
   useEffect(() => {
-    const dark = document.documentElement.classList.contains("dark");
-    setIsDark(dark);
-    setReady(true);
+    setTheme(document.documentElement.dataset.theme === "light" ? "light" : "dark");
   }, []);
 
   const toggleTheme = () => {
-    const nextIsDark = !document.documentElement.classList.contains("dark");
-    document.documentElement.classList.toggle("dark", nextIsDark);
-    window.localStorage.setItem(THEME_KEY, nextIsDark ? "dark" : "light");
-    setIsDark(nextIsDark);
+    const next: Theme = theme === "dark" ? "light" : "dark";
+    applyTheme(next);
+    try {
+      window.localStorage.setItem(THEME_KEY, next);
+    } catch {
+      // Storage blocked (private mode): the theme still applies for this visit.
+    }
+    setTheme(next);
   };
 
+  const label = theme === "dark" ? "Switch to light mode" : "Switch to dark mode";
   return (
     <button
       type="button"
       onClick={toggleTheme}
-      disabled={!ready}
-      aria-label={isDark ? "Switch to light mode" : "Switch to dark mode"}
-      title={isDark ? "Switch to light mode" : "Switch to dark mode"}
-      className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-700 transition-colors hover:bg-slate-100 disabled:opacity-70"
+      aria-label={label}
+      title={label}
+      className="flex h-[38px] w-[38px] flex-none cursor-pointer items-center justify-center rounded-full border border-line bg-transparent text-ink-2 transition-[transform,color] duration-300 hover:text-ink active:-rotate-30 active:scale-[.92]"
     >
-      {isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+      {theme === "dark" ? <Sun size={16} /> : <Moon size={16} />}
     </button>
   );
 }

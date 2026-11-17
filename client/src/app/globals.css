@@ -1,5 +1,155 @@
 @import "tailwindcss";
 
+/* SaveFirst design tokens (design handoff). Dark is the default theme;
+   light is html[data-theme="light"]. */
+:root {
+  --bg: #0b0b0c;
+  --tile: #131315;
+  --tile-2: #1a1a1d;
+  --line: #242428;
+  --line-2: #35353a;
+  --ink: #f2f2ee;
+  --ink-2: #c3c3bd;
+  --muted: #8c8c86;
+  --lime: #c6f432;
+  --lime-text: #c6f432;
+  --lime-ink: #0b0b0c;
+  --lime-soft: #1e240b;
+  --warn: #ffb547;
+  --warn-soft: #241c10;
+  --fixed: #5b5b63;
+  --flex: #8fb4ff;
+  --track: #222226;
+  --danger: #ff7a6b;
+  --danger-soft: #2a1513;
+  --danger-ink: #1a0806;
+  --scrim: rgba(0, 0, 0, 0.62);
+  --ease-out-soft: cubic-bezier(0.2, 0.7, 0.2, 1);
+  --ease-sheet-out: cubic-bezier(0.2, 0.8, 0.2, 1);
+  color-scheme: dark;
+}
+
+html[data-theme="light"] {
+  --bg: #ecece6;
+  --tile: #fbfbf8;
+  --tile-2: #f3f3ee;
+  --line: #dcdcd4;
+  --line-2: #c6c6bd;
+  --ink: #0b0b0c;
+  --ink-2: #3a3a38;
+  --muted: #62625d;
+  --lime: #c6f432;
+  --lime-text: #3d5200;
+  --lime-ink: #0b0b0c;
+  --lime-soft: #eef8cc;
+  --warn: #9a5c00;
+  --warn-soft: #fbefd9;
+  --fixed: #a3a39b;
+  --flex: #3b6fe0;
+  --track: #e4e4dc;
+  --danger: #c2382b;
+  --danger-soft: #fbe5e1;
+  --danger-ink: #ffffff;
+  --scrim: rgba(20, 20, 12, 0.38);
+  color-scheme: light;
+}
+
+/* Tokens as Tailwind utilities: bg-tile, text-ink, border-line, font-serif, ease-soft ... */
+@theme inline {
+  --color-bg: var(--bg);
+  --color-tile: var(--tile);
+  --color-tile-2: var(--tile-2);
+  --color-line: var(--line);
+  --color-line-2: var(--line-2);
+  --color-ink: var(--ink);
+  --color-ink-2: var(--ink-2);
+  --color-muted: var(--muted);
+  --color-lime: var(--lime);
+  --color-lime-text: var(--lime-text);
+  --color-lime-ink: var(--lime-ink);
+  --color-lime-soft: var(--lime-soft);
+  --color-warn: var(--warn);
+  --color-warn-soft: var(--warn-soft);
+  --color-fixed: var(--fixed);
+  --color-flex: var(--flex);
+  --color-track: var(--track);
+  --color-danger: var(--danger);
+  --color-danger-soft: var(--danger-soft);
+  --color-danger-ink: var(--danger-ink);
+  --color-scrim: var(--scrim);
+  --font-sans: var(--font-hanken), ui-sans-serif, system-ui, sans-serif;
+  --font-serif: var(--font-instrument), serif;
+  --ease-soft: var(--ease-out-soft);
+  --ease-sheet: var(--ease-sheet-out);
+}
+
+/* Layered so Tailwind utilities on an element always win over these defaults.
+   (Preflight already makes form controls inherit font and colour.) */
+@layer base {
+  html,
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--font-hanken), ui-sans-serif, system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+  }
+  body {
+    font-size: 15px;
+    line-height: 1.5;
+  }
+  select option {
+    background: var(--tile);
+    color: var(--ink);
+  }
+  input::placeholder,
+  textarea::placeholder {
+    color: var(--muted);
+  }
+  input[type="date"]::-webkit-calendar-picker-indicator {
+    opacity: 0.6;
+    cursor: pointer;
+  }
+  :focus-visible {
+    outline: 2px solid var(--lime);
+    outline-offset: 2px;
+  }
+}
+
+@layer components {
+  .tabular {
+    font-variant-numeric: tabular-nums lining-nums;
+  }
+  .eyebrow {
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  /* Cards fade and slide in on load; stagger with style={{ animationDelay }}. */
+  .sf-rise {
+    animation: sf-rise 0.8s var(--ease-out-soft) both;
+  }
+}
+@keyframes sf-rise {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition: none !important;
+    animation: none !important;
+  }
+}
+
+/* ---- Legacy: styles for pre-redesign components. Delete in the cleanup phase. ---- */
 :root {
   --background: #f8fafc;
   --foreground: #0f172a;
@@ -23,16 +173,6 @@
   --chart-surface: #ffffff;
 }
 
-body {
-  color: var(--foreground);
-  background: var(--background);
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-  margin: 0;
-  padding: 0;
-  -webkit-font-smoothing: antialiased;
-}
-
-
 /* Dark theme overrides for the existing Tailwind utility-based UI. */
 html.dark {
   color-scheme: dark;
@@ -51,11 +191,6 @@ html.dark {
   --chart-grid: #1e293b;
   --chart-axis: #334155;
   --chart-surface: #111c2e;
-}
-
-html.dark body {
-  color: var(--foreground);
-  background: var(--background);
 }
 
 html.dark .bg-white,
@@ -85,18 +220,21 @@ html.dark [class~="hover:bg-slate-100"]:hover { background-color: #334155 !impor
 html.dark [class~="hover:text-slate-900"]:hover,
 html.dark [class~="hover:text-slate-800"]:hover { color: #f8fafc !important; }
 
-/* Keep form controls readable even when their component styles are inline. */
-html.dark input,
-html.dark select,
-html.dark textarea {
-  color-scheme: dark;
-  background-color: #111c2e;
-  color: #e2e8f0;
-  border-color: #475569;
+/* Keep form controls readable even when their component styles are inline.
+   In the base layer so the redesign's utility classes (bg-tile-2, ...) win. */
+@layer base {
+  html.dark input,
+  html.dark select,
+  html.dark textarea {
+    color-scheme: dark;
+    background-color: #111c2e;
+    color: #e2e8f0;
+    border-color: #475569;
+  }
+  html.dark input::placeholder,
+  html.dark textarea::placeholder { color: #94a3b8; }
+  html.dark option { background-color: #111c2e; color: #e2e8f0; }
 }
-html.dark input::placeholder,
-html.dark textarea::placeholder { color: #94a3b8; }
-html.dark option { background-color: #111c2e; color: #e2e8f0; }
 
 html.dark .shadow-xs,
 html.dark .shadow-sm,
