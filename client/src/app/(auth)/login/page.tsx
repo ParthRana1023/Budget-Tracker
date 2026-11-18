@@ -1,353 +1,176 @@
 "use client";
 
-import { useState, useEffect, Suspense } from "react";
-import Link from "next/link";
+import { Suspense, useState, type FormEvent } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/utils/supabase/client";
-import { PiggyBank, Loader2, ArrowRight, Mail, KeyRound, Sparkles, CheckCircle2 } from "lucide-react";
+import { authErrorFor, errorFromQuery, isValidEmail } from "@/lib/auth.mjs";
+import {
+  AuthAlert,
+  AuthHeading,
+  AuthNotice,
+  Field,
+  GoogleButton,
+  LinkButton,
+  OtpInput,
+  PasswordField,
+  SubmitButton,
+  SwitchLine,
+  type AuthError,
+} from "@/components/auth/AuthParts";
+
+type Mode = "password" | "magic";
 
 function LoginForm() {
   const router = useRouter();
-  const searchParams = useSearchParams();
-
-  const [authMode, setAuthMode] = useState<"password" | "magic-link">("password");
+  const params = useSearchParams();
+  const [mode, setMode] = useState<Mode>("password");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [otpCode, setOtpCode] = useState("");
-  const [magicLinkSent, setMagicLinkSent] = useState(false);
-  const [errorMsg, setErrorMsg] = useState("");
-  const [successMsg, setSuccessMsg] = useState("");
-  const [loading, setLoading] = useState(false);
+  const [showPw, setShowPw] = useState(false);
+  const [otp, setOtp] = useState("");
+  const [linkSent, setLinkSent] = useState(false);
+  const [busy, setBusy] = useState<string | null>(null);
+  const [error, setError] = useState<AuthError | null>(() => errorFromQuery(params.get("error")));
 
-  useEffect(() => {
-    const error = searchParams.get("error");
-    if (error) {
-      setErrorMsg(error);
-    }
-  }, [searchParams]);
-
-  // Standard password login
-  const handlePasswordLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-    setErrorMsg("");
-
-    try {
-      const supabase = createClient();
-      const { error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
-
-      if (error) {
-        setErrorMsg(error.message);
-        setLoading(false);
-      } else {
-        router.push("/dashboard");
-        router.refresh();
-      }
-    } catch (err: any) {
-      setErrorMsg(err?.message || "Failed to sign in. Please try again.");
-      setLoading(false);
-    }
+  const toDashboard = () => {
+    router.push("/dashboard");
+    router.refresh();
+  };
+  const fail = (e: AuthError) => {
+    setBusy(null);
+    setError(e);
+  };
+  const sendLink = async () => {
+    setBusy("Sending link…");
+    const { error } = await createClient().auth.signInWithOtp({
+      email: email.trim(),
+      options: { emailRedirectTo: `${window.location.origin}/auth/confirm?next=/dashboard` },
+    });
+    if (error) return fail(authErrorFor(error));
+    setBusy(null);
+    setOtp("");
+    setLinkSent(true);
+  };
+  const verify = async (code: string) => {
+    setBusy("Verifying…");
+    setError(null);
+    const { error } = await createClient().auth.verifyOtp({ email: email.trim(), token: code, type: "email" });
+    if (error) return fail(authErrorFor(error));
+    toDashboard();
   };
 
-  // Send Magic Link
-  const handleSendMagicLink = async (e: React.FormEvent) => {
+  const onSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    if (!email) {
-      setErrorMsg("Please enter your email address.");
-      return;
+    if (busy) return;
+    setError(null);
+    if (mode === "password") {
+      if (!isValidEmail(email)) return setError({ message: "Enter the email you signed up with." });
+      if (!password) return setError({ message: "Enter your password." });
+      setBusy("Signing in…");
+      const { error } = await createClient().auth.signInWithPassword({ email: email.trim(), password });
+      if (error) return fail(authErrorFor(error));
+      return toDashboard();
     }
-
-    setLoading(true);
-    setErrorMsg("");
-    setSuccessMsg("");
-
-    try {
-      const supabase = createClient();
-      const origin = window.location.origin;
-
-      const { error } = await supabase.auth.signInWithOtp({
-        email,
-        options: {
-          emailRedirectTo: `${origin}/auth/confirm?next=/dashboard`,
-        },
-      });
-
-      if (error) {
-        setErrorMsg(error.message);
-      } else {
-        setMagicLinkSent(true);
-        setSuccessMsg("Magic link sent! Check your inbox or enter the 6-digit code below.");
-      }
-    } catch (err: any) {
-      setErrorMsg(err?.message || "Failed to send magic link. Please try again.");
-    } finally {
-      setLoading(false);
+    if (!linkSent) {
+      if (!isValidEmail(email)) return setError({ message: "Enter your email to get a sign-in link." });
+      return sendLink();
     }
+    if (otp.length < 6) return setError({ message: "Enter all 6 digits from the email." });
+    return verify(otp);
   };
 
-  // Verify OTP code if user chooses to enter OTP on screen
-  const handleVerifyOtp = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!otpCode || otpCode.length < 6) {
-      setErrorMsg("Please enter the 6-digit code received in your email.");
-      return;
+  const onAction = async (action: NonNullable<AuthError["action"]>) => {
+    if (action === "forgot") return router.push("/forgot-password");
+    if (action === "resend") {
+      setError(null);
+      return sendLink();
     }
-
-    setLoading(true);
-    setErrorMsg("");
-
-    try {
-      const supabase = createClient();
-      const { error } = await supabase.auth.verifyOtp({
-        email,
-        token: otpCode.trim(),
-        type: "email",
-      });
-
-      if (error) {
-        setErrorMsg(error.message);
-        setLoading(false);
-      } else {
-        router.push("/dashboard");
-        router.refresh();
-      }
-    } catch (err: any) {
-      setErrorMsg(err?.message || "Invalid or expired code.");
-      setLoading(false);
-    }
+    // Unconfirmed email: send a fresh confirmation, then take them to enter its code.
+    setBusy("Sending link…");
+    const { error } = await createClient().auth.resend({
+      type: "signup",
+      email: email.trim(),
+      options: { emailRedirectTo: `${window.location.origin}/auth/confirm?next=/dashboard` },
+    });
+    if (error) return fail(authErrorFor(error));
+    router.push(`/verify?email=${encodeURIComponent(email.trim())}`);
   };
+
+  const switchMode = (m: Mode) => {
+    setMode(m);
+    setError(null);
+    setLinkSent(false);
+    setOtp("");
+  };
+  const magic = mode === "magic";
 
   return (
-    <div className="w-full max-w-md bg-white rounded-3xl shadow-sm border border-slate-200 p-8">
-      {/* Header */}
-      <div className="flex flex-col items-center mb-6">
-        <div className="w-12 h-12 rounded-2xl bg-emerald-600 flex items-center justify-center text-white mb-3 shadow-sm shadow-emerald-500/20">
-          <PiggyBank className="w-6 h-6" />
-        </div>
-        <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Welcome Back</h1>
-        <p className="text-xs text-slate-500 mt-1">Sign in to your personal budget tracker</p>
-      </div>
-
-      {/* Mode Switcher Tabs */}
-      <div className="flex p-1 bg-slate-100 rounded-xl mb-6">
-        <button
-          type="button"
-          onClick={() => {
-            setAuthMode("password");
-            setErrorMsg("");
-            setSuccessMsg("");
-          }}
-          className={`flex-1 py-2 text-xs font-semibold rounded-lg transition-all flex items-center justify-center gap-1.5 ${
-            authMode === "password"
-              ? "bg-white text-slate-900 shadow-xs"
-              : "text-slate-500 hover:text-slate-800"
-          }`}
-        >
-          <KeyRound className="w-3.5 h-3.5" />
-          <span>Password</span>
-        </button>
-        <button
-          type="button"
-          onClick={() => {
-            setAuthMode("magic-link");
-            setErrorMsg("");
-            setSuccessMsg("");
-          }}
-          className={`flex-1 py-2 text-xs font-semibold rounded-lg transition-all flex items-center justify-center gap-1.5 ${
-            authMode === "magic-link"
-              ? "bg-white text-emerald-700 shadow-xs"
-              : "text-slate-500 hover:text-slate-800"
-          }`}
-        >
-          <Sparkles className="w-3.5 h-3.5 text-emerald-600" />
-          <span>Magic Link</span>
-        </button>
-      </div>
-
-      {errorMsg && (
-        <div className="mb-5 p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-medium">
-          {errorMsg}
-        </div>
-      )}
-
-      {successMsg && (
-        <div className="mb-5 p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-medium flex items-start gap-2">
-          <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
-          <span>{successMsg}</span>
-        </div>
-      )}
-
-      {authMode === "password" ? (
-        /* PASSWORD LOGIN FORM */
-        <form onSubmit={handlePasswordLogin} className="space-y-4">
-          <div>
-            <label className="block text-xs font-semibold uppercase text-slate-600 tracking-wider mb-1.5">
-              Email Address
-            </label>
-            <input
-              id="email"
-              type="email"
-              required
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="you@example.com"
-              className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:bg-white transition-all"
-            />
-          </div>
-
-          <div>
-            <div className="flex items-center justify-between mb-1.5">
-              <label className="block text-xs font-semibold uppercase text-slate-600 tracking-wider">
-                Password
-              </label>
-            </div>
-            <input
-              id="password"
-              type="password"
-              required
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="••••••••"
-              className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:bg-white transition-all"
-            />
-          </div>
-
+    <>
+      <AuthHeading eyebrow="Sign in" title="Welcome" em="back.">
+        Sign in to see today’s safe-to-spend.
+      </AuthHeading>
+      <GoogleButton onError={setError} />
+      <div role="tablist" aria-label="Sign-in method" className="flex gap-0.5 rounded-full border border-line p-[3px]">
+        {(
+          [
+            ["password", "Password"],
+            ["magic", "Email link"],
+          ] as const
+        ).map(([m, label]) => (
           <button
-            id="login-submit-btn"
-            type="submit"
-            disabled={loading}
-            className="w-full mt-2 py-3 px-4 bg-emerald-600 hover:bg-emerald-700 text-white font-medium text-sm rounded-xl transition-all shadow-sm flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed"
+            key={m}
+            type="button"
+            role="tab"
+            aria-selected={mode === m}
+            onClick={() => switchMode(m)}
+            className="h-[34px] flex-1 cursor-pointer rounded-full border-0 text-[13px] font-semibold transition-colors duration-200"
+            style={{ background: mode === m ? "var(--tile-2)" : "transparent", color: mode === m ? "var(--ink)" : "var(--muted)" }}
           >
-            {loading ? (
-              <>
-                <Loader2 className="w-4 h-4 animate-spin" />
-                <span>Signing in...</span>
-              </>
-            ) : (
-              <>
-                <span>Sign In with Password</span>
-                <ArrowRight className="w-4 h-4" />
-              </>
-            )}
+            {label}
           </button>
-        </form>
-      ) : (
-        /* MAGIC LINK LOGIN FORM */
-        <div className="space-y-4">
-          {!magicLinkSent ? (
-            <form onSubmit={handleSendMagicLink} className="space-y-4">
-              <div>
-                <label className="block text-xs font-semibold uppercase text-slate-600 tracking-wider mb-1.5">
-                  Email Address
-                </label>
-                <input
-                  id="magic-email"
-                  type="email"
-                  required
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="you@example.com"
-                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:bg-white transition-all"
-                />
-              </div>
-
-              <p className="text-xs text-slate-500">
-                We'll email you a passwordless sign-in link and 6-digit code.
-              </p>
-
-              <button
-                id="send-magic-link-btn"
-                type="submit"
-                disabled={loading}
-                className="w-full py-3 px-4 bg-emerald-600 hover:bg-emerald-700 text-white font-medium text-sm rounded-xl transition-all shadow-sm flex items-center justify-center gap-2 disabled:opacity-70"
-              >
-                {loading ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    <span>Sending magic link...</span>
-                  </>
-                ) : (
-                  <>
-                    <Mail className="w-4 h-4" />
-                    <span>Send Magic Link</span>
-                  </>
-                )}
-              </button>
-            </form>
-          ) : (
-            <form onSubmit={handleVerifyOtp} className="space-y-4 animate-in fade-in duration-200">
-              <div>
-                <label className="block text-xs font-semibold uppercase text-slate-600 tracking-wider mb-1.5">
-                  Enter 6-Digit Email Code
-                </label>
-                <input
-                  id="otp-code"
-                  type="text"
-                  maxLength={8}
-                  autoFocus
-                  required
-                  value={otpCode}
-                  onChange={(e) => setOtpCode(e.target.value)}
-                  placeholder="123456"
-                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-center text-xl font-bold tracking-widest focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                />
-              </div>
-
-              <button
-                id="verify-otp-btn"
-                type="submit"
-                disabled={loading}
-                className="w-full py-3 px-4 bg-emerald-600 hover:bg-emerald-700 text-white font-medium text-sm rounded-xl transition-all shadow-sm flex items-center justify-center gap-2 disabled:opacity-70"
-              >
-                {loading ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    <span>Verifying code...</span>
-                  </>
-                ) : (
-                  <>
-                    <span>Verify & Continue</span>
-                    <ArrowRight className="w-4 h-4" />
-                  </>
-                )}
-              </button>
-
-              <div className="text-center pt-2">
-                <button
-                  type="button"
-                  onClick={() => setMagicLinkSent(false)}
-                  className="text-xs text-slate-500 hover:text-slate-800 underline"
-                >
-                  Resend or change email
-                </button>
-              </div>
-            </form>
-          )}
-        </div>
-      )}
-
-      {/* Footer */}
-      <div className="mt-6 pt-6 border-t border-slate-100 text-center">
-        <p className="text-xs text-slate-500">
-          Don't have an account yet?{" "}
-          <Link href="/signup" className="font-semibold text-emerald-600 hover:text-emerald-700">
-            Sign up
-          </Link>
-        </p>
+        ))}
       </div>
-    </div>
+      {error && <AuthAlert error={error} onAction={onAction} />}
+      {magic && linkSent && !error && <AuthNotice>Link sent to {email.trim()}. Open it, or enter the 6-digit code.</AuthNotice>}
+
+      <form onSubmit={onSubmit} noValidate className="flex flex-col gap-4">
+        {!(magic && linkSent) && (
+          <Field label="Email" id="email" type="email" autoComplete="email" placeholder="you@example.com" value={email} onChange={(e) => setEmail(e.target.value)} />
+        )}
+        {!magic && (
+          <PasswordField
+            id="password"
+            value={password}
+            onChange={setPassword}
+            show={showPw}
+            onToggle={() => setShowPw((s) => !s)}
+            autoComplete="current-password"
+            placeholder="Your password"
+            forgotHref="/forgot-password"
+          />
+        )}
+        {magic && linkSent && <OtpInput value={otp} onChange={setOtp} onComplete={verify} />}
+        <SubmitButton
+          id="login-submit-btn"
+          busy={busy}
+          label={!magic ? "Sign in" : linkSent ? "Verify and continue" : "Email me a sign-in link"}
+        />
+      </form>
+
+      {magic && linkSent && (
+        <LinkButton muted onClick={() => switchMode("magic")}>
+          Use a different email
+        </LinkButton>
+      )}
+      <SwitchLine text="New to SaveFirst?" href="/signup" link="Create an account" />
+    </>
   );
 }
 
 export default function LoginPage() {
   return (
-    <div className="min-h-screen flex flex-col justify-center items-center px-4 py-12 bg-slate-50">
-      <Suspense fallback={<div className="text-xs text-slate-400">Loading...</div>}>
-        <LoginForm />
-      </Suspense>
-    </div>
+    <Suspense>
+      <LoginForm />
+    </Suspense>
   );
 }

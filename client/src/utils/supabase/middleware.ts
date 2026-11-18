@@ -40,7 +40,9 @@ export const updateSession = async (request: NextRequest) => {
   } = await supabase.auth.getUser();
 
   const path = request.nextUrl.pathname;
-  const isAuthPage = path.startsWith("/login") || path.startsWith("/signup");
+  // Signed-out pages; a signed-in visitor is sent on to the dashboard. (/reset-password is
+  // not here: it needs the session the reset link creates.)
+  const isAuthPage = ["/login", "/signup", "/verify", "/forgot-password"].some((p) => path.startsWith(p));
   const isPublicPage =
     path === "/" || path.startsWith("/api") || path.startsWith("/auth/") || path === "/offline" || path === "/session-expired";
 

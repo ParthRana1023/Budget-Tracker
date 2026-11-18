@@ -57,9 +57,8 @@ export async function GET(request: NextRequest) {
   // Verification failed — redirect to login with error message
   const errorRedirect = request.nextUrl.clone();
   errorRedirect.pathname = "/login";
-  errorRedirect.searchParams.set(
-    "error",
-    "Email verification link has expired or is invalid. Please request a new one."
-  );
+  // Only a known code goes in the URL; the login page turns it into a message.
+  errorRedirect.search = "";
+  errorRedirect.searchParams.set("error", "link_expired");
   return NextResponse.redirect(errorRedirect);
 }

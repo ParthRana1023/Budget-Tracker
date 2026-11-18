@@ -3,8 +3,8 @@ import { test, expect } from "@playwright/test";
 test.describe("Phase 2 - Fast Transaction & Category Flows", () => {
   test("landing page has direct entry points to auth and budget", async ({ page }) => {
     await page.goto("/");
-    await expect(page.locator("text=SaveFirst")).toBeVisible();
-    await expect(page.locator("text=safe to spend")).toBeVisible();
+    await expect(page.getByRole("heading", { level: 1, name: /safe to spend/ })).toBeVisible();
+    await expect(page.getByRole("link", { name: "Create free account" }).first()).toHaveAttribute("href", "/signup");
   });
 
   test("login page renders all credentials fields", async ({ page }) => {
@@ -21,7 +21,7 @@ test.describe("Phase 2 - Fast Transaction & Category Flows", () => {
     await page.fill("#signup-confirm-password", "passwordXYZ");
     await page.click("#signup-submit-btn");
 
-    await expect(page.locator("text=Passwords do not match.")).toBeVisible();
+    await expect(page.getByRole("alert").filter({ hasText: "The two passwords don’t match." })).toBeVisible();
   });
 });
 

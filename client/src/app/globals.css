@@ -137,6 +137,30 @@ html[data-theme="light"] {
   .sf-grow {
     animation: sf-grow 1s var(--ease-out-soft) both;
   }
+  /* <Reveal>: content rises in once it scrolls into view; bars inside fill at the same time. */
+  .rv {
+    opacity: 0;
+    transform: translateY(28px);
+    transition:
+      opacity 0.7s ease,
+      transform 0.8s var(--ease-out-soft);
+  }
+  .rv.rv-on {
+    opacity: 1;
+    transform: none;
+  }
+  .rv-bar {
+    transition: width 1s var(--ease-out-soft);
+  }
+  .rv-barh {
+    transition: height 0.9s var(--ease-out-soft);
+  }
+  .rv:not(.rv-on) .rv-bar {
+    width: 0 !important;
+  }
+  .rv:not(.rv-on) .rv-barh {
+    height: 0 !important;
+  }
 }
 @keyframes sf-grow {
   from {
