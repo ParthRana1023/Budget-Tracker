@@ -23,6 +23,10 @@ export default async function DashboardPage() {
     .maybeSingle();
   if (settingsError) throw new Error(`Could not load your settings: ${settingsError.message}`);
 
+  // New accounts set up their salary, savings, bills and categories first.
+  // shortcut: a database without the onboarded_at column (redesign migration not applied) skips onboarding; drop the column check once it is applied everywhere.
+  if (settings && "onboarded_at" in settings && !settings.onboarded_at) redirect("/onboarding");
+
   // Fetch categories
   let { data: categories, error: categoriesError } = await supabase
     .from("categories")
@@ -69,24 +73,12 @@ export default async function DashboardPage() {
   if (incomeError) throw new Error(`Could not load your income sources: ${incomeError.message}`);
 
   // Fetch savings goals
-  let { data: savingsGoals, error: goalsError } = await supabase
+  // No starter goal: the dashboard shows what the user set up (design handoff).
+  const { data: savingsGoals, error: goalsError } = await supabase
     .from("savings_goals")
     .select("*")
     .eq("user_id", user.id);
   if (goalsError) throw new Error(`Could not load your savings goals: ${goalsError.message}`);
-
-  if (!savingsGoals || savingsGoals.length === 0) {
-    const { data: starterGoal, error: starterGoalError } = await supabase
-      .from("savings_goals")
-      .insert([
-        { user_id: user.id, name: "Emergency Fund", target_amount: 10000000 }, // ₹1,00,000 starter goal
-      ])
-      .select();
-    if (starterGoalError) throw new Error(`Could not create your starter savings goal: ${starterGoalError.message}`);
-    if (starterGoal) {
-      savingsGoals = starterGoal;
-    }
-  }
 
   // Fetch goal contributions
   const { data: contributions, error: contributionsError } = await supabase

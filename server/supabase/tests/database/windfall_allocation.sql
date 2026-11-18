@@ -8,7 +8,9 @@ values
   ('eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', 'windfall-a@example.com', '', now(), '{}'::jsonb, '{}'::jsonb),
   ('ffffffff-ffff-ffff-ffff-ffffffffffff', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', 'windfall-b@example.com', '', now(), '{}'::jsonb, '{}'::jsonb);
 
--- The signup trigger created an "Emergency Fund" goal for each user.
+insert into public.savings_goals (user_id, name, target_amount)
+values ('eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee', 'Emergency Fund', 10000000);
+
 create temp table fixture as
 select
   (select id from public.savings_goals where user_id = 'eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee') as goal_a;

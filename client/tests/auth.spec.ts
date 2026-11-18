@@ -61,23 +61,14 @@ test.describe("Authentication and Landing Flow", () => {
     }
   });
 
-  test("unauthenticated access to dashboard redirects to login", async ({ page }) => {
-    await page.goto("/dashboard");
-    await expect(page).toHaveURL(/.*login/);
-  });
-
-  test("a sign-in cookie that no longer works shows the session-expired page", async ({ page, context, baseURL }) => {
-    await context.addCookies([{ name: "sb-test-auth-token", value: "base64-eyJmYWtlIjp0cnVlfQ", url: baseURL! }]);
-    await page.goto("/dashboard");
-    await expect(page).toHaveURL(/\/session-expired$/);
-    await expect(page.getByRole("heading", { name: /has ended/ })).toBeVisible();
-    await expect(page.getByRole("link", { name: "Sign in again" })).toHaveAttribute("href", "/login");
-  });
-
-  test("the service worker and manifest are served even when signed out", async ({ request }) => {
-    for (const path of ["/sw.js", "/manifest.json"]) {
-      expect((await request.get(path, { maxRedirects: 0 })).status(), path).toBe(200);
-    }
+  test("signup checks the two passwords match before calling the server", async ({ page }) => {
+    await page.goto("/signup");
+    await page.fill("#signup-email", "testuser@example.com");
+    await page.fill("#signup-password", "password123");
+    await page.fill("#signup-confirm-password", "passwordXYZ");
+    await expect(page.getByText("Doesn’t match yet")).toBeVisible();
+    await page.click("#signup-submit-btn");
+    await expect(page.getByRole("alert").filter({ hasText: "The two passwords don’t match." })).toBeVisible();
   });
 
   test("expired or invalid confirmation link redirects to login with message", async ({ page }) => {

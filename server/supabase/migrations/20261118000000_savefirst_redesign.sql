@@ -33,6 +33,26 @@ alter table public.transactions add constraint transactions_from_reserve_check
 alter table public.recurring_items
   add column if not exists skip_month text check (skip_month is null or skip_month ~ '^\d{4}-(0[1-9]|1[0-2])$');
 
+-- ---------------------------------------------------------------- signup
+-- New users still get settings and the starter categories, but no starter savings
+-- goal: the dashboard shows what the user sets up in onboarding (design handoff).
+create or replace function public.handle_new_user()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  insert into public.user_settings (user_id, currency, month_start_day)
+  values (new.id, 'INR', 1)
+  on conflict (user_id) do nothing;
+
+  perform public.ensure_starter_categories(new.id);
+
+  return new;
+end;
+$$;
+
 -- ---------------------------------------------------------------- recurring: manual only
 drop function if exists public.process_due_recurring(date);
 

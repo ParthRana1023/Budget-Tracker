@@ -1,11 +1,14 @@
 import { expect, Page } from "@playwright/test";
 
 /**
- * These specs sign up a brand-new user per test, so they need a real Supabase
- * backend with e-mail confirmation DISABLED (the default for `supabase start --workdir server`,
- * see server/supabase/config.toml: [auth.email] enable_confirmations = false) and the
- * client's .env pointing at it. They cannot run against a mocked backend because
- * the dashboard loads its data on the server.
+ * Specs that sign up need a real Supabase with the redesign migrations applied and email
+ * confirmation DISABLED: the local stack (`npx supabase start --workdir server`, see
+ * server/supabase/config.toml [auth.email] enable_confirmations = false). Point the app at
+ * it for the run; variables already in the environment win over client/.env.local:
+ *
+ *   NEXT_PUBLIC_SUPABASE_URL=http://127.0.0.1:55321 \
+ *   NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=<PUBLISHABLE_KEY from `npx supabase status --workdir server`> \
+ *   sh -c "npm run build && npm run test:e2e"
  */
 export async function signUpFreshUser(page: Page): Promise<string> {
   const email = `e2e-${Date.now()}-${Math.random().toString(36).slice(2, 8)}@example.com`;
@@ -17,42 +20,21 @@ export async function signUpFreshUser(page: Page): Promise<string> {
   await page.fill("#signup-confirm-password", password);
   await page.click("#signup-submit-btn");
 
-  await page.waitForURL("**/dashboard", { timeout: 20_000 });
-  // The dashboard has loaded once its category controls render (the old recurring section no longer exists).
-  await expect(page.getByTitle("Manage Categories")).toBeVisible({ timeout: 20_000 });
+  // A new account is sent to onboarding before it sees the dashboard.
+  await page.waitForURL("**/onboarding", { timeout: 20_000 });
+  await expect(page.getByText("Step 1 of 5")).toBeVisible();
   return email;
 }
 
-export const STARTER_FIXED = ["EMI / Loans", "Insurance", "Rent / Housing", "Subscriptions", "Utilities & Bills"];
-export const STARTER_FLEXIBLE = [
-  "Entertainment",
-  "Food & Dining Out",
-  "Groceries",
-  "Health",
-  "Miscellaneous",
-  "Shopping",
-  "Transport / Fuel",
-  "Travel",
-];
+/** Primary button of the current onboarding step ("Skip for now" / "Continue" / "Open my dashboard"). */
+export const onboardingNext = (page: Page) => page.getByRole("main").getByRole("button", { name: /Skip for now|Continue|Open my dashboard/ });
 
-export async function openCategoryModal(page: Page) {
-  await page.getByTitle("Manage Categories").click();
-  await expect(page.getByTestId("category-modal")).toBeVisible();
-}
-
-export async function categoryNames(page: Page): Promise<string[]> {
-  const names = await page.getByTestId("category-row").evaluateAll((rows) => rows.map((r) => (r as HTMLElement).dataset.name ?? ""));
-  return names.sort((a, b) => a.localeCompare(b));
-}
-
-/** YYYY-MM-DD in the browser's (= this machine's) local calendar, like the app does. */
-export function localDate(d: Date): string {
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-}
-
-/** The 15th of last month, a date that is certainly in the past and in a different month. */
-export function lastMonth15th(): string {
-  const now = new Date();
-  return localDate(new Date(now.getFullYear(), now.getMonth() - 1, 15));
+/** Skip every onboarding step and land on the dashboard. */
+export async function skipOnboarding(page: Page) {
+  for (let step = 1; step <= 4; step++) {
+    await expect(page.getByText(`Step ${step} of 5`)).toBeVisible();
+    await onboardingNext(page).click();
+  }
+  await page.getByRole("button", { name: "Open my dashboard" }).click();
+  await page.waitForURL("**/dashboard", { timeout: 20_000 });
 }

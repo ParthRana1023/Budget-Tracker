@@ -1,7 +1,7 @@
 -- SaveFirst redesign migration: onboarding, annual bills reserve, payee, skip month.
 begin;
 
-select plan(31);
+select plan(32);
 
 insert into auth.users (id, instance_id, aud, role, email, encrypted_password, email_confirmed_at, raw_app_meta_data, raw_user_meta_data)
 values
@@ -12,9 +12,15 @@ insert into public.income_sources (id, user_id, name, type, status, amount, expe
   ('a1000000-0000-0000-0000-000000000001', 'a0000000-0000-0000-0000-00000000000a', 'Bonus', 'variable', 'expected', 1000000, '2026-11-10'),
   ('a1000000-0000-0000-0000-000000000002', 'a0000000-0000-0000-0000-00000000000a', 'Probe', 'variable', 'expected', 1000000, '2026-11-10');
 
+insert into public.savings_goals (user_id, name, target_amount)
+values ('a0000000-0000-0000-0000-00000000000a', 'Emergency Fund', 10000000);
+
 create temp table fixture as
 select (select id from public.savings_goals where user_id = 'a0000000-0000-0000-0000-00000000000a' limit 1) as goal_a;
 grant select on fixture to authenticated;
+
+select is((select count(*)::int from public.savings_goals where user_id = 'b0000000-0000-0000-0000-00000000000b'), 0,
+  'signing up no longer creates a starter savings goal');
 
 -- ================================================================ onboarding
 set local role authenticated;

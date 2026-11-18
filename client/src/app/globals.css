@@ -264,8 +264,6 @@ html.dark [class~="hover:text-slate-800"]:hover { color: #f8fafc !important; }
     color: #e2e8f0;
     border-color: #475569;
   }
-  html.dark input::placeholder,
-  html.dark textarea::placeholder { color: #94a3b8; }
   html.dark option { background-color: #111c2e; color: #e2e8f0; }
 }
 
