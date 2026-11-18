@@ -28,7 +28,10 @@ if (files.length === 0) {
 let failed = [];
 for (const tz of ZONES) {
   console.log(`\n=== TZ=${tz} ===`);
-  const result = spawnSync(process.execPath, ["--test", ...files], { env: { ...process.env, TZ: tz }, stdio: "inherit" });
+  const result = spawnSync(process.execPath, ["--test", ...files], {
+    env: { ...process.env, TZ: tz },
+    stdio: "inherit",
+  });
   if (result.status !== 0) failed.push(tz);
 }
 

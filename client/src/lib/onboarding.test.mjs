@@ -5,7 +5,13 @@ import { clampDay, onboardingPayload } from "./onboarding.mjs";
 const base = { salary: "", payDay: "", pct: 30, bills: [], cats: [] };
 
 test("every step skipped still gives a valid payload", () => {
-  assert.deepEqual(onboardingPayload(base), { p_take_home_pay: null, p_pay_day: 1, p_savings_pct: 30, p_bills: [], p_categories: [] });
+  assert.deepEqual(onboardingPayload(base), {
+    p_take_home_pay: null,
+    p_pay_day: 1,
+    p_savings_pct: 30,
+    p_bills: [],
+    p_categories: [],
+  });
 });
 
 test("rupees become paise; blank limits stay empty; bills without an amount are dropped", () => {
@@ -46,7 +52,10 @@ test("names never collide, so the save can't be rejected", () => {
     ],
     cats: [{ name: "Health", limit: "", on: true }],
   });
-  assert.deepEqual(p.p_bills.map((b) => b.name), ["Bill", "Bill 2", "health 2"]);
+  assert.deepEqual(
+    p.p_bills.map((b) => b.name),
+    ["Bill", "Bill 2", "health 2"],
+  );
 });
 
 test("day inputs clamp to 1-28", () => {

@@ -124,18 +124,31 @@ function LoginForm() {
             aria-selected={mode === m}
             onClick={() => switchMode(m)}
             className="h-[34px] flex-1 cursor-pointer rounded-full border-0 text-[13px] font-semibold transition-colors duration-200"
-            style={{ background: mode === m ? "var(--tile-2)" : "transparent", color: mode === m ? "var(--ink)" : "var(--muted)" }}
+            style={{
+              background: mode === m ? "var(--tile-2)" : "transparent",
+              color: mode === m ? "var(--ink)" : "var(--muted)",
+            }}
           >
             {label}
           </button>
         ))}
       </div>
       {error && <AuthAlert error={error} onAction={onAction} />}
-      {magic && linkSent && !error && <AuthNotice>Link sent to {email.trim()}. Open it, or enter the 6-digit code.</AuthNotice>}
+      {magic && linkSent && !error && (
+        <AuthNotice>Link sent to {email.trim()}. Open it, or enter the 6-digit code.</AuthNotice>
+      )}
 
       <form onSubmit={onSubmit} noValidate className="flex flex-col gap-4">
         {!(magic && linkSent) && (
-          <Field label="Email" id="email" type="email" autoComplete="email" placeholder="you@example.com" value={email} onChange={(e) => setEmail(e.target.value)} />
+          <Field
+            label="Email"
+            id="email"
+            type="email"
+            autoComplete="email"
+            placeholder="you@example.com"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+          />
         )}
         {!magic && (
           <PasswordField

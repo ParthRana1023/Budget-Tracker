@@ -7,7 +7,29 @@ import { extendTailwindMerge } from "tailwind-merge";
 const twMerge = extendTailwindMerge({
   extend: {
     theme: {
-      color: ["bg", "tile", "tile-2", "line", "line-2", "ink", "ink-2", "muted", "lime", "lime-text", "lime-ink", "lime-soft", "warn", "warn-soft", "fixed", "flex", "track", "danger", "danger-soft", "danger-ink", "scrim"],
+      color: [
+        "bg",
+        "tile",
+        "tile-2",
+        "line",
+        "line-2",
+        "ink",
+        "ink-2",
+        "muted",
+        "lime",
+        "lime-text",
+        "lime-ink",
+        "lime-soft",
+        "warn",
+        "warn-soft",
+        "fixed",
+        "flex",
+        "track",
+        "danger",
+        "danger-soft",
+        "danger-ink",
+        "scrim",
+      ],
     },
   },
 });
@@ -16,8 +38,7 @@ type Variant = "primary" | "danger" | "ink" | "secondary" | "ghost";
 type Size = "sm" | "md" | "lg" | "xl";
 
 const VARIANTS: Record<Variant, string> = {
-  primary:
-    "border-0 bg-lime text-lime-ink font-bold hover:-translate-y-px hover:shadow-[0_8px_24px_-10px_var(--lime)]",
+  primary: "border-0 bg-lime text-lime-ink font-bold hover:-translate-y-px hover:shadow-[0_8px_24px_-10px_var(--lime)]",
   danger: "border-0 bg-danger text-danger-ink font-bold",
   ink: "border-0 bg-ink text-bg font-bold",
   secondary: "border border-line bg-transparent font-semibold hover:border-ink-2",
@@ -44,12 +65,14 @@ const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button(
       ref={ref}
       type={type}
       // twMerge so a caller's className (e.g. border-line-2) replaces the variant default.
-      className={twMerge(clsx(
-        "inline-flex flex-none cursor-pointer items-center justify-center gap-2 rounded-full transition-[transform,box-shadow,border-color,color,opacity] duration-200 active:scale-[.96] disabled:cursor-default disabled:opacity-75",
-        VARIANTS[variant],
-        SIZES[size],
-        className,
-      ))}
+      className={twMerge(
+        clsx(
+          "inline-flex flex-none cursor-pointer items-center justify-center gap-2 rounded-full transition-[transform,box-shadow,border-color,color,opacity] duration-200 active:scale-[.96] disabled:cursor-default disabled:opacity-75",
+          VARIANTS[variant],
+          SIZES[size],
+          className,
+        ),
+      )}
       {...rest}
     />
   );

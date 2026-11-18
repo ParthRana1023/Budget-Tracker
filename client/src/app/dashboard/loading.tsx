@@ -3,7 +3,12 @@
 import { useEffect, useState } from "react";
 import { StatusShell } from "@/components/StatusPage";
 
-const STEPS = ["Confirming your salary", "Setting aside savings", "Reserving fixed bills", "Working out today’s number"];
+const STEPS = [
+  "Confirming your salary",
+  "Setting aside savings",
+  "Reserving fixed bills",
+  "Working out today’s number",
+];
 // Decorative split of the pay-yourself-first bar: savings, fixed bills, spent, safe.
 const SEGS: Array<[string, string]> = [
   ["31.6%", "var(--lime)"],
@@ -51,7 +56,9 @@ export default function DashboardLoading() {
                 style={{ background: step > i ? "var(--lime)" : step === i ? "var(--ink-2)" : "var(--track)" }}
               />
               <span className="flex-1 font-medium">{label}</span>
-              <span className="font-serif text-[17px] text-muted italic">{step > i ? "done" : step === i ? "working" : ""}</span>
+              <span className="font-serif text-[17px] text-muted italic">
+                {step > i ? "done" : step === i ? "working" : ""}
+              </span>
             </li>
           ))}
         </ol>

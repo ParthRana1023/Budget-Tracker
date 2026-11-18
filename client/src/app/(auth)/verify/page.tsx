@@ -5,7 +5,15 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/utils/supabase/client";
 import { authErrorFor } from "@/lib/auth.mjs";
-import { AuthAlert, LinkButton, OtpInput, SubmitButton, VerifyHeading, useResendTimer, type AuthError } from "@/components/auth/AuthParts";
+import {
+  AuthAlert,
+  LinkButton,
+  OtpInput,
+  SubmitButton,
+  VerifyHeading,
+  useResendTimer,
+  type AuthError,
+} from "@/components/auth/AuthParts";
 
 /** After sign-up: enter the 6-digit code from the confirmation email (or open its link). */
 function VerifyForm() {

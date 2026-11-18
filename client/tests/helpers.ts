@@ -27,7 +27,8 @@ export async function signUpFreshUser(page: Page): Promise<string> {
 }
 
 /** Primary button of the current onboarding step ("Skip for now" / "Continue" / "Open my dashboard"). */
-export const onboardingNext = (page: Page) => page.getByRole("main").getByRole("button", { name: /Skip for now|Continue|Open my dashboard/ });
+export const onboardingNext = (page: Page) =>
+  page.getByRole("main").getByRole("button", { name: /Skip for now|Continue|Open my dashboard/ });
 
 /** Skip every onboarding step and land on the dashboard. */
 export async function skipOnboarding(page: Page) {

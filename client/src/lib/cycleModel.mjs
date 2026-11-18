@@ -28,7 +28,11 @@ export function buildCycleModel({ settings, categories, transactions, recurringI
 
   const cycleTransactions = transactions.filter((t) => t.date >= period.startStr && t.date <= period.endStr);
   const spentByCat = new Map(active.map((c) => [c.id, 0]));
-  let income = 0, regularSaved = 0, windfallSaved = 0, reservedThisCycle = 0, flexSpent = 0;
+  let income = 0,
+    regularSaved = 0,
+    windfallSaved = 0,
+    reservedThisCycle = 0,
+    flexSpent = 0;
   for (const t of cycleTransactions) {
     if (t.type === "expense" && !t.from_reserve) {
       const c = t.category_id ? byId.get(t.category_id) : undefined;
@@ -43,7 +47,8 @@ export function buildCycleModel({ settings, categories, transactions, recurringI
   }
 
   // The reserve is a running balance across cycles.
-  let reserveIn = 0, reserveOut = 0;
+  let reserveIn = 0,
+    reserveOut = 0;
   for (const t of transactions) {
     if (t.type === "reserve_transfer") reserveIn += amt(t);
     else if (t.type === "expense" && t.from_reserve) reserveOut += amt(t);
@@ -54,12 +59,14 @@ export function buildCycleModel({ settings, categories, transactions, recurringI
   const skippedCats = new Set(
     recurringItems
       .filter((r) => r.category_id && recurringStatus(r, statusCtx).key === "skipped")
-      .map((r) => r.category_id)
+      .map((r) => r.category_id),
   );
 
-  let fixedCommitted = 0, unpaidBills = 0;
+  let fixedCommitted = 0,
+    unpaidBills = 0;
   for (const c of fixed) {
-    const spent = spentByCat.get(c.id) ?? 0, limit = Number(c.monthly_limit);
+    const spent = spentByCat.get(c.id) ?? 0,
+      limit = Number(c.monthly_limit);
     if (skippedCats.has(c.id)) fixedCommitted += spent;
     else {
       fixedCommitted += Math.max(limit, spent);
@@ -67,7 +74,8 @@ export function buildCycleModel({ settings, categories, transactions, recurringI
     }
   }
 
-  const takeHome = Number(settings?.take_home_pay ?? 0), pct = Number(settings?.savings_pct ?? 0);
+  const takeHome = Number(settings?.take_home_pay ?? 0),
+    pct = Number(settings?.savings_pct ?? 0);
   const savingsTarget = Math.round((takeHome * pct) / 100);
   const savingsSetAside = Math.max(savingsTarget, regularSaved);
   const safe = income - savingsSetAside - windfallSaved - reservedThisCycle - fixedCommitted - flexSpent;
@@ -99,7 +107,12 @@ export function buildCycleModel({ settings, categories, transactions, recurringI
     safe,
     perDay: Math.floor(Math.max(0, safe) / Math.max(1, period.daysRemaining)),
     /** Hero bar parts; the UI divides each by max(income, 1). */
-    bar: { savings: savingsSetAside + windfallSaved + reservedThisCycle, bills: fixedCommitted, spent: flexSpent, safe },
+    bar: {
+      savings: savingsSetAside + windfallSaved + reservedThisCycle,
+      bills: fixedCommitted,
+      spent: flexSpent,
+      safe,
+    },
     /** Positive = under where an even spend of the flexible budget would be by today. */
     paceDiff: expectedByToday - flexSpent,
   };

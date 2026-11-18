@@ -14,7 +14,17 @@ export type AuthError = { message: string; action?: "forgot" | "verify" | "resen
 const INPUT =
   "h-[50px] w-full rounded-xl border bg-tile px-4 text-[15px] text-ink outline-none transition-[border-color,box-shadow] duration-200 focus:shadow-[0_0_0_3px_var(--lime-soft)] focus-visible:outline-none";
 
-export function AuthHeading({ eyebrow, title, em, children }: { eyebrow: string; title: string; em: string; children?: ReactNode }) {
+export function AuthHeading({
+  eyebrow,
+  title,
+  em,
+  children,
+}: {
+  eyebrow: string;
+  title: string;
+  em: string;
+  children?: ReactNode;
+}) {
   return (
     <div className="flex flex-col gap-2">
       <span className="eyebrow">{eyebrow}</span>
@@ -36,7 +46,8 @@ export function VerifyHeading({ email }: { email: string }) {
         Check your <em>inbox.</em>
       </h1>
       <p className="m-0 text-pretty text-ink-2">
-        We sent a confirmation link and a 6-digit code to <strong className="font-semibold text-ink">{email || "your email"}</strong>.
+        We sent a confirmation link and a 6-digit code to{" "}
+        <strong className="font-semibold text-ink">{email || "your email"}</strong>.
       </p>
     </div>
   );
@@ -110,7 +121,11 @@ export function PasswordField({
         <div className="flex items-center gap-2.5 pt-0.5">
           <div aria-hidden className="grid flex-1 grid-cols-4 gap-1">
             {[0, 1, 2, 3].map((i) => (
-              <span key={i} className="h-1 rounded-full transition-colors duration-300" style={{ background: value && i < score ? color : "var(--track)" }} />
+              <span
+                key={i}
+                className="h-1 rounded-full transition-colors duration-300"
+                style={{ background: value && i < score ? color : "var(--track)" }}
+              />
             ))}
           </div>
           <span className="text-right text-xs whitespace-nowrap text-muted">{PASSWORD_HINTS[value ? score : 0]}</span>
@@ -120,9 +135,22 @@ export function PasswordField({
   );
 }
 
-export function ConfirmPasswordField({ id, value, password, onChange, show }: { id: string; value: string; password: string; onChange: (v: string) => void; show: boolean }) {
+export function ConfirmPasswordField({
+  id,
+  value,
+  password,
+  onChange,
+  show,
+}: {
+  id: string;
+  value: string;
+  password: string;
+  onChange: (v: string) => void;
+  show: boolean;
+}) {
   const match = value ? value === password : null;
-  const border = match === false && value.length >= password.length ? "var(--danger)" : match ? "var(--lime)" : "var(--line-2)";
+  const border =
+    match === false && value.length >= password.length ? "var(--danger)" : match ? "var(--lime)" : "var(--line-2)";
   return (
     <div className="flex flex-col gap-1.5">
       <label htmlFor={id} className="eyebrow">
@@ -148,7 +176,15 @@ export function ConfirmPasswordField({ id, value, password, onChange, show }: { 
 }
 
 /** Six code boxes over one invisible input (so paste and one-time-code autofill work). Calls onComplete at 6 digits. */
-export function OtpInput({ value, onChange, onComplete }: { value: string; onChange: (v: string) => void; onComplete: (v: string) => void }) {
+export function OtpInput({
+  value,
+  onChange,
+  onComplete,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  onComplete: (v: string) => void;
+}) {
   const [focus, setFocus] = useState(false);
   return (
     <div className="flex flex-col gap-2">
@@ -196,9 +232,18 @@ export function OtpInput({ value, onChange, onComplete }: { value: string; onCha
 
 const ACTION_LABEL = { forgot: "Reset password", verify: "Send a new link", resend: "Send a new code" };
 
-export function AuthAlert({ error, onAction }: { error: AuthError; onAction?: (a: NonNullable<AuthError["action"]>) => void }) {
+export function AuthAlert({
+  error,
+  onAction,
+}: {
+  error: AuthError;
+  onAction?: (a: NonNullable<AuthError["action"]>) => void;
+}) {
   return (
-    <div role="alert" className="flex items-start gap-2 rounded-xl bg-danger-soft px-4 py-3 text-sm font-medium text-danger">
+    <div
+      role="alert"
+      className="flex items-start gap-2 rounded-xl bg-danger-soft px-4 py-3 text-sm font-medium text-danger"
+    >
       <CircleAlert size={14} className="mt-[3px] flex-none" />
       <span className="flex flex-1 flex-col gap-1.5">
         {error.message}
@@ -233,7 +278,9 @@ export function SubmitButton({ id, busy, label }: { id?: string; busy: string | 
       disabled={!!busy}
       className="mt-1 flex h-[52px] cursor-pointer items-center justify-center gap-2.5 rounded-full border-0 bg-lime text-[15px] font-bold text-lime-ink transition-[transform,box-shadow,opacity] duration-200 hover:-translate-y-px hover:shadow-[0_12px_28px_-12px_var(--lime)] active:scale-[.98] disabled:opacity-75"
     >
-      {busy && <span aria-hidden className="h-4 w-4 animate-spin rounded-full border-2 border-current border-r-transparent" />}
+      {busy && (
+        <span aria-hidden className="h-4 w-4 animate-spin rounded-full border-2 border-current border-r-transparent" />
+      )}
       {busy ?? label}
     </button>
   );
@@ -252,7 +299,17 @@ export function SwitchLine({ text, href, link }: { text: string; href: string; l
 }
 
 /** Text button for small actions under the form ("Resend email", "Use a different email"). */
-export function LinkButton({ children, disabled, onClick, muted }: { children: ReactNode; disabled?: boolean; onClick: () => void; muted?: boolean }) {
+export function LinkButton({
+  children,
+  disabled,
+  onClick,
+  muted,
+}: {
+  children: ReactNode;
+  disabled?: boolean;
+  onClick: () => void;
+  muted?: boolean;
+}) {
   return (
     <button
       type="button"
@@ -276,7 +333,11 @@ export function useResendTimer(startNow = false) {
     const t = setTimeout(() => setLeft((s) => s - 1), 1000);
     return () => clearTimeout(t);
   }, [left]);
-  return { left, start: () => setLeft(30), label: left > 0 ? `Resend in 0:${String(left).padStart(2, "0")}` : "Resend email" };
+  return {
+    left,
+    start: () => setLeft(30),
+    label: left > 0 ? `Resend in 0:${String(left).padStart(2, "0")}` : "Resend email",
+  };
 }
 
 // Shown only once the Google provider is set up in Supabase (and a Google Cloud OAuth client exists).
@@ -305,10 +366,22 @@ export function GoogleButton({ onError }: { onError: (e: AuthError) => void }) {
         className="flex h-12 cursor-pointer items-center justify-center gap-2.5 rounded-full border border-line-2 bg-transparent text-[15px] font-semibold transition-[border-color,transform] duration-200 hover:border-ink-2 active:scale-[.98]"
       >
         <svg aria-hidden width="16" height="16" viewBox="0 0 48 48">
-          <path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.2 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34.1 6.1 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.4-.4-3.5z" />
-          <path fill="#FF3D00" d="m6.3 14.7 6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34.1 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z" />
-          <path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 35.1 26.7 36 24 36c-5.2 0-9.6-3.3-11.3-7.9l-6.5 5C9.5 39.6 16.2 44 24 44z" />
-          <path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.2-4.1 5.6l6.2 5.2C37 39.2 44 34 44 24c0-1.3-.1-2.4-.4-3.5z" />
+          <path
+            fill="#FFC107"
+            d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.2 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34.1 6.1 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.4-.4-3.5z"
+          />
+          <path
+            fill="#FF3D00"
+            d="m6.3 14.7 6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34.1 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"
+          />
+          <path
+            fill="#4CAF50"
+            d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 35.1 26.7 36 24 36c-5.2 0-9.6-3.3-11.3-7.9l-6.5 5C9.5 39.6 16.2 44 24 44z"
+          />
+          <path
+            fill="#1976D2"
+            d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.2-4.1 5.6l6.2 5.2C37 39.2 44 34 44 24c0-1.3-.1-2.4-.4-3.5z"
+          />
         </svg>
         {opening ? "Opening Google…" : "Continue with Google"}
       </button>

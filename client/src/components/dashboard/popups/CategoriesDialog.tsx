@@ -13,7 +13,14 @@ import type { Category } from "../types";
 import type { PopupContext } from "./context";
 import { FIELD, Preview, SAVE_FAILED, cleanDay, paise, toField } from "./parts";
 
-type Cat = { id: string; name: string; type: "fixed" | "flexible"; monthly_limit: number; due_day: number | null; is_active: boolean };
+type Cat = {
+  id: string;
+  name: string;
+  type: "fixed" | "flexible";
+  monthly_limit: number;
+  due_day: number | null;
+  is_active: boolean;
+};
 const asCat = (c: Category): Cat => ({
   id: c.id,
   name: c.name,
@@ -22,7 +29,8 @@ const asCat = (c: Category): Cat => ({
   due_day: c.due_day ?? null,
   is_active: c.is_active !== false,
 });
-const SMALL = "h-10 rounded-[10px] border border-line-2 bg-tile-2 text-[15px] text-ink outline-none focus:border-lime focus:shadow-[0_0_0_3px_var(--lime-soft)] focus-visible:outline-none";
+const SMALL =
+  "h-10 rounded-[10px] border border-line-2 bg-tile-2 text-[15px] text-ink outline-none focus:border-lime focus:shadow-[0_0_0_3px_var(--lime-soft)] focus-visible:outline-none";
 
 /** Applies a diff; returns the first error. */
 async function apply(userId: string, d: ReturnType<typeof categoryDiff>) {
@@ -42,7 +50,9 @@ export default function CategoriesDialog({ ctx, onClose }: { ctx: PopupContext; 
   const before = ctx.categories.map(asCat);
   const [draft, setDraft] = useState<Cat[]>(before);
   // Typed values, kept as text while editing.
-  const [limits, setLimits] = useState<Record<string, string>>(Object.fromEntries(before.map((c) => [c.id, c.monthly_limit ? toField(c.monthly_limit) : ""])));
+  const [limits, setLimits] = useState<Record<string, string>>(
+    Object.fromEntries(before.map((c) => [c.id, c.monthly_limit ? toField(c.monthly_limit) : ""])),
+  );
   const [tab, setTab] = useState<"flexible" | "fixed">("flexible");
   const [add, setAdd] = useState({ name: "", limit: "", due: "" });
   const [error, setError] = useState<string | null>(null);
@@ -66,7 +76,14 @@ export default function CategoriesDialog({ ctx, onClose }: { ctx: PopupContext; 
     // Re-adding a name that was switched off brings that category back.
     const old = draft.find((c) => !c.is_active && c.name.trim().toLowerCase() === name.toLowerCase());
     const id = old?.id ?? `new-${Date.now()}`;
-    const row: Cat = { id, name, type: tab, monthly_limit: limit, due_day: tab === "fixed" ? due : null, is_active: true };
+    const row: Cat = {
+      id,
+      name,
+      type: tab,
+      monthly_limit: limit,
+      due_day: tab === "fixed" ? due : null,
+      is_active: true,
+    };
     setDraft((d) => (old ? d.map((c) => (c.id === id ? row : c)) : [...d, row]));
     setLimits((l) => ({ ...l, [id]: limit ? toField(limit) : "" }));
     setAdd({ name: "", limit: "", due: "" });
@@ -132,7 +149,10 @@ export default function CategoriesDialog({ ctx, onClose }: { ctx: PopupContext; 
             aria-selected={tab === k}
             onClick={() => setTab(k)}
             className="min-h-[38px] flex-1 cursor-pointer rounded-full border-0 text-[13px] font-semibold transition-colors duration-200"
-            style={{ background: tab === k ? "var(--ink)" : "transparent", color: tab === k ? "var(--bg)" : "var(--muted)" }}
+            style={{
+              background: tab === k ? "var(--ink)" : "transparent",
+              color: tab === k ? "var(--bg)" : "var(--muted)",
+            }}
           >
             {label} · {live.filter((c) => c.type === k).length}
           </button>
@@ -140,9 +160,15 @@ export default function CategoriesDialog({ ctx, onClose }: { ctx: PopupContext; 
       </div>
       <div className="flex flex-col">
         {rows.map((c) => {
-          const spent = model.spentByCat.get(c.id) ?? 0, inUse = usedThisCycle(c.id);
+          const spent = model.spentByCat.get(c.id) ?? 0,
+            inUse = usedThisCycle(c.id);
           return (
-            <div key={c.id} className="flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-line py-3" data-testid="category-row" data-name={c.name}>
+            <div
+              key={c.id}
+              className="flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-line py-3"
+              data-testid="category-row"
+              data-name={c.name}
+            >
               <span className="flex min-w-0 flex-[1_1_150px] flex-col gap-0.5">
                 <input
                   type="text"
@@ -198,7 +224,10 @@ export default function CategoriesDialog({ ctx, onClose }: { ctx: PopupContext; 
                 </span>
               )}
               {inUse ? (
-                <span title="Has entries this cycle, so it can’t be deleted" className="flex w-9 justify-center text-muted">
+                <span
+                  title="Has entries this cycle, so it can’t be deleted"
+                  className="flex w-9 justify-center text-muted"
+                >
                   <Lock size={14} />
                 </span>
               ) : (
@@ -247,7 +276,11 @@ export default function CategoriesDialog({ ctx, onClose }: { ctx: PopupContext; 
               className={`${FIELD} h-11 w-auto flex-[0_1_96px]`}
             />
           )}
-          <button type="button" onClick={addCategory} className="h-11 cursor-pointer rounded-full border-0 bg-ink px-[18px] text-sm font-bold text-bg active:scale-[.97]">
+          <button
+            type="button"
+            onClick={addCategory}
+            className="h-11 cursor-pointer rounded-full border-0 bg-ink px-[18px] text-sm font-bold text-bg active:scale-[.97]"
+          >
             Add
           </button>
         </div>

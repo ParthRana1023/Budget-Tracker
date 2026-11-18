@@ -5,7 +5,20 @@ import { getPeriodRange } from "./periods.mjs";
 import { addDaysStr, cycleDayOf } from "./cycle.mjs";
 
 const MON = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-const MON_L = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+const MON_L = [
+  "January",
+  "February",
+  "March",
+  "April",
+  "May",
+  "June",
+  "July",
+  "August",
+  "September",
+  "October",
+  "November",
+  "December",
+];
 const amt = (t) => Number(t.amount);
 
 /**
@@ -79,7 +92,8 @@ export function topPayees(current, previous, limit = 5) {
     }
     return g;
   };
-  const now = group(current), before = group(previous);
+  const now = group(current),
+    before = group(previous);
   return [...now.entries()]
     .map(([key, r]) => ({ ...r, previous: before.get(key)?.amount ?? null }))
     .sort((a, b) => b.amount - a.amount)
@@ -88,7 +102,8 @@ export function topPayees(current, previous, limit = 5) {
 
 /** Average flexible spend per weekday (Mon..Sun) over the given cycles, up to `today`. */
 export function weekdayAverages(cycles, today) {
-  const sum = Array(7).fill(0), cnt = Array(7).fill(0);
+  const sum = Array(7).fill(0),
+    cnt = Array(7).fill(0);
   for (const cy of cycles) {
     for (let k = 1; k <= cy.period.totalDays; k++) {
       const date = addDaysStr(cy.period.startStr, k - 1);
@@ -115,10 +130,19 @@ export function suggestLimits(flexCategories, fullCycles) {
   const out = [];
   for (const c of flexCategories) {
     const v = last3.map((cy) => cy.byCat.get(c.id) ?? 0);
-    const average = v.reduce((a, b) => a + b, 0) / v.length, lim = Number(c.monthly_limit);
-    const base = { categoryId: c.id, name: c.name, from: lim, average, overCount: v.filter((x) => lim && x > lim).length, high: Math.max(...v) };
+    const average = v.reduce((a, b) => a + b, 0) / v.length,
+      lim = Number(c.monthly_limit);
+    const base = {
+      categoryId: c.id,
+      name: c.name,
+      from: lim,
+      average,
+      overCount: v.filter((x) => lim && x > lim).length,
+      high: Math.max(...v),
+    };
     if (lim && average > lim * 1.05) out.push({ ...base, to: roundLimit(average), tag: "Raise" });
-    else if (lim && average < lim * 0.9 && roundLimit(average) < lim) out.push({ ...base, to: roundLimit(average), tag: "Lower" });
+    else if (lim && average < lim * 0.9 && roundLimit(average) < lim)
+      out.push({ ...base, to: roundLimit(average), tag: "Lower" });
     else if (!lim && average > 0) out.push({ ...base, to: roundLimit(average * 1.2), tag: "Set a limit" });
   }
   return out;

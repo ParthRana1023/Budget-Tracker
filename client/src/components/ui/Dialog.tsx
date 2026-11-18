@@ -89,7 +89,10 @@ export default function Dialog({
           !shown && "translate-y-4 scale-[.98] max-[640px]:translate-y-12 max-[640px]:scale-100",
         )}
       >
-        <span aria-hidden className="mt-2.5 hidden h-1 w-10 flex-none self-center rounded-full bg-line-2 max-[640px]:block" />
+        <span
+          aria-hidden
+          className="mt-2.5 hidden h-1 w-10 flex-none self-center rounded-full bg-line-2 max-[640px]:block"
+        />
         <div className="flex items-start gap-3 border-b border-line pt-5 pr-[22px] pb-4 pl-[26px]">
           <div className="flex min-w-0 flex-1 flex-col gap-1.5">
             <span className="eyebrow">{eyebrow}</span>
@@ -141,7 +144,10 @@ export default function Dialog({
           )}
           <Button type="submit" variant={submitTone} size="xl" disabled={busy} aria-busy={busy} className="min-w-40">
             {busy ? (
-              <span aria-hidden className="h-4 w-4 animate-spin rounded-full border-2 border-current border-r-transparent" />
+              <span
+                aria-hidden
+                className="h-4 w-4 animate-spin rounded-full border-2 border-current border-r-transparent"
+              />
             ) : (
               <Check size={16} className="flex-none" />
             )}

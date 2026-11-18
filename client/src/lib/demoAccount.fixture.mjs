@@ -5,17 +5,39 @@ import { getPeriodRange } from "./periods.mjs";
 export const R = 100; // paise per rupee
 
 export function demoAccount() {
-  const cat = (id, name, type, limit, due_day = null) => ({ id, name, type, monthly_limit: limit * R, due_day, is_active: true });
+  const cat = (id, name, type, limit, due_day = null) => ({
+    id,
+    name,
+    type,
+    monthly_limit: limit * R,
+    due_day,
+    is_active: true,
+  });
   const categories = [
-    cat("groc", "Groceries", "flexible", 10000), cat("dine", "Dining out", "flexible", 5000),
-    cat("fuel", "Fuel", "flexible", 4000), cat("shop", "Shopping", "flexible", 6000),
-    cat("ent", "Entertainment", "flexible", 3000), cat("health", "Health", "flexible", 0),
-    cat("rent", "Rent", "fixed", 28000, 3), cat("net", "Internet", "fixed", 1200, 5),
-    cat("phone", "Phone", "fixed", 600, 4), cat("elec", "Electricity", "fixed", 2500, 20),
+    cat("groc", "Groceries", "flexible", 10000),
+    cat("dine", "Dining out", "flexible", 5000),
+    cat("fuel", "Fuel", "flexible", 4000),
+    cat("shop", "Shopping", "flexible", 6000),
+    cat("ent", "Entertainment", "flexible", 3000),
+    cat("health", "Health", "flexible", 0),
+    cat("rent", "Rent", "fixed", 28000, 3),
+    cat("net", "Internet", "fixed", 1200, 5),
+    cat("phone", "Phone", "fixed", 600, 4),
+    cat("elec", "Electricity", "fixed", 2500, 20),
     cat("ins", "Insurance", "fixed", 3000, 25),
   ];
-  const tx = (id, type, category_id, amount, date, note, extra = {}) =>
-    ({ id, type, category_id, amount: amount * R, date, note, source: "manual", from_reserve: false, external_id: null, ...extra });
+  const tx = (id, type, category_id, amount, date, note, extra = {}) => ({
+    id,
+    type,
+    category_id,
+    amount: amount * R,
+    date,
+    note,
+    source: "manual",
+    from_reserve: false,
+    external_id: null,
+    ...extra,
+  });
   const transactions = [
     tx("t1", "expense", "dine", 640, "2026-11-16", "Swiggy lunch"),
     tx("t2", "expense", "groc", 1180, "2026-11-16", "BigBasket order"),
@@ -32,12 +54,23 @@ export function demoAccount() {
     tx("t13", "expense", "rent", 28000, "2026-11-03", "November rent", { external_id: "recurring:r2:2026-11" }),
     tx("t14", "income", null, 95000, "2026-11-01", "Monthly salary", { external_id: "recurring:r1:2026-11" }),
   ];
-  const item = (id, name, type, category_id, amount, day_of_month) =>
-    ({ id, name, type, category_id, amount: amount * R, day_of_month, active: true, skip_month: null });
+  const item = (id, name, type, category_id, amount, day_of_month) => ({
+    id,
+    name,
+    type,
+    category_id,
+    amount: amount * R,
+    day_of_month,
+    active: true,
+    skip_month: null,
+  });
   const recurringItems = [
-    item("r1", "Monthly salary", "income", null, 95000, 1), item("r2", "Rent", "expense", "rent", 28000, 3),
-    item("r3", "ACT Fibernet", "expense", "net", 1200, 5), item("r4", "Jio postpaid", "expense", "phone", 600, null),
-    item("r5", "Electricity", "expense", "elec", 2500, null), item("r6", "Insurance premium", "expense", "ins", 3000, 25),
+    item("r1", "Monthly salary", "income", null, 95000, 1),
+    item("r2", "Rent", "expense", "rent", 28000, 3),
+    item("r3", "ACT Fibernet", "expense", "net", 1200, 5),
+    item("r4", "Jio postpaid", "expense", "phone", 600, null),
+    item("r5", "Electricity", "expense", "elec", 2500, null),
+    item("r6", "Insurance premium", "expense", "ins", 3000, 25),
   ];
   return {
     categories,

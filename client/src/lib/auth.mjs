@@ -37,10 +37,16 @@ export const errorFromQuery = (/** @type {string | null} */ code) => (code && QU
 export function authErrorFor(error) {
   const code = error?.code ?? "";
   if (code === "invalid_credentials") {
-    return { message: "That email and password don’t match. Check for typos or reset your password.", action: "forgot" };
+    return {
+      message: "That email and password don’t match. Check for typos or reset your password.",
+      action: "forgot",
+    };
   }
   if (code === "email_not_confirmed") {
-    return { message: "This email hasn’t been confirmed yet. Open the link we sent, or get a new one.", action: "verify" };
+    return {
+      message: "This email hasn’t been confirmed yet. Open the link we sent, or get a new one.",
+      action: "verify",
+    };
   }
   if (code === "otp_expired") {
     return { message: "That code has expired. Request a new one and use it within 10 minutes.", action: "resend" };

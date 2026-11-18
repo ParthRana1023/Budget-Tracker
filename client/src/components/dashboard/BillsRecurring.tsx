@@ -12,7 +12,8 @@ import { CARD_H2, PILL_LIME, PILL_LINE, type Category, type RecurringItem, type 
 type Period = { startStr: string; endStr: string; totalDays: number; daysElapsed: number };
 
 const PILL_STATUS = "rounded-full border px-2 py-0.5 text-[11px] font-semibold whitespace-nowrap";
-const ROW = "mt-2 flex flex-wrap items-center gap-x-3.5 gap-y-2 rounded-xl border px-3.5 py-3 transition-opacity duration-200";
+const ROW =
+  "mt-2 flex flex-wrap items-center gap-x-3.5 gap-y-2 rounded-xl border px-3.5 py-3 transition-opacity duration-200";
 
 export default function BillsRecurring({
   items,
@@ -51,7 +52,12 @@ export default function BillsRecurring({
 
   // Still to pay: unpaid fixed bills plus recurring expenses outside fixed categories that are due or coming up.
   const recurringDue = rows
-    .filter(({ item, st }) => item.type === "expense" && byId.get(item.category_id ?? "")?.type !== "fixed" && (st.key === "due" || st.key === "upcoming"))
+    .filter(
+      ({ item, st }) =>
+        item.type === "expense" &&
+        byId.get(item.category_id ?? "")?.type !== "fixed" &&
+        (st.key === "due" || st.key === "upcoming"),
+    )
     .reduce((s, { item }) => s + Number(item.amount), 0);
   const yearly =
     (items.filter((r) => r.type === "expense" && r.active).reduce((s, r) => s + Number(r.amount), 0) +
@@ -68,11 +74,19 @@ export default function BillsRecurring({
     });
 
   const status = (key: string, dueDate: string | null, entryDate?: string) => {
-    if (key === "recorded") return { label: `Recorded ${dayLabel(entryDate!, today)}`, color: "var(--muted)", border: "var(--line)" };
+    if (key === "recorded")
+      return { label: `Recorded ${dayLabel(entryDate!, today)}`, color: "var(--muted)", border: "var(--line)" };
     if (key === "paused") return { label: "Stopped", color: "var(--muted)", border: "var(--line)" };
-    if (key === "skipped") return { label: "Skipped this month · not counted", color: "var(--muted)", border: "var(--line)" };
-    if (key === "due") return { label: dueDate === today ? "Due today" : "Due · not recorded", color: "var(--warn)", border: "var(--warn)" };
-    if (key === "upcoming") return { label: `Due ${shortDate(dueDate!)}`, color: "var(--ink-2)", border: "var(--line-2)" };
+    if (key === "skipped")
+      return { label: "Skipped this month · not counted", color: "var(--muted)", border: "var(--line)" };
+    if (key === "due")
+      return {
+        label: dueDate === today ? "Due today" : "Due · not recorded",
+        color: "var(--warn)",
+        border: "var(--warn)",
+      };
+    if (key === "upcoming")
+      return { label: `Due ${shortDate(dueDate!)}`, color: "var(--ink-2)", border: "var(--line-2)" };
     return { label: "Suggested when you log", color: "var(--muted)", border: "var(--line-2)" };
   };
 
@@ -91,10 +105,21 @@ export default function BillsRecurring({
         <div className="flex flex-col gap-2 pt-4 pb-1.5">
           <div className="grid gap-0.5" style={{ gridTemplateColumns: `repeat(${period.totalDays}, minmax(0, 1fr))` }}>
             {Array.from({ length: period.totalDays }, (_, i) => {
-              const k = i + 1, date = addDaysStr(period.startStr, i), dom = +date.slice(8), isToday = k === period.daysElapsed;
+              const k = i + 1,
+                date = addDaysStr(period.startStr, i),
+                dom = +date.slice(8),
+                isToday = k === period.daysElapsed;
               const here = byDay.get(k) ?? [];
               const keys = here.map((r) => r.st.key);
-              const st = keys.includes("due") ? "due" : keys.some((x) => x === "upcoming" || x === "suggested") ? "up" : keys.includes("recorded") ? "done" : here.length ? "skip" : "";
+              const st = keys.includes("due")
+                ? "due"
+                : keys.some((x) => x === "upcoming" || x === "suggested")
+                  ? "up"
+                  : keys.includes("recorded")
+                    ? "done"
+                    : here.length
+                      ? "skip"
+                      : "";
               const title = `${shortDate(date)}${isToday ? " (today)" : ""}${here.length ? ": " + here.map((r) => `${r.item.name} ${inr(r.item.amount)} (${r.st.key === "recorded" ? "recorded" : r.st.key === "due" ? "due" : r.st.key === "skipped" ? "skipped" : "coming up"})`).join(", ") : ""}`;
               return (
                 <span
@@ -104,7 +129,10 @@ export default function BillsRecurring({
                   className="flex h-[46px] flex-col items-center justify-between rounded-md py-[5px]"
                   style={{ background: isToday ? "var(--tile-2)" : "transparent" }}
                 >
-                  <span className="tabular text-[10px] leading-none" style={{ color: isToday ? "var(--ink)" : "var(--muted)", fontWeight: isToday ? 700 : 400 }}>
+                  <span
+                    className="tabular text-[10px] leading-none"
+                    style={{ color: isToday ? "var(--ink)" : "var(--muted)", fontWeight: isToday ? 700 : 400 }}
+                  >
                     {k === 1 || dom % 5 === 0 || isToday ? dom : ""}
                   </span>
                   <span
@@ -113,7 +141,14 @@ export default function BillsRecurring({
                       opacity: !here.length ? 0 : st === "skip" ? 0.6 : 1,
                       borderStyle: st === "skip" ? "dashed" : "solid",
                       background: st === "done" ? "var(--lime)" : "transparent",
-                      borderColor: st === "done" ? "var(--lime)" : st === "due" ? "var(--warn)" : st === "skip" ? "var(--muted)" : "var(--line-2)",
+                      borderColor:
+                        st === "done"
+                          ? "var(--lime)"
+                          : st === "due"
+                            ? "var(--warn)"
+                            : st === "skip"
+                              ? "var(--muted)"
+                              : "var(--line-2)",
                     }}
                   />
                 </span>
@@ -145,14 +180,19 @@ export default function BillsRecurring({
           <div
             key={item.id}
             className={ROW}
-            style={{ borderColor: "var(--line-2)", borderStyle: st.key === "recorded" ? "solid" : "dashed", opacity: item.active ? 1 : 0.55 }}
+            style={{
+              borderColor: "var(--line-2)",
+              borderStyle: st.key === "recorded" ? "solid" : "dashed",
+              opacity: item.active ? 1 : 0.55,
+            }}
             data-testid="recurring-row"
             data-name={item.name}
           >
             <span className="flex min-w-0 flex-[1_1_180px] flex-col">
               <span className="font-semibold">{item.name}</span>
               <span className="text-[13px] text-muted">
-                {item.type === "income" ? "Income" : (cat?.name ?? "Expense")} · {item.day_of_month ? `day ${item.day_of_month}` : "no fixed day"}
+                {item.type === "income" ? "Income" : (cat?.name ?? "Expense")} ·{" "}
+                {item.day_of_month ? `day ${item.day_of_month}` : "no fixed day"}
               </span>
             </span>
             <span className={PILL_STATUS} style={{ borderColor: s.border, color: s.color }}>
@@ -164,11 +204,21 @@ export default function BillsRecurring({
             </span>
             <span className="flex gap-1.5">
               {item.active && (st.key === "due" || st.key === "suggested") && (
-                <button type="button" onClick={() => onRecord(item)} aria-label={`Record ${item.name} now`} className={`${PILL_LIME} px-3`}>
+                <button
+                  type="button"
+                  onClick={() => onRecord(item)}
+                  aria-label={`Record ${item.name} now`}
+                  className={`${PILL_LIME} px-3`}
+                >
                   Record
                 </button>
               )}
-              <button type="button" onClick={() => onEdit(item)} aria-label={`Edit ${item.name}`} className={`${PILL_LINE} px-3`}>
+              <button
+                type="button"
+                onClick={() => onEdit(item)}
+                aria-label={`Edit ${item.name}`}
+                className={`${PILL_LINE} px-3`}
+              >
                 Edit
               </button>
               <button
@@ -185,30 +235,63 @@ export default function BillsRecurring({
       })}
 
       {billCats.map((c) => {
-        const spent = spentByCat.get(c.id) ?? 0, limit = Number(c.monthly_limit), paid = spent >= limit;
+        const spent = spentByCat.get(c.id) ?? 0,
+          limit = Number(c.monthly_limit),
+          paid = spent >= limit;
         const due = c.due_day ? dueDateInCycle(c.due_day, period) : null;
         const late = !paid && !!due && due < today;
-        const label = skippedCats.has(c.id) ? "Skipped this month" : paid ? "Paid" : spent > 0 ? `${inr(limit - spent)} left` : late ? "Due · not paid" : due ? `Due ${shortDate(due)}` : "Due";
+        const label = skippedCats.has(c.id)
+          ? "Skipped this month"
+          : paid
+            ? "Paid"
+            : spent > 0
+              ? `${inr(limit - spent)} left`
+              : late
+                ? "Due · not paid"
+                : due
+                  ? `Due ${shortDate(due)}`
+                  : "Due";
         return (
-          <div key={c.id} className={ROW} style={{ borderColor: "var(--line-2)", borderStyle: paid ? "solid" : "dashed" }} data-testid="bill-row" data-name={c.name}>
+          <div
+            key={c.id}
+            className={ROW}
+            style={{ borderColor: "var(--line-2)", borderStyle: paid ? "solid" : "dashed" }}
+            data-testid="bill-row"
+            data-name={c.name}
+          >
             <span className="flex min-w-0 flex-[1_1_180px] flex-col">
               <span className="font-semibold">{c.name}</span>
-              <span className="text-[13px] text-muted">Fixed bill · {due ? `due ${shortDate(due)}` : "no due day"}</span>
+              <span className="text-[13px] text-muted">
+                Fixed bill · {due ? `due ${shortDate(due)}` : "no due day"}
+              </span>
             </span>
             <span
               className={PILL_STATUS}
-              style={{ borderColor: paid ? "var(--line)" : late ? "var(--warn)" : "var(--line-2)", color: paid ? "var(--muted)" : late ? "var(--warn)" : "var(--ink-2)" }}
+              style={{
+                borderColor: paid ? "var(--line)" : late ? "var(--warn)" : "var(--line-2)",
+                color: paid ? "var(--muted)" : late ? "var(--warn)" : "var(--ink-2)",
+              }}
             >
               {label}
             </span>
             <span className="tabular min-w-[90px] text-right font-semibold">− {inr(limit)}</span>
             <span className="flex gap-1.5">
               {!paid && (
-                <button type="button" onClick={() => onPayBill(c)} aria-label={`Record ${c.name} payment`} className={`${PILL_LIME} px-3`}>
+                <button
+                  type="button"
+                  onClick={() => onPayBill(c)}
+                  aria-label={`Record ${c.name} payment`}
+                  className={`${PILL_LIME} px-3`}
+                >
                   Record
                 </button>
               )}
-              <button type="button" onClick={onManage} aria-label={`Edit ${c.name} in categories`} className={`${PILL_LINE} px-3`}>
+              <button
+                type="button"
+                onClick={onManage}
+                aria-label={`Edit ${c.name} in categories`}
+                className={`${PILL_LINE} px-3`}
+              >
                 Edit
               </button>
             </span>
@@ -218,7 +301,8 @@ export default function BillsRecurring({
 
       {rows.length + billCats.length === 0 && (
         <p className="mt-[18px] mb-1 font-serif text-xl text-pretty text-ink-2 italic">
-          No bills or recurring payments yet. Add rent or EMIs in Manage, or turn on “Repeat every month” when you log a subscription.
+          No bills or recurring payments yet. Add rent or EMIs in Manage, or turn on “Repeat every month” when you log a
+          subscription.
         </p>
       )}
     </Reveal>

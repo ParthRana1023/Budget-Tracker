@@ -4,7 +4,15 @@ import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/utils/supabase/client";
 import { authErrorFor } from "@/lib/auth.mjs";
-import { AuthAlert, AuthHeading, ConfirmPasswordField, PasswordField, SubmitButton, SwitchLine, type AuthError } from "@/components/auth/AuthParts";
+import {
+  AuthAlert,
+  AuthHeading,
+  ConfirmPasswordField,
+  PasswordField,
+  SubmitButton,
+  SwitchLine,
+  type AuthError,
+} from "@/components/auth/AuthParts";
 
 /** Reached from the reset email (already signed in by /auth/confirm); the proxy keeps everyone else out. */
 export default function ResetPasswordPage() {
@@ -49,7 +57,13 @@ export default function ResetPasswordPage() {
           placeholder="At least 6 characters"
           strength
         />
-        <ConfirmPasswordField id="reset-confirm-password" value={confirm} password={password} onChange={setConfirm} show={showPw} />
+        <ConfirmPasswordField
+          id="reset-confirm-password"
+          value={confirm}
+          password={password}
+          onChange={setConfirm}
+          show={showPw}
+        />
         <SubmitButton busy={busy} label="Save new password" />
       </form>
       <SwitchLine text="Remembered it?" href="/login" link="Back to sign in" />

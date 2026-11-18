@@ -17,6 +17,6 @@ test("exports transactions as escaped CSV with amounts in rupees", () => {
 
   assert.equal(
     csv,
-    'Date,Type,Category,Amount (INR),Note\r\n2026-11-03,expense,Food & Dining Out,1234.56,"Lunch, ""team"""'
+    'Date,Type,Category,Amount (INR),Note\r\n2026-11-03,expense,Food & Dining Out,1234.56,"Lunch, ""team"""',
   );
 });

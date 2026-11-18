@@ -85,7 +85,10 @@ export default async function DashboardPage() {
     .select("goal_id, amount, date")
     .eq("user_id", user.id);
   if (contributionsError) throw new Error(`Could not load your savings contributions: ${contributionsError.message}`);
-  const { data: recurringItems, error: recurringError } = await supabase.from("recurring_items").select("*").eq("user_id", user.id);
+  const { data: recurringItems, error: recurringError } = await supabase
+    .from("recurring_items")
+    .select("*")
+    .eq("user_id", user.id);
   if (recurringError) throw new Error(`Could not load your recurring items: ${recurringError.message}`);
 
   return (

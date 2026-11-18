@@ -13,7 +13,11 @@ export default async function OnboardingPage() {
   if (!user) redirect("/login");
 
   // Onboarding runs once: running it again would switch off categories set up since.
-  const { data: settings } = await supabase.from("user_settings").select("onboarded_at").eq("user_id", user.id).maybeSingle();
+  const { data: settings } = await supabase
+    .from("user_settings")
+    .select("onboarded_at")
+    .eq("user_id", user.id)
+    .maybeSingle();
   if (settings?.onboarded_at) redirect("/dashboard");
 
   return <Onboarding />;

@@ -26,18 +26,26 @@ router.post("/calculate", (req, res) => {
       daysRemainingInPeriod: Number(daysRemainingInPeriod),
     };
     const rawValues = {
-      confirmedIncome, unreceivedVariableIncome, targetSavings,
-      budgetedFixedBills, paidFixedBills, flexibleSpent, daysRemainingInPeriod,
+      confirmedIncome,
+      unreceivedVariableIncome,
+      targetSavings,
+      budgetedFixedBills,
+      paidFixedBills,
+      flexibleSpent,
+      daysRemainingInPeriod,
     };
-    if (Object.entries(values).some(([key, value]) =>
-      !Number.isFinite(value) ||
-      (typeof rawValues[key as keyof typeof rawValues] === "string" &&
-        (rawValues[key as keyof typeof rawValues] as string).trim() === "") ||
-      (key === "daysRemainingInPeriod"
-        ? !Number.isInteger(value) || value < 1
-        : value < 0)
-    )) {
-      return res.status(400).json({ error: "Budget values must be finite, non-negative numbers and daysRemainingInPeriod must be at least 1." });
+    if (
+      Object.entries(values).some(
+        ([key, value]) =>
+          !Number.isFinite(value) ||
+          (typeof rawValues[key as keyof typeof rawValues] === "string" &&
+            (rawValues[key as keyof typeof rawValues] as string).trim() === "") ||
+          (key === "daysRemainingInPeriod" ? !Number.isInteger(value) || value < 1 : value < 0),
+      )
+    ) {
+      return res.status(400).json({
+        error: "Budget values must be finite, non-negative numbers and daysRemainingInPeriod must be at least 1.",
+      });
     }
 
     const summary = calculateSafeToSpend(values);
@@ -55,9 +63,9 @@ router.get("/period", (req, res) => {
   }
   const dateStr = req.query.date as string | undefined;
   const refDate = dateStr
-    ? (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)
-        ? new Date(Number(dateStr.slice(0, 4)), Number(dateStr.slice(5, 7)) - 1, Number(dateStr.slice(8, 10)))
-        : new Date(dateStr))
+    ? /^\d{4}-\d{2}-\d{2}$/.test(dateStr)
+      ? new Date(Number(dateStr.slice(0, 4)), Number(dateStr.slice(5, 7)) - 1, Number(dateStr.slice(8, 10)))
+      : new Date(dateStr)
     : new Date();
   if (Number.isNaN(refDate.getTime())) {
     return res.status(400).json({ error: "date must be a valid date." });
@@ -72,4 +80,3 @@ router.get("/period", (req, res) => {
 });
 
 export default router;
-

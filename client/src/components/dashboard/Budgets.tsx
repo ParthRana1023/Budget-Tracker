@@ -32,11 +32,18 @@ export default function Budgets({
         </span>
       </div>
       {flex.map((c, i) => {
-        const spent = spentByCat.get(c.id) ?? 0, limit = Number(c.monthly_limit);
-        const over = limit > 0 && spent > limit, hot = limit > 0 && spent / limit >= 0.75;
+        const spent = spentByCat.get(c.id) ?? 0,
+          limit = Number(c.monthly_limit);
+        const over = limit > 0 && spent > limit,
+          hot = limit > 0 && spent / limit >= 0.75;
         const tone = over ? "var(--danger)" : hot ? "var(--warn)" : "var(--ink)";
         return (
-          <div key={c.id} className="flex flex-col gap-[7px] border-b border-line py-[11px]" data-testid="budget-row" data-name={c.name}>
+          <div
+            key={c.id}
+            className="flex flex-col gap-[7px] border-b border-line py-[11px]"
+            data-testid="budget-row"
+            data-name={c.name}
+          >
             <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
               <span className="font-medium">{c.name}</span>
               <span aria-hidden className="flex-[1_1_24px] -translate-y-1 border-b border-dotted border-line-2" />

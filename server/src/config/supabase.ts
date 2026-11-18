@@ -7,4 +7,3 @@ const supabaseUrl = process.env.SUPABASE_URL || "https://clfeauivpjqwkbsqcwiq.su
 const supabaseKey = process.env.SUPABASE_KEY || "sb_publishable_qUCtsDH2mNhVuzP1aV9Dqg_uXW2wiGk";
 
 export const supabase = createClient(supabaseUrl, supabaseKey);
-

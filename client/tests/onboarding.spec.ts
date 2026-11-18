@@ -3,7 +3,8 @@ import { onboardingNext, signUpFreshUser, skipOnboarding } from "./helpers";
 
 // Design handoff, Onboarding: five steps, nothing blocks, saved together at the end.
 
-const summaryRow = (page: Page, label: string | RegExp) => page.getByRole("main").locator("form div").filter({ hasText: label }).last();
+const summaryRow = (page: Page, label: string | RegExp) =>
+  page.getByRole("main").locator("form div").filter({ hasText: label }).last();
 
 test.describe("Onboarding", () => {
   test("a new account goes to onboarding; every step can be skipped", async ({ page }) => {

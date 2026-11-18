@@ -26,21 +26,30 @@ export default function SafeToSpend({ model, daysLeft }: { model: Model; daysLef
     >
       <div className="flex flex-wrap items-center justify-between gap-2">
         <span className="eyebrow">Safe to spend this cycle</span>
-        <span className="rounded-full bg-lime-soft px-2.5 py-[3px] text-xs font-semibold text-lime-text">Savings set aside first</span>
+        <span className="rounded-full bg-lime-soft px-2.5 py-[3px] text-xs font-semibold text-lime-text">
+          Savings set aside first
+        </span>
       </div>
       <div className="flex flex-col gap-2.5">
-        <span className="tabular font-serif text-[clamp(58px,17vw,128px)] leading-[.86] tracking-[-0.025em]" data-testid="safe-to-spend">
+        <span
+          className="tabular font-serif text-[clamp(58px,17vw,128px)] leading-[.86] tracking-[-0.025em]"
+          data-testid="safe-to-spend"
+        >
           <CountUp rupees={model.safe / 100} />
         </span>
         <p className="m-0 max-w-[540px] font-serif text-[clamp(20px,2.2vw,25px)] leading-[1.25] text-pretty text-ink-2">
-          That’s <em className="text-ink">{inr(model.perDay)} a day</em> for the next {daysLeft} days, after {inr(model.savedTotal)} to savings and{" "}
-          {inr(model.unpaidBills)} in bills still due.
+          That’s <em className="text-ink">{inr(model.perDay)} a day</em> for the next {daysLeft} days, after{" "}
+          {inr(model.savedTotal)} to savings and {inr(model.unpaidBills)} in bills still due.
         </p>
       </div>
       <div className="mt-auto flex flex-col gap-2.5">
         <div aria-hidden className="flex h-3.5 gap-[3px]">
           {bar.map(([v, c], i) => (
-            <div key={c} className="rv-bar rounded-md" style={{ width: pct(v), background: c, transitionDelay: `${0.3 + i * 0.15}s` }} />
+            <div
+              key={c}
+              className="rv-bar rounded-md"
+              style={{ width: pct(v), background: c, transitionDelay: `${0.3 + i * 0.15}s` }}
+            />
           ))}
         </div>
         <div className="flex flex-wrap items-center gap-x-5 gap-y-1">

@@ -2,14 +2,16 @@
 
 import { useEffect, useRef, useState } from "react";
 
-const FOCUSABLE = 'button:not([disabled]),[href],input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])';
+const FOCUSABLE =
+  'button:not([disabled]),[href],input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])';
 const EXIT_MS = 240;
 
 // Open modals, newest last. Only the top one reacts to Esc / Tab, and the page
 // scroll stays locked until the last one closes.
 const stack: object[] = [];
 
-const reducedMotion = () => typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+const reducedMotion = () =>
+  typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
 
 /**
  * Shared behaviour for Dialog and Drawer (handoff "Popups"):

@@ -6,7 +6,8 @@ import { addDaysStr, cycleDayOf, dueDateInCycle } from "./cycle.mjs";
 import { recurringStatus } from "./recurringStatus.mjs";
 
 const HISTORY_DAYS = 90;
-const isRecurringEntry = (/** @type {{ external_id?: string | null }} */ t) => !!t.external_id?.startsWith("recurring:");
+const isRecurringEntry = (/** @type {{ external_id?: string | null }} */ t) =>
+  !!t.external_id?.startsWith("recurring:");
 const weekdayOf = (/** @type {string} */ dateStr) => {
   const [y, m, d] = dateStr.split("-").map(Number);
   return new Date(y, m - 1, d).getDay();
@@ -24,15 +25,26 @@ const weekdayOf = (/** @type {string} */ dateStr) => {
  * }} input  transactions: all of the user's (history drives the weekday pattern);
  *   dailySpend: slider value in paise a day, null = the user's own pace; weekPattern: "My week" (true) or "Even".
  */
-export function projectUntilPayday({ model, period, today, transactions, recurringItems, dailySpend = null, weekPattern = true }) {
-  const DAY = period.daysElapsed, N = period.totalDays;
+export function projectUntilPayday({
+  model,
+  period,
+  today,
+  transactions,
+  recurringItems,
+  dailySpend = null,
+  weekPattern = true,
+}) {
+  const DAY = period.daysElapsed,
+    N = period.totalDays;
   const amt = (t) => Number(t.amount);
   const isFlexible = (t) => model.byId.get(t.category_id)?.type !== "fixed"; // uncategorised counts as everyday spending
   const everyday = (t) => t.type === "expense" && !t.from_reserve && isFlexible(t) && !isRecurringEntry(t);
 
   // Pace: everyday spending so far this cycle. Recurring items are left out of the
   // average because they show up as their own drop on their due day.
-  const spentSoFar = model.cycleTransactions.filter((t) => t.date <= today && everyday(t)).reduce((s, t) => s + amt(t), 0);
+  const spentSoFar = model.cycleTransactions
+    .filter((t) => t.date <= today && everyday(t))
+    .reduce((s, t) => s + amt(t), 0);
   const pace = spentSoFar / Math.max(1, DAY);
   const burn = dailySpend ?? pace;
 
@@ -45,7 +57,9 @@ export function projectUntilPayday({ model, period, today, transactions, recurri
     bills.set(day, [...(bills.get(day) ?? []), { ...item, overdue: !!dueDate && k <= DAY }]);
   };
   for (const c of model.fixed) {
-    const owe = model.skippedCats.has(c.id) ? 0 : Math.max(0, Number(c.monthly_limit) - (model.spentByCat.get(c.id) ?? 0));
+    const owe = model.skippedCats.has(c.id)
+      ? 0
+      : Math.max(0, Number(c.monthly_limit) - (model.spentByCat.get(c.id) ?? 0));
     if (owe) put(c.due_day ? dueDateInCycle(c.due_day, period) : null, { name: c.name, amount: owe, recurring: false });
   }
   const statusCtx = { cycleTransactions: model.cycleTransactions, period, today };
@@ -53,7 +67,8 @@ export function projectUntilPayday({ model, period, today, transactions, recurri
     if (r.type !== "expense" || !r.active || !r.day_of_month) continue;
     if (model.byId.get(r.category_id)?.type === "fixed") continue; // its fixed bill is already counted
     const st = recurringStatus(r, statusCtx);
-    if (st.key === "due" || st.key === "upcoming") put(st.dueDate, { name: r.name, amount: Number(r.amount), recurring: true });
+    if (st.key === "due" || st.key === "upcoming")
+      put(st.dueDate, { name: r.name, amount: Number(r.amount), recurring: true });
   }
 
   // What actually happened, day by day.
@@ -66,7 +81,8 @@ export function projectUntilPayday({ model, period, today, transactions, recurri
     const day = cycleDayOf(t.date, period);
     let dv = 0;
     if (t.type === "expense" && !t.from_reserve) dv = -amt(t);
-    else if (t.type === "income" && day > 1) dv = amt(t); // pay on day 1 is part of the opening amount
+    else if (t.type === "income" && day > 1)
+      dv = amt(t); // pay on day 1 is part of the opening amount
     else if ((t.type === "savings_transfer" && t.source === "windfall") || t.type === "reserve_transfer") dv = -amt(t);
     if (!dv) continue;
     delta.set(day, (delta.get(day) ?? 0) + dv);
@@ -80,7 +96,8 @@ export function projectUntilPayday({ model, period, today, transactions, recurri
   const openValue = todayValue - [...delta.values()].reduce((s, v) => s + v, 0);
 
   // Weekday pattern from the last 90 days of everyday spending (not just this cycle).
-  const sum = Array(7).fill(0), cnt = Array(7).fill(0);
+  const sum = Array(7).fill(0),
+    cnt = Array(7).fill(0);
   const from = addDaysStr(today, -HISTORY_DAYS);
   for (let d = from; d < today; d = addDaysStr(d, 1)) cnt[weekdayOf(d)]++;
   for (const t of transactions) if (t.date >= from && t.date < today && everyday(t)) sum[weekdayOf(t.date)] += amt(t);
@@ -150,14 +167,16 @@ export function monotonePath(pts) {
   if (n === 1) return `M${f(pts[0][0])} ${f(pts[0][1])}`;
   const slope = pts.slice(0, -1).map((p, i) => (pts[i + 1][1] - p[1]) / (pts[i + 1][0] - p[0] || 1));
   const tan = pts.map((_, i) =>
-    i === 0 ? slope[0] : i === n - 1 ? slope[n - 2] : slope[i - 1] * slope[i] <= 0 ? 0 : (slope[i - 1] + slope[i]) / 2
+    i === 0 ? slope[0] : i === n - 1 ? slope[n - 2] : slope[i - 1] * slope[i] <= 0 ? 0 : (slope[i - 1] + slope[i]) / 2,
   );
   for (let i = 0; i < n - 1; i++) {
     if (slope[i] === 0) {
       tan[i] = tan[i + 1] = 0;
       continue;
     }
-    const a = tan[i] / slope[i], b = tan[i + 1] / slope[i], q = a * a + b * b;
+    const a = tan[i] / slope[i],
+      b = tan[i + 1] / slope[i],
+      q = a * a + b * b;
     if (q > 9) {
       const t = 3 / Math.sqrt(q);
       tan[i] = t * a * slope[i];
@@ -166,7 +185,9 @@ export function monotonePath(pts) {
   }
   let d = `M${f(pts[0][0])} ${f(pts[0][1])}`;
   for (let i = 0; i < n - 1; i++) {
-    const [x0, y0] = pts[i], [x1, y1] = pts[i + 1], h = (x1 - x0) / 3;
+    const [x0, y0] = pts[i],
+      [x1, y1] = pts[i + 1],
+      h = (x1 - x0) / 3;
     d += ` C${f(x0 + h)} ${f(y0 + tan[i] * h)} ${f(x1 - h)} ${f(y1 - tan[i + 1] * h)} ${f(x1)} ${f(y1)}`;
   }
   return d;

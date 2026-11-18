@@ -74,6 +74,8 @@ test.describe("Authentication and Landing Flow", () => {
   test("expired or invalid confirmation link redirects to login with message", async ({ page }) => {
     await page.goto("/auth/confirm?token_hash=invalid&type=signup");
     await expect(page).toHaveURL(/\/login\?error=link_expired$/);
-    await expect(page.getByRole("alert").filter({ hasText: "Email verification link has expired or is invalid." })).toBeVisible();
+    await expect(
+      page.getByRole("alert").filter({ hasText: "Email verification link has expired or is invalid." }),
+    ).toBeVisible();
   });
 });

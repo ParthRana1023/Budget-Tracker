@@ -31,7 +31,11 @@ test("windfall savings, reserve and reserve-paid bills", () => {
     { id: "w5", type: "expense", category_id: "health", amount: 4000 * R, date: "2026-11-16", from_reserve: true },
   ];
   const m = buildCycleModel({ ...DEMO, transactions: [...DEMO.transactions, ...extra] });
-  assert.equal(m.safe, (16800 + 60000 - 30000 - 18000) * R, "windfall: part saved, part reserved, the rest is spendable");
+  assert.equal(
+    m.safe,
+    (16800 + 60000 - 30000 - 18000) * R,
+    "windfall: part saved, part reserved, the rest is spendable",
+  );
   assert.equal(m.reserveLeft, (18000 + 5000 - 4000) * R, "reserve is a running balance across cycles");
   assert.equal(m.spentByCat.get("health"), 0, "a bill paid from the reserve is not category spending");
   assert.equal(m.savedTotal, (30000 + 30000) * R);
@@ -65,7 +69,11 @@ test("pay-day cycle dates and recurring status (salary on the 25th)", () => {
   assert.equal(dueDateInCycle(25, period), "2026-11-25");
   assert.equal(cycleDayOf("2026-12-03", period), 9);
   assert.equal(addDaysStr("2026-12-31", 1), "2027-01-01");
-  const ctx = { cycleTransactions: [{ id: "x", date: "2026-11-27", external_id: "recurring:rec:2026-11" }], period, today: "2026-11-28" };
+  const ctx = {
+    cycleTransactions: [{ id: "x", date: "2026-11-27", external_id: "recurring:rec:2026-11" }],
+    period,
+    today: "2026-11-28",
+  };
   const s = (over) => recurringStatus({ id: "i", day_of_month: 26, active: true, skip_month: null, ...over }, ctx);
   assert.equal(s({}).key, "due");
   assert.equal(s({}).dueDate, "2026-11-26");
@@ -78,10 +86,25 @@ test("pay-day cycle dates and recurring status (salary on the 25th)", () => {
 });
 
 test("budget warnings at 80% and over, dismissed per level", () => {
-  const flex = [{ id: "a", name: "A", monthly_limit: 1000 }, { id: "b", name: "B", monthly_limit: 1000 }, { id: "c", name: "C", monthly_limit: 0 }];
-  const spentByCat = new Map([["a", 870], ["b", 1200], ["c", 5000]]);
+  const flex = [
+    { id: "a", name: "A", monthly_limit: 1000 },
+    { id: "b", name: "B", monthly_limit: 1000 },
+    { id: "c", name: "C", monthly_limit: 0 },
+  ];
+  const spentByCat = new Map([
+    ["a", 870],
+    ["b", 1200],
+    ["c", 5000],
+  ]);
   const w = budgetWarnings({ flex, spentByCat });
-  assert.deepEqual(w.map((x) => [x.key, x.pct]), [["a:80", 87], ["b:over", 120]], "no warning without a limit");
+  assert.deepEqual(
+    w.map((x) => [x.key, x.pct]),
+    [
+      ["a:80", 87],
+      ["b:over", 120],
+    ],
+    "no warning without a limit",
+  );
   assert.equal(budgetWarnings({ flex, spentByCat, dismissed: ["a:80"] }).length, 1);
   spentByCat.set("a", 1001);
   assert.equal(budgetWarnings({ flex, spentByCat, dismissed: ["a:80"] })[0].key, "a:over", "going over shows it again");

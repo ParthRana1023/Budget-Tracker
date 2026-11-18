@@ -21,7 +21,10 @@ test("Supabase errors map to the handoff's wording and actions", () => {
   assert.equal(authErrorFor({ code: "invalid_credentials", message: "Invalid login credentials" }).action, "forgot");
   assert.equal(authErrorFor({ code: "email_not_confirmed" }).action, "verify");
   assert.equal(authErrorFor({ code: "otp_expired" }).action, "resend");
-  assert.match(authErrorFor({ name: "AuthRetryableFetchError", message: "Failed to fetch" }).message, /couldn’t reach SaveFirst/);
+  assert.match(
+    authErrorFor({ name: "AuthRetryableFetchError", message: "Failed to fetch" }).message,
+    /couldn’t reach SaveFirst/,
+  );
   assert.equal(authErrorFor({ message: "Something specific" }).message, "Something specific");
   assert.match(authErrorFor(null).message, /Something went wrong/);
 });

@@ -59,7 +59,10 @@ export function calculateSafeToSpend(input: BudgetSummaryInput): BudgetSummaryRe
 /**
  * Calculates period start and end dates based on user's month_start_day setting
  */
-export function getPeriodRange(referenceDate: Date, monthStartDay: number = 1): { startDate: Date; endDate: Date; daysRemaining: number } {
+export function getPeriodRange(
+  referenceDate: Date,
+  monthStartDay: number = 1,
+): { startDate: Date; endDate: Date; daysRemaining: number } {
   const clampedStart = Math.min(Math.max(1, Math.trunc(monthStartDay) || 1), 28);
   const year = referenceDate.getFullYear();
   const month = referenceDate.getMonth();

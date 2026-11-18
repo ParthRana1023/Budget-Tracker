@@ -33,15 +33,28 @@ export function draftProblems(draft) {
  */
 export function categoryDiff(before, after) {
   const old = new Map(before.map((c) => [c.id, c]));
-  const updates = [], inserts = [];
+  const updates = [],
+    inserts = [];
   for (const c of after) {
-    const row = { name: c.name.trim(), type: c.type, monthly_limit: c.monthly_limit, due_day: c.type === "fixed" ? c.due_day : null, is_active: c.is_active };
+    const row = {
+      name: c.name.trim(),
+      type: c.type,
+      monthly_limit: c.monthly_limit,
+      due_day: c.type === "fixed" ? c.due_day : null,
+      is_active: c.is_active,
+    };
     const was = old.get(c.id);
     if (!was) {
       if (c.is_active) inserts.push(row);
       continue;
     }
-    const wasRow = { name: was.name, type: was.type, monthly_limit: was.monthly_limit, due_day: was.type === "fixed" ? was.due_day ?? null : null, is_active: was.is_active };
+    const wasRow = {
+      name: was.name,
+      type: was.type,
+      monthly_limit: was.monthly_limit,
+      due_day: was.type === "fixed" ? (was.due_day ?? null) : null,
+      is_active: was.is_active,
+    };
     /** @type {Partial<Cat>} */
     const patch = {};
     for (const k of /** @type {const} */ (["name", "type", "monthly_limit", "due_day", "is_active"])) {

@@ -16,7 +16,8 @@ export function budgetWarnings({ flex, spentByCat, dismissed = [] }) {
   for (const c of flex) {
     const limit = Number(c.monthly_limit);
     if (!(limit > 0)) continue;
-    const spent = spentByCat.get(c.id) ?? 0, ratio = spent / limit;
+    const spent = spentByCat.get(c.id) ?? 0,
+      ratio = spent / limit;
     const level = ratio >= 1 ? "over" : ratio >= 0.8 ? "80" : null;
     const key = `${c.id}:${level}`;
     if (!level || off.has(key)) continue;

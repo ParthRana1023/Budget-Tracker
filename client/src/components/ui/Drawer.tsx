@@ -26,7 +26,10 @@ export default function Drawer({ open, onClose, eyebrow, title, footer, children
     <>
       <div
         onClick={onClose}
-        className={clsx("fixed inset-0 z-55 bg-scrim transition-opacity duration-[250ms]", shown ? "opacity-100" : "opacity-0")}
+        className={clsx(
+          "fixed inset-0 z-55 bg-scrim transition-opacity duration-[250ms]",
+          shown ? "opacity-100" : "opacity-0",
+        )}
       />
       <aside
         ref={ref}

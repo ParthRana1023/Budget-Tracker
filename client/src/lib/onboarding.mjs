@@ -2,7 +2,16 @@
 // The form keeps rupee strings; the database takes paise. "Nothing blocks": anything
 // that would make the save fail (blank or repeated names) is fixed up here instead.
 
-export const ONBOARDING_CATEGORIES = ["Groceries", "Dining out", "Fuel", "Shopping", "Entertainment", "Health", "Travel", "Personal care"];
+export const ONBOARDING_CATEGORIES = [
+  "Groceries",
+  "Dining out",
+  "Fuel",
+  "Shopping",
+  "Entertainment",
+  "Health",
+  "Travel",
+  "Personal care",
+];
 export const DEFAULT_BILLS = [
   { name: "Rent", amt: "", due: "3" },
   { name: "Electricity", amt: "", due: "" },
@@ -38,13 +47,20 @@ export function onboardingPayload(s) {
   const used = new Set();
   // Names must be unique across bills and categories (case-insensitive): "Bill", "Bill 2", …
   const unique = (/** @type {string} */ name) => {
-    let candidate = name, n = 2;
+    let candidate = name,
+      n = 2;
     while (used.has(candidate.toLowerCase())) candidate = `${name} ${n++}`;
     used.add(candidate.toLowerCase());
     return candidate;
   };
-  const categories = s.cats.filter((c) => c.on).map((c) => ({ name: unique(c.name), limit: +c.limit > 0 ? +c.limit * 100 : null }));
-  const bills = keptBills(s.bills).map((b) => ({ name: unique(b.name), amount: +b.amt * 100, due_day: b.due ? +clampDay(b.due) : null }));
+  const categories = s.cats
+    .filter((c) => c.on)
+    .map((c) => ({ name: unique(c.name), limit: +c.limit > 0 ? +c.limit * 100 : null }));
+  const bills = keptBills(s.bills).map((b) => ({
+    name: unique(b.name),
+    amount: +b.amt * 100,
+    due_day: b.due ? +clampDay(b.due) : null,
+  }));
   const salary = +s.salary || 0;
   return {
     p_take_home_pay: salary > 0 ? salary * 100 : null,

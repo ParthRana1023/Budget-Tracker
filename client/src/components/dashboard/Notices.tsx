@@ -53,16 +53,29 @@ export default function Notices({
 
   const count = (offline ? 1 : 0) + due.length + warnings.length;
   if (!count) return null;
-  const summary = [offline && "Offline", due.length && `${due.length} due`, warnings.map((w) => (w.level === "over" ? "over limit" : "note")).join(", ")]
+  const summary = [
+    offline && "Offline",
+    due.length && `${due.length} due`,
+    warnings.map((w) => (w.level === "over" ? "over limit" : "note")).join(", "),
+  ]
     .filter(Boolean)
     .join(" · ");
 
   return (
-    <section aria-label="Notices" className="sf-rise flex flex-col rounded-[14px] border border-line bg-tile px-5 py-1.5" style={{ animationDelay: ".1s" }}>
+    <section
+      aria-label="Notices"
+      className="sf-rise flex flex-col rounded-[14px] border border-line bg-tile px-5 py-1.5"
+      style={{ animationDelay: ".1s" }}
+    >
       <div className="flex items-center gap-2.5 py-2">
         <span className="eyebrow flex-none whitespace-nowrap">Notices · {count}</span>
         <span className="min-w-0 flex-1 truncate text-[13px] text-ink-2">{open ? "" : summary}</span>
-        <button type="button" onClick={toggle} aria-expanded={open} className="cursor-pointer border-0 bg-transparent py-1 text-[13px] font-semibold text-lime-text hover:text-ink">
+        <button
+          type="button"
+          onClick={toggle}
+          aria-expanded={open}
+          className="cursor-pointer border-0 bg-transparent py-1 text-[13px] font-semibold text-lime-text hover:text-ink"
+        >
           {open ? "Hide" : "Show"}
         </button>
       </div>
@@ -71,7 +84,9 @@ export default function Notices({
           {offline && (
             <div role="status" className={ROW}>
               <span className={`${TAG} text-warn`}>Offline</span>
-              <span className="min-w-0 flex-[1_1_240px] font-serif text-xl text-pretty">Showing what was saved last. Logging and edits need a connection.</span>
+              <span className="min-w-0 flex-[1_1_240px] font-serif text-xl text-pretty">
+                Showing what was saved last. Logging and edits need a connection.
+              </span>
               <span className="flex items-center gap-3">
                 <Link href="/offline" className="text-[13px] font-semibold text-lime-text hover:text-ink">
                   Details
@@ -89,14 +104,25 @@ export default function Notices({
                 <span className="font-serif text-xl leading-[1.2]">{item.name}</span>
                 <span className="tabular text-[13px] text-muted">
                   {item.type === "income" ? "+ " : "− "}
-                  {inr(item.amount)} · {dueDate === today ? "due today" : `due ${shortDate(dueDate)}`} · not added until you record it
+                  {inr(item.amount)} · {dueDate === today ? "due today" : `due ${shortDate(dueDate)}`} · not added until
+                  you record it
                 </span>
               </span>
               <span className="flex gap-1.5">
-                <button type="button" onClick={() => onRecord(item)} aria-label={`Record ${item.name}`} className={PILL_LIME}>
+                <button
+                  type="button"
+                  onClick={() => onRecord(item)}
+                  aria-label={`Record ${item.name}`}
+                  className={PILL_LIME}
+                >
                   Record
                 </button>
-                <button type="button" onClick={() => onSkip(item)} aria-label={`Skip ${item.name} this month`} className={PILL_LINE}>
+                <button
+                  type="button"
+                  onClick={() => onSkip(item)}
+                  aria-label={`Skip ${item.name} this month`}
+                  className={PILL_LINE}
+                >
                   Skip this month
                 </button>
               </span>

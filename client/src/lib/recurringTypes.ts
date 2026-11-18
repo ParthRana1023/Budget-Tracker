@@ -12,4 +12,3 @@ export interface RecurringItem {
   active: boolean;
   income_type: "salary" | "variable" | "other";
 }
-

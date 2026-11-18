@@ -21,7 +21,10 @@ test("Reports: tabs, keyboard, empty states, and habits after one expense", asyn
   await page.getByRole("button", { name: "Dashboard", exact: true }).click();
   await page.getByRole("button", { name: "Log expense" }).first().click();
   await page.getByRole("dialog").getByLabel("Amount").fill("640");
-  await page.getByRole("dialog").getByRole("button", { name: /^Groceries/ }).click();
+  await page
+    .getByRole("dialog")
+    .getByRole("button", { name: /^Groceries/ })
+    .click();
   await page.getByRole("dialog").getByLabel("Payee").fill("Swiggy");
   await page.getByRole("dialog").getByRole("button", { name: "Log ₹640" }).click();
   await expect(page.getByRole("dialog")).toHaveCount(0);

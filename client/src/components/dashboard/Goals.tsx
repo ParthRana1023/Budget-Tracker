@@ -19,15 +19,30 @@ const SAVE_FAILED = "Couldn’t save. Check your connection and try again. Nothi
 
 /** Rupees typed into a field -> paise (0 when blank or invalid). */
 const paise = (v: string) => Math.round((parseFloat(v.replace(/[^\d.]/g, "")) || 0) * 100);
-const cleanAmount = (v: string) => v.replace(/[^\d.]/g, "").replace(/(\..*)\./g, "$1").slice(0, 9);
+const cleanAmount = (v: string) =>
+  v
+    .replace(/[^\d.]/g, "")
+    .replace(/(\..*)\./g, "$1")
+    .slice(0, 9);
 const thisMonth = (today: string) => today.slice(0, 7);
 /** Months from this month to 'YYYY-MM' (the handoff's monthsTo). */
 const monthsTo = (by: string, today: string) => {
-  const [y, m] = by.split("-").map(Number), [ty, tm] = today.split("-").map(Number);
+  const [y, m] = by.split("-").map(Number),
+    [ty, tm] = today.split("-").map(Number);
   return (y - ty) * 12 + (m - tm);
 };
 
-function Labeled({ id, label, optional, children }: { id: string; label: string; optional?: boolean; children: ReactNode }) {
+function Labeled({
+  id,
+  label,
+  optional,
+  children,
+}: {
+  id: string;
+  label: string;
+  optional?: boolean;
+  children: ReactNode;
+}) {
   return (
     <div className="flex min-w-0 flex-col gap-2">
       <label htmlFor={id} className="eyebrow">
@@ -115,26 +130,41 @@ export default function Goals({
       if (amount <= 0) return setError("Enter an amount above ₹0.");
       if (form.date < cycleStart || form.date > today) return setError("Pick a date in this cycle, up to today.");
       return run(
-        () => supabase.rpc("record_goal_contribution", { p_goal_id: mode.goal.id, p_amount: amount, p_date: form.date, p_note: mode.goal.name }),
+        () =>
+          supabase.rpc("record_goal_contribution", {
+            p_goal_id: mode.goal.id,
+            p_amount: amount,
+            p_date: form.date,
+            p_note: mode.goal.name,
+          }),
         `Moved ${inr(amount)} to ${mode.goal.name}`,
       );
     }
     if (mode.kind === "delete") {
       return run(() => supabase.from("savings_goals").delete().eq("id", mode.goal.id), `Deleted ${mode.goal.name}`);
     }
-    const name = form.name.trim(), target = paise(form.target), saved = paise(form.saved);
+    const name = form.name.trim(),
+      target = paise(form.target),
+      saved = paise(form.saved);
     if (!name) return setError("Give the goal a name.");
     if (target <= 0) return setError("Enter a target above ₹0.");
-    if (form.by && monthsTo(form.by, today) < 1) return setError(`Pick a target month after ${monthLabel(`${thisMonth(today)}-01`)}.`);
+    if (form.by && monthsTo(form.by, today) < 1)
+      return setError(`Pick a target month after ${monthLabel(`${thisMonth(today)}-01`)}.`);
     const target_date = form.by ? `${form.by}-01` : null;
     if (mode.kind === "new") {
       if (saved > target) return setError("Already saved can’t be more than the target.");
       return run(
-        () => supabase.from("savings_goals").insert({ user_id: userId, name, target_amount: target, target_date, saved_before: saved }),
+        () =>
+          supabase
+            .from("savings_goals")
+            .insert({ user_id: userId, name, target_amount: target, target_date, saved_before: saved }),
         `Created ${name}`,
       );
     }
-    return run(() => supabase.from("savings_goals").update({ name, target_amount: target, target_date }).eq("id", mode.goal.id), "Goal updated");
+    return run(
+      () => supabase.from("savings_goals").update({ name, target_amount: target, target_date }).eq("id", mode.goal.id),
+      "Goal updated",
+    );
   };
 
   // Popup copy for the open mode.
@@ -142,22 +172,46 @@ export default function Goals({
   const amount = paise(form.amount);
   const dialog =
     mode?.kind === "add"
-      ? { eyebrow: "Add to savings goal", title: mode.goal.name, submit: amount > 0 ? `Add ${inr(amount)}` : "Add to goal", size: "md" as const }
+      ? {
+          eyebrow: "Add to savings goal",
+          title: mode.goal.name,
+          submit: amount > 0 ? `Add ${inr(amount)}` : "Add to goal",
+          size: "md" as const,
+        }
       : mode?.kind === "new"
-        ? { eyebrow: "Funded before anything is safe to spend", title: "New savings goal", submit: "Create goal", size: "md" as const }
+        ? {
+            eyebrow: "Funded before anything is safe to spend",
+            title: "New savings goal",
+            submit: "Create goal",
+            size: "md" as const,
+          }
         : mode?.kind === "edit"
-          ? { eyebrow: current ? `${inr(current.a.current)} saved so far` : "", title: "Edit goal", submit: "Save goal", size: "md" as const }
+          ? {
+              eyebrow: current ? `${inr(current.a.current)} saved so far` : "",
+              title: "Edit goal",
+              submit: "Save goal",
+              size: "md" as const,
+            }
           : mode?.kind === "delete"
-            ? { eyebrow: "Savings goal", title: `Delete ${mode.goal.name}?`, submit: "Delete goal", size: "sm" as const }
+            ? {
+                eyebrow: "Savings goal",
+                title: `Delete ${mode.goal.name}?`,
+                submit: "Delete goal",
+                size: "sm" as const,
+              }
             : null;
   const quick: Array<[string, number]> = [];
   if (current && mode?.kind === "add") {
-    if (current.a.hasTargetDate && current.a.monthsRemaining > 0) quick.push([`Monthly pace · ${inr(current.a.requiredMonthly)}`, current.a.requiredMonthly]);
+    if (current.a.hasTargetDate && current.a.monthsRemaining > 0)
+      quick.push([`Monthly pace · ${inr(current.a.requiredMonthly)}`, current.a.requiredMonthly]);
     quick.push([`Finish it · ${inr(current.a.remaining)}`, current.a.remaining], ["₹5,000", 500000]);
   }
 
   return (
-    <Reveal className="flex min-w-0 flex-[2_1_340px] flex-col rounded-[18px] border border-line bg-tile p-6" style={{ transitionDelay: ".08s" }}>
+    <Reveal
+      className="flex min-w-0 flex-[2_1_340px] flex-col rounded-[18px] border border-line bg-tile p-6"
+      style={{ transitionDelay: ".08s" }}
+    >
       <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 border-b border-line-2 pb-2.5">
         <h2 className={CARD_H2}>Goals</h2>
         <button type="button" onClick={() => open({ kind: "new" })} className={LINK_BUTTON}>
@@ -174,9 +228,15 @@ export default function Goals({
             : a.isPastDeadline
               ? "Target date has passed"
               : `${inr(a.requiredMonthly)} a month to reach it by ${monthLabel(g.target_date)}`;
-        const tagColor = track?.tag === "on_track" ? "var(--lime-text)" : track?.tag === "late" ? "var(--warn)" : "var(--muted)";
+        const tagColor =
+          track?.tag === "on_track" ? "var(--lime-text)" : track?.tag === "late" ? "var(--warn)" : "var(--muted)";
         return (
-          <div key={g.id} className="flex flex-wrap items-center gap-x-4 gap-y-3 border-b border-line py-3.5" data-testid="goal-row" data-name={g.name}>
+          <div
+            key={g.id}
+            className="flex flex-wrap items-center gap-x-4 gap-y-3 border-b border-line py-3.5"
+            data-testid="goal-row"
+            data-name={g.name}
+          >
             <div
               aria-hidden
               className="relative h-[58px] w-[58px] flex-none rounded-full"
@@ -199,7 +259,10 @@ export default function Goals({
               <span className="tabular text-[13px] text-muted">
                 {inr(a.current)} of {inr(a.targetAmount)}
               </span>
-              <span className="text-[13px]" style={{ color: done ? "var(--lime-text)" : a.isPastDeadline ? "var(--warn)" : "var(--muted)" }}>
+              <span
+                className="text-[13px]"
+                style={{ color: done ? "var(--lime-text)" : a.isPastDeadline ? "var(--warn)" : "var(--muted)" }}
+              >
                 {foot}
               </span>
               {track && (
@@ -217,11 +280,21 @@ export default function Goals({
                         transitionDelay: ".5s",
                       }}
                     />
-                    <span className="rv-bar absolute inset-y-0 left-0 rounded-full bg-lime" style={{ width: `${(pct * 100).toFixed(2)}%`, transitionDelay: ".3s" }} />
+                    <span
+                      className="rv-bar absolute inset-y-0 left-0 rounded-full bg-lime"
+                      style={{ width: `${(pct * 100).toFixed(2)}%`, transitionDelay: ".3s" }}
+                    />
                   </div>
                   <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-xs">
-                    <span className="rounded-full border px-2 py-px font-bold" style={{ borderColor: tagColor, color: tagColor }}>
-                      {track.tag === "on_track" ? "On track" : track.tag === "nothing_yet" ? "Nothing added yet" : `About ${track.monthsLate} month${track.monthsLate === 1 ? "" : "s"} late`}
+                    <span
+                      className="rounded-full border px-2 py-px font-bold"
+                      style={{ borderColor: tagColor, color: tagColor }}
+                    >
+                      {track.tag === "on_track"
+                        ? "On track"
+                        : track.tag === "nothing_yet"
+                          ? "Nothing added yet"
+                          : `About ${track.monthsLate} month${track.monthsLate === 1 ? "" : "s"} late`}
                     </span>
                     <span className="text-muted">
                       {a.monthlyPace > 0
@@ -257,7 +330,9 @@ export default function Goals({
         );
       })}
       {goals.length === 0 && (
-        <p className="mt-[18px] mb-1 font-serif text-xl text-ink-2 italic">No goals yet. Start one and it’s funded before anything counts as safe to spend.</p>
+        <p className="mt-[18px] mb-1 font-serif text-xl text-ink-2 italic">
+          No goals yet. Start one and it’s funded before anything counts as safe to spend.
+        </p>
       )}
 
       {dialog && (
@@ -284,7 +359,10 @@ export default function Goals({
                   <span>{inr(current.a.remaining)} to go</span>
                 </div>
                 <div className="h-2 overflow-hidden rounded-full bg-track">
-                  <div className="h-full rounded-full bg-lime" style={{ width: `${Math.min(100, current.a.percent).toFixed(1)}%` }} />
+                  <div
+                    className="h-full rounded-full bg-lime"
+                    style={{ width: `${Math.min(100, current.a.percent).toFixed(1)}%` }}
+                  />
                 </div>
               </div>
               <div className="flex flex-col gap-3">
@@ -306,20 +384,30 @@ export default function Goals({
                   />
                 </div>
                 <div className="flex flex-wrap gap-1.5">
-                  {quick.filter(([, v]) => v > 0).map(([text, v]) => (
-                    <button
-                      key={text}
-                      type="button"
-                      onClick={() => set({ amount: String(v / 100) })}
-                      className="tabular min-h-[34px] cursor-pointer rounded-full border border-line bg-transparent px-3 py-1 text-[13px] font-semibold text-ink-2 hover:border-ink-2 hover:text-ink"
-                    >
-                      {text}
-                    </button>
-                  ))}
+                  {quick
+                    .filter(([, v]) => v > 0)
+                    .map(([text, v]) => (
+                      <button
+                        key={text}
+                        type="button"
+                        onClick={() => set({ amount: String(v / 100) })}
+                        className="tabular min-h-[34px] cursor-pointer rounded-full border border-line bg-transparent px-3 py-1 text-[13px] font-semibold text-ink-2 hover:border-ink-2 hover:text-ink"
+                      >
+                        {text}
+                      </button>
+                    ))}
                 </div>
               </div>
               <Labeled id="g-date" label="Date">
-                <input id="g-date" type="date" min={cycleStart} max={today} value={form.date} onChange={(e) => set({ date: e.target.value })} className={`${FIELD} max-w-[240px]`} />
+                <input
+                  id="g-date"
+                  type="date"
+                  min={cycleStart}
+                  max={today}
+                  value={form.date}
+                  onChange={(e) => set({ date: e.target.value })}
+                  className={`${FIELD} max-w-[240px]`}
+                />
               </Labeled>
             </>
           )}
@@ -349,7 +437,14 @@ export default function Goals({
                   />
                 </Labeled>
                 <Labeled id="ng-by" label="Target month" optional>
-                  <input id="ng-by" type="month" min={thisMonth(today)} value={form.by} onChange={(e) => set({ by: e.target.value })} className={FIELD} />
+                  <input
+                    id="ng-by"
+                    type="month"
+                    min={thisMonth(today)}
+                    value={form.by}
+                    onChange={(e) => set({ by: e.target.value })}
+                    className={FIELD}
+                  />
                 </Labeled>
               </div>
               {mode.kind === "new" && (
@@ -369,7 +464,8 @@ export default function Goals({
           )}
           {mode?.kind === "delete" && current && (
             <p className="m-0 font-serif text-[22px] leading-[1.3] text-pretty text-ink-2">
-              {mode.goal.name} and its {inr(current.a.current)} of progress will be removed from your goals. Past transfers stay in the ledger.
+              {mode.goal.name} and its {inr(current.a.current)} of progress will be removed from your goals. Past
+              transfers stay in the ledger.
             </p>
           )}
         </Dialog>

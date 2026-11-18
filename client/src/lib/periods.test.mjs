@@ -74,7 +74,11 @@ test("cycles tile the calendar: every day belongs to exactly one cycle, with no 
       assert.ok(p.daysRemaining >= 1 && p.daysRemaining <= p.totalDays, `daysRemaining out of range on ${today}`);
       if (prevEnd && p.endStr !== prevEnd) {
         // A new cycle has started: it must begin the day after the previous one ended.
-        const nextDay = new Date(Number(prevEnd.slice(0, 4)), Number(prevEnd.slice(5, 7)) - 1, Number(prevEnd.slice(8, 10)) + 1);
+        const nextDay = new Date(
+          Number(prevEnd.slice(0, 4)),
+          Number(prevEnd.slice(5, 7)) - 1,
+          Number(prevEnd.slice(8, 10)) + 1,
+        );
         assert.equal(p.startStr, toLocalDateString(nextDay), `gap or overlap before ${today} (start day ${startDay})`);
       }
       prevEnd = p.endStr;
@@ -85,7 +89,10 @@ test("cycles tile the calendar: every day belongs to exactly one cycle, with no 
 test("string bounds include both boundary days when filtering by date", () => {
   const p = getPeriodRange(at(2026, 11, 15), 1);
   const dates = ["2026-10-31", "2026-11-01", "2026-11-30", "2026-12-01"];
-  assert.deepEqual(dates.filter((d) => d >= p.startStr && d <= p.endStr), ["2026-11-01", "2026-11-30"]);
+  assert.deepEqual(
+    dates.filter((d) => d >= p.startStr && d <= p.endStr),
+    ["2026-11-01", "2026-11-30"],
+  );
 });
 
 test("msUntilNextLocalMidnight counts to the end of the LOCAL day", () => {
@@ -97,5 +104,10 @@ test("msUntilNextLocalMidnight counts to the end of the LOCAL day", () => {
   assert.ok(day >= 23 * 3_600_000 && day <= 25 * 3_600_000);
   // Month and year roll-over.
   assert.equal(msUntilNextLocalMidnight(at(2026, 12, 31, 23, 0, 0)), 3_600_000);
-  assert.equal(toLocalDateString(new Date(at(2026, 12, 31, 23, 0, 0).getTime() + msUntilNextLocalMidnight(at(2026, 12, 31, 23, 0, 0)))), "2027-01-01");
+  assert.equal(
+    toLocalDateString(
+      new Date(at(2026, 12, 31, 23, 0, 0).getTime() + msUntilNextLocalMidnight(at(2026, 12, 31, 23, 0, 0))),
+    ),
+    "2027-01-01",
+  );
 });

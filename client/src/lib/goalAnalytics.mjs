@@ -42,7 +42,13 @@ export function simulateGoalCompletion(remaining, monthlyContribution, reference
  *   referenceDate?: Date
  * }} input contributions must already be filtered to this goal; startingAmount = saved before tracking (not part of the pace)
  */
-export function analyzeGoal({ targetAmount, targetDate, contributions, startingAmount = 0, referenceDate = new Date() }) {
+export function analyzeGoal({
+  targetAmount,
+  targetDate,
+  contributions,
+  startingAmount = 0,
+  referenceDate = new Date(),
+}) {
   const today = toLocalDateString(referenceDate);
   const current = Number(startingAmount) + contributions.reduce((s, c) => s + Number(c.amount), 0);
   const remaining = Math.max(0, targetAmount - current);
@@ -59,7 +65,7 @@ export function analyzeGoal({ targetAmount, targetDate, contributions, startingA
     const daysSinceFirst = Math.round((utcDay(referenceDate) - utcDay(parseLocal(firstDate))) / 86400000) + 1;
     const windowDays = Math.max(30, Math.min(PACE_WINDOW_DAYS, daysSinceFirst));
     const windowStart = toLocalDateString(
-      new Date(referenceDate.getFullYear(), referenceDate.getMonth(), referenceDate.getDate() - windowDays + 1)
+      new Date(referenceDate.getFullYear(), referenceDate.getMonth(), referenceDate.getDate() - windowDays + 1),
     );
     const inWindow = dated.filter((c) => c.date >= windowStart).reduce((s, c) => s + Number(c.amount), 0);
     monthlyPace = Math.round((inWindow / windowDays) * DAYS_PER_MONTH);
@@ -95,8 +101,10 @@ export function analyzeGoal({ targetAmount, targetDate, contributions, startingA
  * @returns {{ projected: number, tag: "on_track" | "nothing_yet" | "late", monthsLate: number } | null}
  */
 export function goalTrack(goal) {
-  if (goal.status === "completed" || !goal.hasTargetDate || goal.isPastDeadline || !(goal.targetAmount > 0)) return null;
-  const months = goal.monthsRemaining, pace = goal.monthlyPace;
+  if (goal.status === "completed" || !goal.hasTargetDate || goal.isPastDeadline || !(goal.targetAmount > 0))
+    return null;
+  const months = goal.monthsRemaining,
+    pace = goal.monthlyPace;
   const projected = Math.min(goal.targetAmount, goal.current + pace * months);
   if (pace >= goal.requiredMonthly) return { projected, tag: "on_track", monthsLate: 0 };
   if (!(pace > 0)) return { projected, tag: "nothing_yet", monthsLate: 0 };

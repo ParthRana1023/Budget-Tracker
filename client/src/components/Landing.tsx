@@ -23,10 +23,46 @@ const HERO_CATS: Array<[string, number, number]> = [
 ];
 // [n, title, description, bar left, bar width, colour, amount, amount colour]
 const STEPS: Array<[string, string, string, string, string, string, string, string]> = [
-  ["i", "Salary lands", "Confirmed take-home pay starts the cycle.", "0%", "100%", "var(--ink-2)", "₹95,000", "var(--ink)"],
-  ["ii", "Savings come out first", "Your monthly target goes straight to your goals.", "68.42%", "31.58%", "var(--lime)", "−30,000", "var(--ink)"],
-  ["iii", "Fixed bills are reserved", "Rent, EMIs, insurance and utilities.", "31.26%", "37.16%", "var(--fixed)", "−35,300", "var(--ink)"],
-  ["iv", "The rest is safe to spend", "₹990 a day across a 30-day cycle.", "0%", "31.26%", "var(--flex)", "₹29,700", "var(--lime-text)"],
+  [
+    "i",
+    "Salary lands",
+    "Confirmed take-home pay starts the cycle.",
+    "0%",
+    "100%",
+    "var(--ink-2)",
+    "₹95,000",
+    "var(--ink)",
+  ],
+  [
+    "ii",
+    "Savings come out first",
+    "Your monthly target goes straight to your goals.",
+    "68.42%",
+    "31.58%",
+    "var(--lime)",
+    "−30,000",
+    "var(--ink)",
+  ],
+  [
+    "iii",
+    "Fixed bills are reserved",
+    "Rent, EMIs, insurance and utilities.",
+    "31.26%",
+    "37.16%",
+    "var(--fixed)",
+    "−35,300",
+    "var(--ink)",
+  ],
+  [
+    "iv",
+    "The rest is safe to spend",
+    "₹990 a day across a 30-day cycle.",
+    "0%",
+    "31.26%",
+    "var(--flex)",
+    "₹29,700",
+    "var(--lime-text)",
+  ],
 ];
 const DEMO_CATS = ["Groceries", "Dining out", "Fuel", "Shopping", "Health", "Travel"];
 const CHART: Array<[string, number, number]> = [
@@ -38,7 +74,10 @@ const CHART: Array<[string, number, number]> = [
   ["Nov", 48.2, 30],
 ];
 const FAQ: Array<[string, string]> = [
-  ["Do I need to connect my bank?", "No. You record income and expenses yourself, and logging takes three taps. Nothing links to your bank account."],
+  [
+    "Do I need to connect my bank?",
+    "No. You record income and expenses yourself, and logging takes three taps. Nothing links to your bank account.",
+  ],
   [
     "What counts as safe to spend?",
     "Confirmed income, minus your savings target, minus fixed bills not yet paid, minus flexible spending so far. Divided by the days left, it becomes your daily number.",
@@ -75,7 +114,8 @@ export default function Landing() {
             Know what’s safe to spend, <em className="text-lime-text">every day</em> of the month.
           </h1>
           <p className="m-0 max-w-[500px] text-lg text-pretty text-ink-2">
-            SaveFirst sets aside your savings and fixed bills the day your salary lands. What’s left becomes one daily number you can trust.
+            SaveFirst sets aside your savings and fixed bills the day your salary lands. What’s left becomes one daily
+            number you can trust.
           </p>
           <div className="flex flex-wrap gap-2.5">
             <Link href="/signup" className={PRIMARY}>
@@ -99,7 +139,9 @@ export default function Landing() {
           <div className={`${CARD} flex flex-col gap-5 p-[26px] shadow-[0_30px_80px_-30px_rgba(0,0,0,.7)]`}>
             <div className="flex flex-wrap items-center justify-between gap-2">
               <span className="eyebrow">Safe to spend · Day 16 of 30</span>
-              <span className="rounded-full bg-lime-soft px-2.5 py-[3px] text-xs font-semibold text-lime-text">On track</span>
+              <span className="rounded-full bg-lime-soft px-2.5 py-[3px] text-xs font-semibold text-lime-text">
+                On track
+              </span>
             </div>
             <div className="flex flex-col gap-2">
               <span className="tabular font-serif text-[clamp(54px,15vw,96px)] leading-[.86] tracking-[-0.025em]">
@@ -121,7 +163,10 @@ export default function Landing() {
                   <div key={name} className="flex flex-col gap-[7px] border-b border-line py-[11px]">
                     <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
                       <span className="font-medium">{name}</span>
-                      <span aria-hidden className="flex-[1_1_24px] -translate-y-1 border-b border-dotted border-line-2" />
+                      <span
+                        aria-hidden
+                        className="flex-[1_1_24px] -translate-y-1 border-b border-dotted border-line-2"
+                      />
                       <span className="tabular text-sm">
                         <strong className="font-semibold" style={{ color: hot ? "var(--warn)" : "var(--ink)" }}>
                           ₹{spent.toLocaleString("en-IN")}
@@ -132,7 +177,12 @@ export default function Landing() {
                     <div className="h-1 overflow-hidden rounded-full bg-track">
                       <div
                         className="rv-bar h-full rounded-full"
-                        style={{ width: `${(spent / limit) * 100}%`, background: hot ? "var(--warn)" : "var(--lime)", transitionDuration: "1.1s", transitionDelay: `${0.5 + i * 0.12}s` }}
+                        style={{
+                          width: `${(spent / limit) * 100}%`,
+                          background: hot ? "var(--warn)" : "var(--lime)",
+                          transitionDuration: "1.1s",
+                          transitionDelay: `${0.5 + i * 0.12}s`,
+                        }}
                       />
                     </div>
                   </div>
@@ -166,12 +216,16 @@ export default function Landing() {
               </h2>
             </div>
             <p className="m-0 max-w-[380px] text-pretty text-ink-2">
-              Most budgets start with what you spent. SaveFirst starts with what you’re keeping, so overspending shows up before it happens.
+              Most budgets start with what you spent. SaveFirst starts with what you’re keeping, so overspending shows
+              up before it happens.
             </p>
           </div>
           <Reveal className={`${CARD} px-[26px] py-2`}>
             {STEPS.map(([n, title, desc, left, w, color, amt, amtColor], i) => (
-              <div key={n} className="flex flex-wrap items-center gap-x-8 gap-y-3.5 border-b border-line py-[22px] last:border-b-0">
+              <div
+                key={n}
+                className="flex flex-wrap items-center gap-x-8 gap-y-3.5 border-b border-line py-[22px] last:border-b-0"
+              >
                 <div className="flex min-w-0 flex-[1_1_260px] items-baseline gap-3.5">
                   <span className="w-[30px] font-serif text-[28px] leading-none text-muted italic">{n}</span>
                   <div className="flex flex-col gap-0.5">
@@ -181,9 +235,15 @@ export default function Landing() {
                 </div>
                 <div className="flex min-w-0 flex-[2_1_240px] items-center gap-3.5">
                   <div className="relative h-[30px] flex-1 rounded-lg bg-track">
-                    <div className="rv-bar absolute inset-y-0 rounded-lg" style={{ left, width: w, background: color, transitionDelay: `${0.15 + i * 0.18}s` }} />
+                    <div
+                      className="rv-bar absolute inset-y-0 rounded-lg"
+                      style={{ left, width: w, background: color, transitionDelay: `${0.15 + i * 0.18}s` }}
+                    />
                   </div>
-                  <span className="tabular min-w-[84px] flex-none text-right font-serif text-2xl leading-none" style={{ color: amtColor }}>
+                  <span
+                    className="tabular min-w-[84px] flex-none text-right font-serif text-2xl leading-none"
+                    style={{ color: amtColor }}
+                  >
                     {amt}
                   </span>
                 </div>
@@ -207,9 +267,12 @@ export default function Landing() {
             <Reveal className={`${CARD} flex min-w-0 flex-[1_1_420px] flex-col gap-[22px] p-7`}>
               <div className="flex flex-col gap-2">
                 <span className="eyebrow text-warn">Variable pay</span>
-                <h3 className="m-0 font-serif text-[34px] leading-[1.05] font-normal">Bonuses wait until they’re in your bank.</h3>
+                <h3 className="m-0 font-serif text-[34px] leading-[1.05] font-normal">
+                  Bonuses wait until they’re in your bank.
+                </h3>
                 <p className="m-0 text-pretty text-ink-2">
-                  Incentives sit on hold, outside safe-to-spend. When one arrives, split it across savings, annual bills and spending in one step.
+                  Incentives sit on hold, outside safe-to-spend. When one arrives, split it across savings, annual bills
+                  and spending in one step.
                 </p>
               </div>
               <div className="mt-auto flex flex-col gap-3.5 rounded-[14px] bg-tile-2 p-[18px]">
@@ -225,7 +288,11 @@ export default function Landing() {
                       ["20%", "var(--ink)"],
                     ] as const
                   ).map(([w, c], i) => (
-                    <div key={c} className="rv-bar rounded-md" style={{ width: w, background: c, transitionDelay: `${0.2 + i * 0.15}s` }} />
+                    <div
+                      key={c}
+                      className="rv-bar rounded-md"
+                      style={{ width: w, background: c, transitionDelay: `${0.2 + i * 0.15}s` }}
+                    />
                   ))}
                 </div>
                 <Legend
@@ -238,10 +305,15 @@ export default function Landing() {
               </div>
             </Reveal>
 
-            <Reveal className={`${CARD} flex min-w-0 flex-[1_1_420px] flex-col gap-[22px] p-7`} style={{ transitionDelay: ".1s" }}>
+            <Reveal
+              className={`${CARD} flex min-w-0 flex-[1_1_420px] flex-col gap-[22px] p-7`}
+              style={{ transitionDelay: ".1s" }}
+            >
               <div className="flex flex-col gap-2">
                 <span className="eyebrow text-lime-text">Logging</span>
-                <h3 className="m-0 font-serif text-[34px] leading-[1.05] font-normal">A chai or a grocery run, in three taps.</h3>
+                <h3 className="m-0 font-serif text-[34px] leading-[1.05] font-normal">
+                  A chai or a grocery run, in three taps.
+                </h3>
               </div>
               <div aria-hidden className="mt-auto flex flex-wrap gap-[18px]">
                 <ol className="m-0 flex flex-[1_1_150px] list-none flex-col p-0">
@@ -253,7 +325,10 @@ export default function Landing() {
                     >
                       <span className="w-[22px] font-serif text-xl italic">{["i", "ii", "iii"][i]}</span>
                       <span className="font-medium">{label}</span>
-                      <span className="ml-auto h-[7px] w-[7px] rounded-full bg-lime transition-opacity duration-300" style={{ opacity: tap === i + 1 ? 1 : 0 }} />
+                      <span
+                        className="ml-auto h-[7px] w-[7px] rounded-full bg-lime transition-opacity duration-300"
+                        style={{ opacity: tap === i + 1 ? 1 : 0 }}
+                      />
                     </li>
                   ))}
                 </ol>
@@ -272,7 +347,10 @@ export default function Landing() {
                         <span
                           key={name}
                           className="flex min-h-[34px] items-center rounded-lg border px-2 py-1.5 text-xs leading-[1.2] font-semibold [overflow-wrap:anywhere] transition-colors duration-200"
-                          style={{ background: sel ? "var(--lime-soft)" : "var(--tile-2)", borderColor: sel ? "var(--lime)" : "var(--line)" }}
+                          style={{
+                            background: sel ? "var(--lime-soft)" : "var(--tile-2)",
+                            borderColor: sel ? "var(--lime)" : "var(--line)",
+                          }}
                         >
                           {name}
                         </span>
@@ -297,14 +375,20 @@ export default function Landing() {
           <Reveal className={`${CARD} flex flex-wrap items-center gap-x-12 gap-y-7 p-7`}>
             <div className="flex min-w-0 flex-[1_1_340px] flex-col gap-2">
               <span className="eyebrow">Warnings</span>
-              <h3 className="m-0 font-serif text-[34px] leading-[1.05] font-normal">Hear about overspending in week two, not week four.</h3>
+              <h3 className="m-0 font-serif text-[34px] leading-[1.05] font-normal">
+                Hear about overspending in week two, not week four.
+              </h3>
               <p className="m-0 text-pretty text-ink-2">
-                SaveFirst compares your spending with where you should be today. If the pace puts your savings at risk, you see it while there’s time to adjust.
+                SaveFirst compares your spending with where you should be today. If the pace puts your savings at risk,
+                you see it while there’s time to adjust.
               </p>
             </div>
             <div className="flex min-w-0 flex-[1_1_400px] flex-col gap-3.5">
               <div className="relative h-2.5 rounded-full bg-track">
-                <div className="rv-bar absolute inset-y-0 left-0 rounded-full bg-warn" style={{ width: "61%", transitionDuration: "1.2s", transitionDelay: ".2s" }} />
+                <div
+                  className="rv-bar absolute inset-y-0 left-0 rounded-full bg-warn"
+                  style={{ width: "61%", transitionDuration: "1.2s", transitionDelay: ".2s" }}
+                />
                 <div aria-hidden className="absolute -top-1.5 -bottom-1.5 left-[53%] w-0.5 rounded-[1px] bg-ink" />
               </div>
               <div className="tabular flex flex-wrap justify-between gap-x-3 gap-y-0.5 text-[13px] text-muted">
@@ -313,7 +397,9 @@ export default function Landing() {
               </div>
               <div className="flex flex-wrap items-baseline gap-x-3.5 gap-y-1.5 rounded-[14px] bg-warn-soft px-[18px] py-3.5">
                 <span className="text-xs font-bold tracking-[.09em] text-warn uppercase">Note</span>
-                <span className="min-w-0 flex-[1_1_200px] font-serif text-[19px]">At this pace you’ll dip ₹4,200 into savings by 30 November.</span>
+                <span className="min-w-0 flex-[1_1_200px] font-serif text-[19px]">
+                  At this pace you’ll dip ₹4,200 into savings by 30 November.
+                </span>
               </div>
             </div>
           </Reveal>
@@ -330,7 +416,9 @@ export default function Landing() {
                 A savings rate bonuses <em>can’t inflate.</em>
               </h2>
             </div>
-            <p className="m-0 max-w-[360px] text-pretty text-ink-2">Monthly trends are measured against regular take-home pay. Windfalls get their own line.</p>
+            <p className="m-0 max-w-[360px] text-pretty text-ink-2">
+              Monthly trends are measured against regular take-home pay. Windfalls get their own line.
+            </p>
           </div>
           <Reveal className={`${CARD} overflow-hidden`}>
             <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,220px),1fr))] border-b border-line">
@@ -341,7 +429,10 @@ export default function Landing() {
                   ["Net surplus", "₹41,600", "var(--ink)"],
                 ] as const
               ).map(([label, value, color]) => (
-                <div key={label} className="-mr-px -mb-px flex flex-col gap-1 border-r border-b border-line px-[26px] py-[22px]">
+                <div
+                  key={label}
+                  className="-mr-px -mb-px flex flex-col gap-1 border-r border-b border-line px-[26px] py-[22px]"
+                >
                   <span className="eyebrow">{label}</span>
                   <span className="font-serif text-[44px] leading-none" style={{ color }}>
                     {value}
@@ -357,8 +448,14 @@ export default function Landing() {
               >
                 {CHART.map(([label, spend, save], i) => (
                   <div key={label} className="flex h-full flex-1 items-end justify-center gap-[5px]">
-                    <span className="rv-barh max-w-[30px] flex-1 rounded-t-md bg-fixed" style={{ height: `${(spend / 80) * 100}%`, transitionDelay: `${i * 0.08}s` }} />
-                    <span className="rv-barh max-w-[30px] flex-1 rounded-t-md bg-lime" style={{ height: `${(save / 80) * 100}%`, transitionDelay: `${i * 0.08 + 0.1}s` }} />
+                    <span
+                      className="rv-barh max-w-[30px] flex-1 rounded-t-md bg-fixed"
+                      style={{ height: `${(spend / 80) * 100}%`, transitionDelay: `${i * 0.08}s` }}
+                    />
+                    <span
+                      className="rv-barh max-w-[30px] flex-1 rounded-t-md bg-lime"
+                      style={{ height: `${(save / 80) * 100}%`, transitionDelay: `${i * 0.08 + 0.1}s` }}
+                    />
                   </div>
                 ))}
               </div>
@@ -411,7 +508,10 @@ export default function Landing() {
                       <Plus size={14} />
                     </span>
                   </button>
-                  <div className="grid transition-[grid-template-rows] duration-[350ms] ease-soft" style={{ gridTemplateRows: open ? "1fr" : "0fr" }}>
+                  <div
+                    className="grid transition-[grid-template-rows] duration-[350ms] ease-soft"
+                    style={{ gridTemplateRows: open ? "1fr" : "0fr" }}
+                  >
                     <div className="overflow-hidden">
                       <p className="m-0 pr-[clamp(0px,6vw,48px)] pb-[22px] text-pretty text-ink-2">{a}</p>
                     </div>

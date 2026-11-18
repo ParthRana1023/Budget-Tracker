@@ -26,7 +26,11 @@ export default function DemoSplit() {
     <>
       <div aria-hidden className="flex h-3 gap-[3px]">
         {parts.map(([w, c], i) => (
-          <div key={c} className="rv-bar rounded-md" style={{ width: w, background: c, transitionDelay: `${0.25 + i * 0.15}s` }} />
+          <div
+            key={c}
+            className="rv-bar rounded-md"
+            style={{ width: w, background: c, transitionDelay: `${0.25 + i * 0.15}s` }}
+          />
         ))}
       </div>
       <Legend

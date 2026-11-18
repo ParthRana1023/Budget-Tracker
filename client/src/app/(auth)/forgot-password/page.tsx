@@ -3,7 +3,16 @@
 import { useState, type FormEvent } from "react";
 import { createClient } from "@/utils/supabase/client";
 import { authErrorFor, isValidEmail } from "@/lib/auth.mjs";
-import { AuthAlert, AuthHeading, Field, LinkButton, SubmitButton, SwitchLine, useResendTimer, type AuthError } from "@/components/auth/AuthParts";
+import {
+  AuthAlert,
+  AuthHeading,
+  Field,
+  LinkButton,
+  SubmitButton,
+  SwitchLine,
+  useResendTimer,
+  type AuthError,
+} from "@/components/auth/AuthParts";
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState("");
@@ -41,7 +50,17 @@ export default function ForgotPasswordPage() {
       </AuthHeading>
       {error && <AuthAlert error={error} />}
       <form onSubmit={onSubmit} noValidate className="flex flex-col gap-4">
-        {!sent && <Field label="Email" id="forgot-email" type="email" autoComplete="email" placeholder="you@example.com" value={email} onChange={(e) => setEmail(e.target.value)} />}
+        {!sent && (
+          <Field
+            label="Email"
+            id="forgot-email"
+            type="email"
+            autoComplete="email"
+            placeholder="you@example.com"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+          />
+        )}
         <SubmitButton busy={busy} label={sent ? "Send it again" : "Email me a reset link"} />
       </form>
       {sent && (

@@ -7,18 +7,51 @@ import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { X } from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
-import { DEFAULT_BILLS, ONBOARDING_CATEGORIES, clampDay, digits, keptBills, onboardingPayload } from "@/lib/onboarding.mjs";
+import {
+  DEFAULT_BILLS,
+  ONBOARDING_CATEGORIES,
+  clampDay,
+  digits,
+  keptBills,
+  onboardingPayload,
+} from "@/lib/onboarding.mjs";
 
 const STEPS: Array<[eyebrow: string, title: string, em: string, lede: string]> = [
-  ["Step 1 · Income", "What lands", "each month?", "Regular take-home pay only. Bonuses and incentives are added later, when they arrive. Not sure yet? Skip it and add it from the dashboard."],
-  ["Step 2 · Savings", "Pay yourself", "first.", "This comes out the day your salary lands, before anything counts as safe to spend."],
-  ["Step 3 · Fixed bills", "What’s", "already spoken for?", "Rent, EMIs, insurance, utilities. Fill in the ones you know. Anything left blank is skipped, and you can add it later."],
-  ["Step 4 · Flexible spending", "Where the rest", "usually goes.", "Pick the categories you use. Only add a limit where you’re sure of it. After a few months of entries, SaveFirst suggests limits from what you actually spend."],
-  ["Step 5 · Ready", "Your first cycle", "starts today.", "Here’s how your salary splits. You can adjust any of this from the dashboard."],
+  [
+    "Step 1 · Income",
+    "What lands",
+    "each month?",
+    "Regular take-home pay only. Bonuses and incentives are added later, when they arrive. Not sure yet? Skip it and add it from the dashboard.",
+  ],
+  [
+    "Step 2 · Savings",
+    "Pay yourself",
+    "first.",
+    "This comes out the day your salary lands, before anything counts as safe to spend.",
+  ],
+  [
+    "Step 3 · Fixed bills",
+    "What’s",
+    "already spoken for?",
+    "Rent, EMIs, insurance, utilities. Fill in the ones you know. Anything left blank is skipped, and you can add it later.",
+  ],
+  [
+    "Step 4 · Flexible spending",
+    "Where the rest",
+    "usually goes.",
+    "Pick the categories you use. Only add a limit where you’re sure of it. After a few months of entries, SaveFirst suggests limits from what you actually spend.",
+  ],
+  [
+    "Step 5 · Ready",
+    "Your first cycle",
+    "starts today.",
+    "Here’s how your salary splits. You can adjust any of this from the dashboard.",
+  ],
 ];
 
 const inr = (n: number) => `${n < 0 ? "−" : ""}₹${Math.round(Math.abs(n)).toLocaleString("en-IN")}`;
-const FIELD = "rounded-[10px] border border-line-2 bg-tile-2 text-[15px] text-ink outline-none focus:border-lime focus-visible:outline-none";
+const FIELD =
+  "rounded-[10px] border border-line-2 bg-tile-2 text-[15px] text-ink outline-none focus:border-lime focus-visible:outline-none";
 
 type Bill = { name: string; amt: string; due: string };
 type Cat = { name: string; limit: string; on: boolean };
@@ -46,11 +79,14 @@ export default function Onboarding() {
     setErr("");
     setShown(false);
     const animate = !window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
-    setTimeout(() => {
-      window.scrollTo(0, 0);
-      setStep(to);
-      setShown(true);
-    }, animate ? 180 : 0);
+    setTimeout(
+      () => {
+        window.scrollTo(0, 0);
+        setStep(to);
+        setShown(true);
+      },
+      animate ? 180 : 0,
+    );
   };
 
   const next = async (e: FormEvent) => {
@@ -65,7 +101,10 @@ export default function Onboarding() {
 
     setBusy(true);
     setErr("");
-    const { error } = await createClient().rpc("complete_onboarding", onboardingPayload({ salary, payDay, pct, bills, cats }));
+    const { error } = await createClient().rpc(
+      "complete_onboarding",
+      onboardingPayload({ salary, payDay, pct, bills, cats }),
+    );
     if (error) {
       setBusy(false);
       return setErr("Couldn’t save your setup. Check your connection and try again.");
@@ -78,7 +117,13 @@ export default function Onboarding() {
   const patchCat = (i: number, p: Partial<Cat>) => setCats((cs) => cs.map((c, j) => (j === i ? { ...c, ...p } : c)));
   const [eyebrow, title, em, lede] = STEPS[step];
   const empty = (step === 0 && !sal) || (step === 2 && !billTotal) || (step === 3 && !cats.some((c) => c.on));
-  const nextLabel = busy ? "Opening dashboard…" : step === 4 ? "Open my dashboard" : empty ? "Skip for now" : "Continue";
+  const nextLabel = busy
+    ? "Opening dashboard…"
+    : step === 4
+      ? "Open my dashboard"
+      : empty
+        ? "Skip for now"
+        : "Continue";
 
   const summary: Array<[string, string, string]> = [
     ["Take-home pay", sal ? inr(sal) : "Add later", sal ? "var(--ink)" : "var(--muted)"],
@@ -107,7 +152,10 @@ export default function Onboarding() {
           aria-valuenow={step + 1}
           className="h-[3px] overflow-hidden rounded-full bg-track"
         >
-          <div className="h-full bg-lime transition-[width] duration-500 ease-soft" style={{ width: `${((step + 1) / 5) * 100}%` }} />
+          <div
+            className="h-full bg-lime transition-[width] duration-500 ease-soft"
+            style={{ width: `${((step + 1) / 5) * 100}%` }}
+          />
         </div>
       </div>
 
@@ -176,7 +224,10 @@ export default function Onboarding() {
                 >
                   −
                 </button>
-                <span className="tabular font-serif text-[clamp(72px,14vw,112px)] leading-[.9] tracking-[-0.02em]" aria-live="polite">
+                <span
+                  className="tabular font-serif text-[clamp(72px,14vw,112px)] leading-[.9] tracking-[-0.02em]"
+                  aria-live="polite"
+                >
                   {pct}%
                 </span>
                 <button
@@ -199,7 +250,10 @@ export default function Onboarding() {
                     aria-pressed={pct === p}
                     onClick={() => setPct(p)}
                     className="h-[38px] cursor-pointer rounded-full border px-4 text-[13px] font-semibold"
-                    style={{ borderColor: pct === p ? "var(--lime)" : "var(--line)", background: pct === p ? "var(--lime-soft)" : "transparent" }}
+                    style={{
+                      borderColor: pct === p ? "var(--lime)" : "var(--line)",
+                      background: pct === p ? "var(--lime-soft)" : "transparent",
+                    }}
                   >
                     {p}%
                   </button>
@@ -271,7 +325,10 @@ export default function Onboarding() {
                 <div
                   key={c.name}
                   className="flex flex-col gap-2 rounded-[14px] border px-3.5 py-3 transition-colors duration-200"
-                  style={{ borderColor: c.on ? "var(--lime)" : "var(--line)", background: c.on ? "var(--lime-soft)" : "transparent" }}
+                  style={{
+                    borderColor: c.on ? "var(--lime)" : "var(--line)",
+                    background: c.on ? "var(--lime-soft)" : "transparent",
+                  }}
                 >
                   <button
                     type="button"
@@ -282,7 +339,10 @@ export default function Onboarding() {
                     <span
                       aria-hidden
                       className="h-[18px] w-[18px] flex-none rounded-md border-[1.5px]"
-                      style={{ borderColor: c.on ? "var(--lime)" : "var(--line)", background: c.on ? "var(--lime)" : "transparent" }}
+                      style={{
+                        borderColor: c.on ? "var(--lime)" : "var(--line)",
+                        background: c.on ? "var(--lime)" : "transparent",
+                      }}
                     />
                     {c.name}
                   </button>
@@ -355,7 +415,10 @@ export default function Onboarding() {
           </span>
           <div aria-hidden className="flex h-3 gap-[3px]">
             <span className="rounded-md bg-lime transition-[width] duration-500 ease-soft" style={{ width: w(save) }} />
-            <span className="rounded-md bg-fixed transition-[width] duration-500 ease-soft" style={{ width: w(billTotal) }} />
+            <span
+              className="rounded-md bg-fixed transition-[width] duration-500 ease-soft"
+              style={{ width: w(billTotal) }}
+            />
             <span className="rounded-md bg-ink transition-[width] duration-500 ease-soft" style={{ width: w(safe) }} />
           </div>
           <div className="tabular flex flex-wrap gap-x-4 gap-y-1.5 text-[13px] text-muted">

@@ -9,13 +9,34 @@ const october = [
   { id: "o1", type: "income", amount: 95000 * R, date: "2026-10-01" },
   { id: "o2", type: "expense", category_id: "rent", amount: 28000 * R, date: "2026-10-03" },
   { id: "o3", type: "expense", category_id: "dine", amount: 6200 * R, date: "2026-10-10", note: "Swiggy lunch" },
-  { id: "o4", type: "expense", category_id: "groc", amount: 9000 * R, date: "2026-10-18", payee: "BigBasket", note: "weekly shop" },
+  {
+    id: "o4",
+    type: "expense",
+    category_id: "groc",
+    amount: 9000 * R,
+    date: "2026-10-18",
+    payee: "BigBasket",
+    note: "weekly shop",
+  },
   { id: "o5", type: "savings_transfer", amount: 30000 * R, date: "2026-10-02" },
 ];
-const hist = cycleHistory({ transactions: [...DEMO.transactions, ...october], categories: DEMO.categories, monthStartDay: 1, today: DEMO.today, count: 3 });
+const hist = cycleHistory({
+  transactions: [...DEMO.transactions, ...october],
+  categories: DEMO.categories,
+  monthStartDay: 1,
+  today: DEMO.today,
+  count: 3,
+});
 
 test("cycle history: oldest first, current cycle partial", () => {
-  assert.deepEqual(hist.map((c) => [c.label, c.partial]), [["Sep", false], ["Oct", false], ["Nov", true]]);
+  assert.deepEqual(
+    hist.map((c) => [c.label, c.partial]),
+    [
+      ["Sep", false],
+      ["Oct", false],
+      ["Nov", true],
+    ],
+  );
   const [sep, oct, nov] = hist;
   assert.equal(sep.income, 0);
   assert.equal(oct.flex, (6200 + 9000) * R);
@@ -51,8 +72,21 @@ test("suggested limits and the next-cycle forecast", () => {
     full,
   );
   // Averages over Sep + Oct: Dining out 3,100 -> 3,250; Groceries 4,500 -> 4,500. Health never used: no suggestion.
-  assert.deepEqual(s.map((x) => [x.name, x.tag, x.to / R]), [["Dining out", "Lower", 3250], ["Groceries", "Lower", 4500]]);
-  const f = forecastNext({ settings: DEMO.settings, fixed: DEMO.categories.filter((c) => c.type === "fixed"), recurringItems: DEMO.recurringItems, flex: [], fullCycles: full, lastIncome: 0 });
+  assert.deepEqual(
+    s.map((x) => [x.name, x.tag, x.to / R]),
+    [
+      ["Dining out", "Lower", 3250],
+      ["Groceries", "Lower", 4500],
+    ],
+  );
+  const f = forecastNext({
+    settings: DEMO.settings,
+    fixed: DEMO.categories.filter((c) => c.type === "fixed"),
+    recurringItems: DEMO.recurringItems,
+    flex: [],
+    fullCycles: full,
+    lastIncome: 0,
+  });
   assert.equal(f.income, 100000 * R);
   assert.equal(f.savings, 30000 * R);
   assert.equal(f.fixedTotal, 35300 * R);

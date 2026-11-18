@@ -42,12 +42,14 @@ export default function Ledger({
   };
 
   const spent = entries.filter((t) => t.type === "expense").reduce((s, t) => s + Number(t.amount), 0);
-  const n = entries.length, word = n === 1 ? "entry" : "entries";
+  const n = entries.length,
+    word = n === 1 ? "entry" : "entries";
   const days = [...new Set(entries.map((t) => t.date))].sort().reverse();
 
   const row = (t: Tx) => {
     const cat = t.category_id ? byId.get(t.category_id) : undefined;
-    if (t.type === "expense") return { cat: t.category?.name ?? cat?.name ?? "Uncategorised", amt: `− ${inr(t.amount)}`, color: "var(--ink)" };
+    if (t.type === "expense")
+      return { cat: t.category?.name ?? cat?.name ?? "Uncategorised", amt: `− ${inr(t.amount)}`, color: "var(--ink)" };
     if (t.type === "income") return { cat: "Income", amt: `+ ${inr(t.amount)}`, color: "var(--lime-text)" };
     if (t.type === "savings_transfer") return { cat: "Savings", amt: `→ ${inr(t.amount)}`, color: "var(--lime-text)" };
     return { cat: "Reserved", amt: `→ ${inr(t.amount)}`, color: "var(--muted)" };
@@ -69,7 +71,11 @@ export default function Ledger({
           >
             Ledger
             <span className="flex h-[30px] w-[30px] items-center justify-center rounded-full border border-line-2 text-ink-2">
-              <ChevronDown size={14} className="transition-transform duration-200" style={{ transform: `rotate(${open ? 180 : 0}deg)` }} />
+              <ChevronDown
+                size={14}
+                className="transition-transform duration-200"
+                style={{ transform: `rotate(${open ? 180 : 0}deg)` }}
+              />
             </span>
           </button>
         </h2>
@@ -84,7 +90,9 @@ export default function Ledger({
         <div id="ledger-body" className="flex flex-col">
           {days.map((date) => (
             <div key={date} className="flex flex-wrap gap-x-4 border-b border-line py-1.5">
-              <span className="flex-[0_0_96px] pt-2.5 font-serif text-lg text-ink-2 italic">{dayLabel(date, today)}</span>
+              <span className="flex-[0_0_96px] pt-2.5 font-serif text-lg text-ink-2 italic">
+                {dayLabel(date, today)}
+              </span>
               <div className="flex min-w-0 flex-[1_1_260px] flex-col">
                 {entries
                   .filter((t) => t.date === date)
@@ -100,8 +108,13 @@ export default function Ledger({
                         className="-mx-2.5 flex w-[calc(100%+20px)] cursor-pointer flex-wrap items-center gap-x-3 gap-y-1.5 rounded-[10px] border-0 bg-transparent p-2.5 text-left text-[15px] transition-colors duration-150 hover:bg-tile-2"
                       >
                         <span className="flex min-w-0 flex-[1_1_120px] items-center gap-2">{note}</span>
-                        <span className="rounded-full bg-tile-2 px-2 py-0.5 text-[11px] font-semibold whitespace-nowrap text-ink-2">{r.cat}</span>
-                        <span className="tabular ml-auto min-w-20 text-right font-semibold whitespace-nowrap" style={{ color: r.color }}>
+                        <span className="rounded-full bg-tile-2 px-2 py-0.5 text-[11px] font-semibold whitespace-nowrap text-ink-2">
+                          {r.cat}
+                        </span>
+                        <span
+                          className="tabular ml-auto min-w-20 text-right font-semibold whitespace-nowrap"
+                          style={{ color: r.color }}
+                        >
                           {r.amt}
                         </span>
                       </button>
@@ -112,7 +125,9 @@ export default function Ledger({
           ))}
           {n === 0 && (
             <div className="flex flex-col items-start gap-3 pt-[22px] pb-1.5">
-              <p className="m-0 font-serif text-[22px] text-pretty text-ink-2 italic">No entries this cycle. Record your salary first, then log spending as it happens.</p>
+              <p className="m-0 font-serif text-[22px] text-pretty text-ink-2 italic">
+                No entries this cycle. Record your salary first, then log spending as it happens.
+              </p>
               <div className="flex flex-wrap gap-2">
                 <button type="button" onClick={onIncome} className={`${PILL_LINE} h-10 px-4`}>
                   Record income

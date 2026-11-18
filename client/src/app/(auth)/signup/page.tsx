@@ -59,7 +59,15 @@ export default function SignupPage() {
       <GoogleButton onError={setError} />
       {error && <AuthAlert error={error} />}
       <form onSubmit={onSubmit} noValidate className="flex flex-col gap-4">
-        <Field label="Email" id="signup-email" type="email" autoComplete="email" placeholder="you@example.com" value={email} onChange={(e) => setEmail(e.target.value)} />
+        <Field
+          label="Email"
+          id="signup-email"
+          type="email"
+          autoComplete="email"
+          placeholder="you@example.com"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+        />
         <PasswordField
           id="signup-password"
           value={password}
@@ -70,7 +78,13 @@ export default function SignupPage() {
           placeholder="At least 6 characters"
           strength
         />
-        <ConfirmPasswordField id="signup-confirm-password" value={confirm} password={password} onChange={setConfirm} show={showPw} />
+        <ConfirmPasswordField
+          id="signup-confirm-password"
+          value={confirm}
+          password={password}
+          onChange={setConfirm}
+          show={showPw}
+        />
         <SubmitButton id="signup-submit-btn" busy={busy} label="Create account" />
       </form>
       <SwitchLine text="Already have an account?" href="/login" link="Sign in" />

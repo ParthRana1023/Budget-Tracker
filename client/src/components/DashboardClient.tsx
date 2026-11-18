@@ -23,7 +23,16 @@ import Budgets from "./dashboard/Budgets";
 import Goals from "./dashboard/Goals";
 import BillsRecurring from "./dashboard/BillsRecurring";
 import Ledger from "./dashboard/Ledger";
-import { LINK_BUTTON, type Category, type Contribution, type Goal, type IncomeSource, type RecurringItem, type Settings, type Tx } from "./dashboard/types";
+import {
+  LINK_BUTTON,
+  type Category,
+  type Contribution,
+  type Goal,
+  type IncomeSource,
+  type RecurringItem,
+  type Settings,
+  type Tx,
+} from "./dashboard/types";
 import ExpenseDialog, { type ExpensePrefill } from "./dashboard/popups/ExpenseDialog";
 import IncomeDialog from "./dashboard/popups/IncomeDialog";
 import WindfallDialog from "./dashboard/popups/WindfallDialog";
@@ -168,12 +177,20 @@ export default function DashboardClient(props: DashboardClientProps) {
         }),
       `Recorded ${item.name} · ${inr(item.amount)}`,
       `Couldn’t record ${item.name}. Try again.`,
-      (txId) => db().from("transactions").delete().eq("id", txId as string),
+      (txId) =>
+        db()
+          .from("transactions")
+          .delete()
+          .eq("id", txId as string),
     );
   };
   const skipItem = (item: RecurringItem) =>
     act(
-      () => db().from("recurring_items").update({ skip_month: cycleMonthKey(period) }).eq("id", item.id),
+      () =>
+        db()
+          .from("recurring_items")
+          .update({ skip_month: cycleMonthKey(period) })
+          .eq("id", item.id),
       `Skipped ${item.name} for this cycle`,
       `Couldn’t skip ${item.name}. Try again.`,
       () => db().from("recurring_items").update({ skip_month: null }).eq("id", item.id),
@@ -197,7 +214,10 @@ export default function DashboardClient(props: DashboardClientProps) {
     const ok = navigator.onLine && (await refreshData());
     setRetrying(false);
     setOffline(!ok);
-    toast(ok ? "Back online" : "Still offline. We’ll reconnect when the network is back.", ok ? undefined : { error: true });
+    toast(
+      ok ? "Back online" : "Still offline. We’ll reconnect when the network is back.",
+      ok ? undefined : { error: true },
+    );
   };
   const exportCsv = () => {
     const blob = new Blob([`﻿${transactionsToCsv(transactions as never[])}`], { type: "text/csv;charset=utf-8" });
@@ -213,7 +233,6 @@ export default function DashboardClient(props: DashboardClientProps) {
     await fetch("/auth/signout", { method: "POST" });
     window.location.href = "/login";
   };
-
 
   const popupCtx: PopupContext = {
     userId,
@@ -261,7 +280,10 @@ export default function DashboardClient(props: DashboardClientProps) {
       }}
       aria-current={view === v ? "page" : undefined}
       className="flex h-[30px] cursor-pointer items-center rounded-full border-0 px-3.5 text-[13px] font-semibold transition-colors duration-200 hover:text-ink"
-      style={{ background: view === v ? "var(--tile-2)" : "transparent", color: view === v ? "var(--ink)" : "var(--muted)" }}
+      style={{
+        background: view === v ? "var(--tile-2)" : "transparent",
+        color: view === v ? "var(--ink)" : "var(--muted)",
+      }}
     >
       {text}
     </button>
@@ -310,9 +332,19 @@ export default function DashboardClient(props: DashboardClientProps) {
         </header>
 
         {view === "reports" ? (
-          <ReportsView transactions={transactions} categories={categories} settings={settings} recurringItems={recurringItems} today={today} onChanged={refreshData} />
+          <ReportsView
+            transactions={transactions}
+            categories={categories}
+            settings={settings}
+            recurringItems={recurringItems}
+            today={today}
+            onChanged={refreshData}
+          />
         ) : loadFailed ? (
-          <section role="alert" className="flex flex-col items-start gap-3.5 rounded-[18px] border border-line bg-tile p-[clamp(24px,5vw,40px)]">
+          <section
+            role="alert"
+            className="flex flex-col items-start gap-3.5 rounded-[18px] border border-line bg-tile p-[clamp(24px,5vw,40px)]"
+          >
             <span className="eyebrow text-danger">Couldn’t load</span>
             <h2 className="m-0 font-serif text-[clamp(34px,5vw,48px)] leading-none font-normal text-pretty">
               Your numbers didn’t <em>load.</em>
@@ -321,7 +353,11 @@ export default function DashboardClient(props: DashboardClientProps) {
               Nothing you entered has been lost. Try again, or check the status page if it keeps happening.
             </p>
             <div className="flex flex-wrap items-center gap-x-4 gap-y-2.5 pt-1.5">
-              <button type="button" onClick={refreshData} className="h-11 cursor-pointer rounded-full border-0 bg-lime px-5 text-sm font-bold text-lime-ink active:scale-[.97]">
+              <button
+                type="button"
+                onClick={refreshData}
+                className="h-11 cursor-pointer rounded-full border-0 bg-lime px-5 text-sm font-bold text-lime-ink active:scale-[.97]"
+              >
                 Try again
               </button>
             </div>
@@ -348,11 +384,20 @@ export default function DashboardClient(props: DashboardClientProps) {
 
             <div className="flex flex-wrap gap-3.5">
               <SafeToSpend model={model} daysLeft={period.daysRemaining} />
-              <UntilPayday model={model} period={period} today={today} transactions={transactions} recurringItems={recurringItems} />
+              <UntilPayday
+                model={model}
+                period={period}
+                today={today}
+                transactions={transactions}
+                recurringItems={recurringItems}
+              />
             </div>
 
             <div className="flex flex-wrap gap-3.5">
-              <section className="sf-rise flex min-w-0 flex-[1_1_300px] flex-col gap-2.5 rounded-[18px] border border-line bg-tile p-[22px]" style={{ animationDelay: ".46s" }}>
+              <section
+                className="sf-rise flex min-w-0 flex-[1_1_300px] flex-col gap-2.5 rounded-[18px] border border-line bg-tile p-[22px]"
+                style={{ animationDelay: ".46s" }}
+              >
                 <span className="eyebrow text-warn">On hold</span>
                 <span className="tabular font-serif text-[44px] leading-none">{inr(holdTotal)}</span>
                 <p className="m-0 text-sm text-pretty text-ink-2">
@@ -371,12 +416,19 @@ export default function DashboardClient(props: DashboardClientProps) {
                     Mark received &amp; allocate
                   </button>
                 ) : (
-                  <button type="button" onClick={() => openIncome(true)} className={`${LINK_BUTTON} mt-auto self-start`}>
+                  <button
+                    type="button"
+                    onClick={() => openIncome(true)}
+                    className={`${LINK_BUTTON} mt-auto self-start`}
+                  >
                     Record expected income
                   </button>
                 )}
               </section>
-              <section className="sf-rise flex min-w-0 flex-[1_1_300px] flex-col gap-2.5 rounded-[18px] border border-line bg-tile p-[22px]" style={{ animationDelay: ".52s" }}>
+              <section
+                className="sf-rise flex min-w-0 flex-[1_1_300px] flex-col gap-2.5 rounded-[18px] border border-line bg-tile p-[22px]"
+                style={{ animationDelay: ".52s" }}
+              >
                 <span className="eyebrow">Annual bills reserve</span>
                 <span className="tabular font-serif text-[44px] leading-none">{inr(model.reserveLeft)}</span>
                 <p className="m-0 text-sm text-pretty text-ink-2">
@@ -385,7 +437,11 @@ export default function DashboardClient(props: DashboardClientProps) {
                     : "Nothing set aside yet. Split part of a bonus here for insurance, taxes or a car service."}
                 </p>
                 {model.reserveLeft > 0 && (
-                  <button type="button" onClick={() => openExpense({ fromReserve: true })} className={`${LINK_BUTTON} mt-auto self-start`}>
+                  <button
+                    type="button"
+                    onClick={() => openExpense({ fromReserve: true })}
+                    className={`${LINK_BUTTON} mt-auto self-start`}
+                  >
                     Pay a bill from it
                   </button>
                 )}
@@ -393,8 +449,21 @@ export default function DashboardClient(props: DashboardClientProps) {
             </div>
 
             <div className="flex flex-wrap gap-3.5">
-              <Budgets flex={model.flex} spentByCat={model.spentByCat} flexSpent={model.flexSpent} flexBudget={model.flexBudget} onManage={() => setCategoriesOpen(true)} />
-              <Goals goals={goals} contributions={contributions} userId={userId} today={today} cycleStart={period.startStr} onChanged={async () => void (await refreshData())} />
+              <Budgets
+                flex={model.flex}
+                spentByCat={model.spentByCat}
+                flexSpent={model.flexSpent}
+                flexBudget={model.flexBudget}
+                onManage={() => setCategoriesOpen(true)}
+              />
+              <Goals
+                goals={goals}
+                contributions={contributions}
+                userId={userId}
+                today={today}
+                cycleStart={period.startStr}
+                onChanged={async () => void (await refreshData())}
+              />
             </div>
 
             <BillsRecurring
@@ -410,7 +479,11 @@ export default function DashboardClient(props: DashboardClientProps) {
               onRecord={recordItem}
               onToggle={toggleItem}
               onPayBill={(c) =>
-                openExpense({ categoryId: c.id, amount: Math.max(0, Number(c.monthly_limit) - (model.spentByCat.get(c.id) ?? 0)), note: c.name })
+                openExpense({
+                  categoryId: c.id,
+                  amount: Math.max(0, Number(c.monthly_limit) - (model.spentByCat.get(c.id) ?? 0)),
+                  note: c.name,
+                })
               }
               onEdit={setEditingItem}
               onManage={() => setCategoriesOpen(true)}
@@ -434,7 +507,11 @@ export default function DashboardClient(props: DashboardClientProps) {
         aria-label="Quick actions"
         className="fixed inset-x-0 bottom-0 z-40 flex gap-2.5 border-t border-line bg-bg px-3.5 pt-2.5 pb-[calc(10px+env(safe-area-inset-bottom))] min-[720px]:hidden"
       >
-        <button type="button" onClick={() => openIncome()} className="h-[50px] flex-1 cursor-pointer rounded-full border border-line-2 bg-transparent text-sm font-semibold active:scale-[.97]">
+        <button
+          type="button"
+          onClick={() => openIncome()}
+          className="h-[50px] flex-1 cursor-pointer rounded-full border border-line-2 bg-transparent text-sm font-semibold active:scale-[.97]"
+        >
           Record income
         </button>
         <button

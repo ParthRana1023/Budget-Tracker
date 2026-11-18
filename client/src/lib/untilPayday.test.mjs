@@ -20,7 +20,8 @@ test("demo account: today, opening amount and payday", () => {
 });
 
 test("'My week' reshapes the days but lands on the same payday amount", () => {
-  const even = run({ weekPattern: false }), week = run({ weekPattern: true });
+  const even = run({ weekPattern: false }),
+    week = run({ weekPattern: true });
   assert.ok(Math.abs(even.finalValue - week.finalValue) < 1);
   const daily = [17, 18, 19, 20, 21, 22, 23].map((k) => week.spendOn(k));
   assert.ok(Math.max(...daily) > Math.min(...daily), "weekdays differ when there is a pattern");
@@ -34,13 +35,24 @@ test("spending faster runs short, and overdue bills come off tomorrow", () => {
 });
 
 test("monotonePath never overshoots its points", () => {
-  const pts = [[0, 10], [10, 10], [20, 40], [30, 45], [40, 90], [50, 92]];
+  const pts = [
+    [0, 10],
+    [10, 10],
+    [20, 40],
+    [30, 45],
+    [40, 90],
+    [50, 92],
+  ];
   const nums = monotonePath(pts).replace(/[MC]/g, " ").trim().split(/[\s]+/).map(Number);
   // M x0 y0, then per segment: cx1 cy1 cx2 cy2 x y
   for (let i = 0; i < pts.length - 1; i++) {
     const [, cy1, , cy2] = nums.slice(2 + i * 6, 2 + i * 6 + 4);
-    const lo = Math.min(pts[i][1], pts[i + 1][1]), hi = Math.max(pts[i][1], pts[i + 1][1]);
-    assert.ok(cy1 >= lo - 1e-9 && cy1 <= hi + 1e-9 && cy2 >= lo - 1e-9 && cy2 <= hi + 1e-9, `segment ${i} stays within its ends`);
+    const lo = Math.min(pts[i][1], pts[i + 1][1]),
+      hi = Math.max(pts[i][1], pts[i + 1][1]);
+    assert.ok(
+      cy1 >= lo - 1e-9 && cy1 <= hi + 1e-9 && cy2 >= lo - 1e-9 && cy2 <= hi + 1e-9,
+      `segment ${i} stays within its ends`,
+    );
   }
   assert.equal(monotonePath([[0, 1]]), "M0 1");
   assert.equal(monotonePath([]), "");
