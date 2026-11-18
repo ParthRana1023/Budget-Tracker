@@ -32,18 +32,28 @@ export const updateSession = async (request: NextRequest) => {
     }
   );
 
+  // Read before getUser(): a failed refresh clears the auth cookie on the request.
+  const hadSession = request.cookies.getAll().some((c) => c.name.startsWith("sb-") && c.name.includes("-auth-token"));
+
   const {
     data: { user },
   } = await supabase.auth.getUser();
 
-  // If user is not signed in and trying to access protected routes, redirect to /login
-  const isAuthPage = request.nextUrl.pathname.startsWith("/login") || request.nextUrl.pathname.startsWith("/signup");
-  const isPublicPage = request.nextUrl.pathname === "/" || request.nextUrl.pathname.startsWith("/api") || request.nextUrl.pathname.startsWith("/auth/");
+  const path = request.nextUrl.pathname;
+  const isAuthPage = path.startsWith("/login") || path.startsWith("/signup");
+  const isPublicPage =
+    path === "/" || path.startsWith("/api") || path.startsWith("/auth/") || path === "/offline" || path === "/session-expired";
 
+  // Not signed in on a protected route: a stale sign-in cookie means the session ended
+  // (show "Session expired"); no cookie at all means they never signed in (go to login).
   if (!user && !isAuthPage && !isPublicPage) {
     const url = request.nextUrl.clone();
-    url.pathname = "/login";
-    return NextResponse.redirect(url);
+    url.pathname = hadSession ? "/session-expired" : "/login";
+    url.search = "";
+    const redirect = NextResponse.redirect(url);
+    // Carry over cookie changes (e.g. the cleared stale session) from the refresh attempt.
+    supabaseResponse.cookies.getAll().forEach((c) => redirect.cookies.set(c));
+    return redirect;
   }
 
   // If user is signed in and visits /login or /signup, redirect to /dashboard

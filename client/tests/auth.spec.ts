@@ -42,6 +42,20 @@ test.describe("Authentication and Landing Flow", () => {
     await expect(page).toHaveURL(/.*login/);
   });
 
+  test("a sign-in cookie that no longer works shows the session-expired page", async ({ page, context, baseURL }) => {
+    await context.addCookies([{ name: "sb-test-auth-token", value: "base64-eyJmYWtlIjp0cnVlfQ", url: baseURL! }]);
+    await page.goto("/dashboard");
+    await expect(page).toHaveURL(/\/session-expired$/);
+    await expect(page.getByRole("heading", { name: /has ended/ })).toBeVisible();
+    await expect(page.getByRole("link", { name: "Sign in again" })).toHaveAttribute("href", "/login");
+  });
+
+  test("the service worker and manifest are served even when signed out", async ({ request }) => {
+    for (const path of ["/sw.js", "/manifest.json"]) {
+      expect((await request.get(path, { maxRedirects: 0 })).status(), path).toBe(200);
+    }
+  });
+
   test("expired or invalid confirmation link redirects to login with message", async ({ page }) => {
     await page.goto("/auth/confirm?token_hash=invalid&type=signup");
     await expect(page).toHaveURL(/.*login.*error.*/);

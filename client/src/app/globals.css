@@ -133,6 +133,15 @@ html[data-theme="light"] {
   .sf-rise {
     animation: sf-rise 0.8s var(--ease-out-soft) both;
   }
+  /* Bars fill from empty to their inline width on load. */
+  .sf-grow {
+    animation: sf-grow 1s var(--ease-out-soft) both;
+  }
+}
+@keyframes sf-grow {
+  from {
+    width: 0;
+  }
 }
 @keyframes sf-rise {
   from {
