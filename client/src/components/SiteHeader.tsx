@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import ThemeToggle from "./ThemeToggle";
-import { Logo } from "./StatusPage";
+import { HomeLogo } from "./StatusPage";
 
 /** Sticky header for the landing and sign-in pages (design handoff, Landing and Auth). */
 export default function SiteHeader({ nav = false }: { nav?: boolean }) {
@@ -14,7 +14,7 @@ export default function SiteHeader({ nav = false }: { nav?: boolean }) {
   return (
     <header className="sticky top-0 z-30 border-b border-line bg-bg">
       <div className="mx-auto flex h-16 max-w-[1200px] items-center gap-4 px-6 max-[480px]:px-4">
-        <Logo />
+        <HomeLogo />
         {nav && (
           <nav className="flex gap-0.5 rounded-full border border-line p-[3px] text-[13px] font-medium max-[820px]:hidden">
             {[

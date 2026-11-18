@@ -1,4 +1,4 @@
-const CACHE_NAME = "savefirst-v2";
+const CACHE_NAME = "savefirst-v3";
 const ASSETS_TO_CACHE = ["/", "/dashboard", "/login", "/signup", "/offline", "/manifest.json", "/icon.svg"];
 
 self.addEventListener("install", (event) => {

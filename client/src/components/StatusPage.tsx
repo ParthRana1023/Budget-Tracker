@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
+import Logo from "./Logo";
 
 export type StatusPageProps = {
   eyebrow: string;
@@ -23,12 +24,11 @@ export type StatusPageProps = {
 
 const TONE = { muted: "var(--muted)", danger: "var(--danger)", warn: "var(--warn)" };
 
-/** Logo used in page headers. */
-export function Logo() {
+/** Logo linking home, used in page headers. */
+export function HomeLogo() {
   return (
-    <Link href="/" className="flex items-center gap-2.5 text-ink hover:text-ink">
-      <span aria-hidden className="h-[9px] w-[9px] rounded-full bg-lime shadow-[0_0_0_4px_var(--lime-soft)]" />
-      <span className="font-serif text-[28px] leading-none tracking-[-0.01em]">SaveFirst</span>
+    <Link href="/" className="flex items-center text-ink hover:text-ink">
+      <Logo />
     </Link>
   );
 }
@@ -38,7 +38,7 @@ export function StatusShell({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex min-h-screen w-full flex-col">
       <header className="mx-auto flex h-16 w-full max-w-[1200px] items-center gap-2.5 border-b border-line px-6">
-        <Logo />
+        <HomeLogo />
       </header>
       <main className="flex flex-1 items-center justify-center px-6 py-12">{children}</main>
     </div>

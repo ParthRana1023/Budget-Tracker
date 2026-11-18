@@ -10,6 +10,7 @@ import SiteHeader from "./SiteHeader";
 import DemoSplit, { Legend } from "./DemoSplit";
 import Reveal from "./ui/Reveal";
 import CountUp from "./ui/CountUp";
+import Logo from "./Logo";
 
 const H2 = "m-0 font-serif text-[clamp(40px,5vw,64px)] leading-none font-normal tracking-[-0.015em] text-balance";
 const CARD = "rounded-[20px] border border-line bg-tile";
@@ -541,10 +542,7 @@ export default function Landing() {
 
       <footer className="border-t border-line">
         <div className="mx-auto flex max-w-[1200px] flex-wrap items-center gap-x-7 gap-y-3.5 px-6 py-7 text-[13px] text-muted">
-          <span className="flex items-center gap-2">
-            <span aria-hidden className="h-[7px] w-[7px] rounded-full bg-lime" />
-            <span className="font-serif text-[22px] text-ink">SaveFirst</span>
-          </span>
+          <Logo size={20} />
           <span>Savings-first budgeting for a monthly salary.</span>
           <span className="ml-auto flex flex-wrap gap-x-5 gap-y-2">
             <Link href="/login" className="text-muted hover:text-ink">

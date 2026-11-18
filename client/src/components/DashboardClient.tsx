@@ -41,6 +41,7 @@ import CategoriesDialog from "./dashboard/popups/CategoriesDialog";
 import RecurringDialog from "./dashboard/popups/RecurringDialog";
 import type { PopupContext } from "./dashboard/popups/context";
 import ReportsView from "./ReportsView";
+import Logo from "./Logo";
 
 const NOTES_OFF_KEY = "sf-notes-off";
 const TX_SELECT = "*, category:categories(name, type)";
@@ -293,10 +294,7 @@ export default function DashboardClient(props: DashboardClientProps) {
     <div className="min-h-screen w-full overflow-x-clip">
       <div className="mx-auto flex max-w-[1240px] flex-col gap-3.5 px-6 pt-[18px] pb-14 max-[480px]:px-3.5">
         <header className="flex flex-wrap items-center gap-x-6 gap-y-3 pt-0.5 pb-2.5">
-          <div className="flex items-center gap-2.5">
-            <span aria-hidden className="h-[9px] w-[9px] rounded-full bg-lime shadow-[0_0_0_4px_var(--lime-soft)]" />
-            <span className="font-serif text-[28px] leading-none tracking-[-0.01em]">SaveFirst</span>
-          </div>
+          <Logo />
           <nav className="flex gap-0.5 rounded-full border border-line p-[3px]">
             {navButton("dashboard", "Dashboard")}
             {navButton("reports", "Reports")}

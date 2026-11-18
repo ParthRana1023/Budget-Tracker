@@ -6,6 +6,7 @@
 import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { X } from "lucide-react";
+import Logo from "./Logo";
 import { createClient } from "@/utils/supabase/client";
 import {
   DEFAULT_BILLS,
@@ -137,10 +138,7 @@ export default function Onboarding() {
   return (
     <div className="flex min-h-screen w-full flex-col">
       <header className="mx-auto flex h-16 w-full max-w-[1200px] items-center gap-4 border-b border-line px-6">
-        <span className="flex items-center gap-2.5">
-          <span aria-hidden className="h-[9px] w-[9px] rounded-full bg-lime shadow-[0_0_0_4px_var(--lime-soft)]" />
-          <span className="font-serif text-[28px] leading-none tracking-[-0.01em]">SaveFirst</span>
-        </span>
+        <Logo />
         <span className="tabular ml-auto text-[13px] text-muted">Step {step + 1} of 5</span>
       </header>
       <div className="mx-auto w-full max-w-[1200px] px-6">
