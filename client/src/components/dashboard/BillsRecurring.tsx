@@ -27,6 +27,7 @@ export default function BillsRecurring({
   onRecord,
   onToggle,
   onPayBill,
+  onEdit,
   onManage,
 }: {
   items: RecurringItem[];
@@ -41,6 +42,7 @@ export default function BillsRecurring({
   onRecord: (item: RecurringItem) => void;
   onToggle: (item: RecurringItem) => void;
   onPayBill: (category: Category) => void;
+  onEdit: (item: RecurringItem) => void;
   onManage: () => void;
 }) {
   const ctx = { cycleTransactions, period, today };
@@ -166,6 +168,9 @@ export default function BillsRecurring({
                   Record
                 </button>
               )}
+              <button type="button" onClick={() => onEdit(item)} aria-label={`Edit ${item.name}`} className={`${PILL_LINE} px-3`}>
+                Edit
+              </button>
               <button
                 type="button"
                 onClick={() => onToggle(item)}

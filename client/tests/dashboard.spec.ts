@@ -1,22 +1,8 @@
-import { test, expect, Page } from "@playwright/test";
-import { onboardingNext, signUpFreshUser } from "./helpers";
+import { test, expect } from "@playwright/test";
+import { setUpAccount } from "./helpers";
 
 // Design handoff, Dashboard. A fresh account set up with ₹1,00,000 pay, 20% savings,
 // a ₹28,000 rent bill and a ₹10,000 groceries limit, before any salary is recorded.
-
-async function setUpAccount(page: Page) {
-  await signUpFreshUser(page);
-  await page.fill("#ob-sal", "100000");
-  await onboardingNext(page).click();
-  await page.getByRole("button", { name: "20%" }).click();
-  await onboardingNext(page).click();
-  await page.getByLabel("Rent amount").fill("28000");
-  await onboardingNext(page).click();
-  await page.getByLabel("Groceries monthly limit").fill("10000");
-  await onboardingNext(page).click();
-  await page.getByRole("button", { name: "Open my dashboard" }).click();
-  await page.waitForURL("**/dashboard", { timeout: 20_000 });
-}
 
 test.describe("Dashboard", () => {
   test("shows the cycle, safe to spend, budgets and bills from onboarding", async ({ page }) => {

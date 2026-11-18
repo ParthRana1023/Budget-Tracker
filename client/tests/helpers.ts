@@ -38,3 +38,18 @@ export async function skipOnboarding(page: Page) {
   await page.getByRole("button", { name: "Open my dashboard" }).click();
   await page.waitForURL("**/dashboard", { timeout: 20_000 });
 }
+
+/** Sign up and onboard: ₹1,00,000 pay, 20% savings, ₹28,000 rent due on the 3rd, ₹10,000 groceries limit. */
+export async function setUpAccount(page: Page) {
+  await signUpFreshUser(page);
+  await page.fill("#ob-sal", "100000");
+  await onboardingNext(page).click();
+  await page.getByRole("button", { name: "20%" }).click();
+  await onboardingNext(page).click();
+  await page.getByLabel("Rent amount").fill("28000");
+  await onboardingNext(page).click();
+  await page.getByLabel("Groceries monthly limit").fill("10000");
+  await onboardingNext(page).click();
+  await page.getByRole("button", { name: "Open my dashboard" }).click();
+  await page.waitForURL("**/dashboard", { timeout: 20_000 });
+}

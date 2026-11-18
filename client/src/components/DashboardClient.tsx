@@ -28,12 +28,14 @@ import Goals from "./dashboard/Goals";
 import BillsRecurring from "./dashboard/BillsRecurring";
 import Ledger from "./dashboard/Ledger";
 import { LINK_BUTTON, type Category, type Contribution, type Goal, type IncomeSource, type RecurringItem, type Settings, type Tx } from "./dashboard/types";
-// Pre-redesign popups and Reports, used here until their redesign (Phases 8 and 9).
-import FastExpenseModal from "./FastExpenseModal";
-import IncomeModal from "./IncomeModal";
-import CategoryManagementModal from "./CategoryManagementModal";
-import EditTransactionModal from "./EditTransactionModal";
-import WindfallAllocationModal from "./WindfallAllocationModal";
+import ExpenseDialog, { type ExpensePrefill } from "./dashboard/popups/ExpenseDialog";
+import IncomeDialog from "./dashboard/popups/IncomeDialog";
+import WindfallDialog from "./dashboard/popups/WindfallDialog";
+import EditEntryDialog from "./dashboard/popups/EditEntryDialog";
+import CategoriesDialog from "./dashboard/popups/CategoriesDialog";
+import RecurringDialog from "./dashboard/popups/RecurringDialog";
+import type { PopupContext } from "./dashboard/popups/context";
+// Pre-redesign Reports, used here until its redesign (Phase 9).
 import ReportsView from "./ReportsView";
 
 const NOTES_OFF_KEY = "sf-notes-off";
@@ -67,12 +69,15 @@ export default function DashboardClient(props: DashboardClientProps) {
   const [loadFailed, setLoadFailed] = useState(false);
 
   // Popups.
-  const [expenseOpen, setExpenseOpen] = useState(false);
-  const [incomeOpen, setIncomeOpen] = useState(false);
+  const [expense, setExpense] = useState<ExpensePrefill | null>(null);
+  const [income, setIncome] = useState<{ expected: boolean } | null>(null);
   const [categoriesOpen, setCategoriesOpen] = useState(false);
   const [signOutOpen, setSignOutOpen] = useState(false);
   const [editing, setEditing] = useState<Tx | null>(null);
-  const [windfall, setWindfall] = useState<{ id: string; name: string; amount: number } | null>(null);
+  const [windfallId, setWindfallId] = useState<string | null>(null);
+  const [editingItem, setEditingItem] = useState<RecurringItem | null>(null);
+  const openExpense = (prefill: ExpensePrefill = {}) => setExpense(prefill);
+  const openIncome = (expected = false) => setIncome({ expected });
 
   useEffect(() => {
     try {
@@ -224,6 +229,40 @@ export default function DashboardClient(props: DashboardClientProps) {
     return generateInsights({ categoryBudgets, period, pace, completedMonths });
   }, [model, activeCategories, period, transactions, incomeSources, contributions]);
 
+  const popupCtx: PopupContext = {
+    userId,
+    today,
+    period,
+    model,
+    categories,
+    transactions,
+    recurringItems,
+    goals,
+    held,
+    previewSafe: (extra, removeId) =>
+      buildCycleModel({
+        settings,
+        categories,
+        recurringItems,
+        period,
+        today,
+        transactions: [...transactions.filter((t) => t.id !== removeId), ...(extra as Tx[])],
+      }).safe,
+    saved: async (message, undo) => {
+      await refreshData();
+      toast(
+        message,
+        undo && {
+          undo: async () => {
+            const r = await undo();
+            if (r.error) throw r.error;
+            await refreshData();
+          },
+        },
+      );
+    },
+  };
+
   const dateLong = new Date(`${today}T12:00:00`)
     .toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long", year: "numeric" })
     .replace(/^(\w+) /, "$1, ");
@@ -258,7 +297,7 @@ export default function DashboardClient(props: DashboardClientProps) {
             <ThemeToggle />
             <button
               type="button"
-              onClick={() => setIncomeOpen(true)}
+              onClick={() => openIncome()}
               className="h-[38px] cursor-pointer rounded-full border border-line bg-transparent px-[15px] text-[13px] font-semibold transition-[border-color,transform] hover:border-ink-2 active:scale-[.96] max-[720px]:hidden"
             >
               Record income
@@ -266,7 +305,7 @@ export default function DashboardClient(props: DashboardClientProps) {
             <button
               type="button"
               id="open-fast-expense-btn"
-              onClick={() => setExpenseOpen(true)}
+              onClick={() => openExpense()}
               className="flex h-[38px] cursor-pointer items-center gap-2 rounded-full border-0 bg-lime px-4 text-sm font-bold text-lime-ink transition-[transform,box-shadow] hover:-translate-y-px hover:shadow-[0_8px_24px_-10px_var(--lime)] active:scale-[.96] max-[720px]:hidden"
             >
               <Plus size={16} />
@@ -347,13 +386,13 @@ export default function DashboardClient(props: DashboardClientProps) {
                 {held.length > 0 ? (
                   <button
                     type="button"
-                    onClick={() => setWindfall({ id: held[0].id, name: held[0].name, amount: Number(held[0].amount) })}
+                    onClick={() => setWindfallId(held[0].id)}
                     className="mt-auto h-[38px] cursor-pointer self-start rounded-full border border-line-2 bg-transparent px-4 text-[13px] font-semibold transition-colors hover:border-ink hover:bg-ink hover:text-bg"
                   >
                     Mark received &amp; allocate
                   </button>
                 ) : (
-                  <button type="button" onClick={() => setIncomeOpen(true)} className={`${LINK_BUTTON} mt-auto self-start`}>
+                  <button type="button" onClick={() => openIncome(true)} className={`${LINK_BUTTON} mt-auto self-start`}>
                     Record expected income
                   </button>
                 )}
@@ -366,6 +405,11 @@ export default function DashboardClient(props: DashboardClientProps) {
                     ? `${inr(model.reserveIn)} set aside from windfalls · ${inr(model.reserveOut)} used`
                     : "Nothing set aside yet. Split part of a bonus here for insurance, taxes or a car service."}
                 </p>
+                {model.reserveLeft > 0 && (
+                  <button type="button" onClick={() => openExpense({ fromReserve: true })} className={`${LINK_BUTTON} mt-auto self-start`}>
+                    Pay a bill from it
+                  </button>
+                )}
               </section>
             </div>
 
@@ -386,7 +430,10 @@ export default function DashboardClient(props: DashboardClientProps) {
               today={today}
               onRecord={recordItem}
               onToggle={toggleItem}
-              onPayBill={() => setExpenseOpen(true)}
+              onPayBill={(c) =>
+                openExpense({ categoryId: c.id, amount: Math.max(0, Number(c.monthly_limit) - (model.spentByCat.get(c.id) ?? 0)), note: c.name })
+              }
+              onEdit={setEditingItem}
               onManage={() => setCategoriesOpen(true)}
             />
 
@@ -396,8 +443,8 @@ export default function DashboardClient(props: DashboardClientProps) {
               today={today}
               onEdit={setEditing}
               onExport={exportCsv}
-              onIncome={() => setIncomeOpen(true)}
-              onExpense={() => setExpenseOpen(true)}
+              onIncome={() => openIncome()}
+              onExpense={() => openExpense()}
             />
           </>
         )}
@@ -408,12 +455,12 @@ export default function DashboardClient(props: DashboardClientProps) {
         aria-label="Quick actions"
         className="fixed inset-x-0 bottom-0 z-40 flex gap-2.5 border-t border-line bg-bg px-3.5 pt-2.5 pb-[calc(10px+env(safe-area-inset-bottom))] min-[720px]:hidden"
       >
-        <button type="button" onClick={() => setIncomeOpen(true)} className="h-[50px] flex-1 cursor-pointer rounded-full border border-line-2 bg-transparent text-sm font-semibold active:scale-[.97]">
+        <button type="button" onClick={() => openIncome()} className="h-[50px] flex-1 cursor-pointer rounded-full border border-line-2 bg-transparent text-sm font-semibold active:scale-[.97]">
           Record income
         </button>
         <button
           type="button"
-          onClick={() => setExpenseOpen(true)}
+          onClick={() => openExpense()}
           className="flex h-[50px] flex-[1.4] cursor-pointer items-center justify-center gap-2 rounded-full border-0 bg-lime text-[15px] font-bold text-lime-ink active:scale-[.97]"
         >
           <Plus size={16} />
@@ -437,48 +484,12 @@ export default function DashboardClient(props: DashboardClientProps) {
         </p>
       </Dialog>
 
-      <FastExpenseModal
-        isOpen={expenseOpen}
-        onClose={() => setExpenseOpen(false)}
-        categories={activeCategories as never[]}
-        userId={userId}
-        onExpenseAdded={refreshData}
-        currentSafeToSpend={model.safe}
-        recentTransactions={model.cycleTransactions as never[]}
-        onAlertTriggered={(msg: string) => toast(msg, { error: true })}
-        recurringItems={recurringItems}
-        allTransactions={transactions as never[]}
-      />
-      <IncomeModal
-        isOpen={incomeOpen}
-        onClose={() => setIncomeOpen(false)}
-        userId={userId}
-        onIncomeAdded={refreshData}
-        recurringItems={recurringItems}
-        allTransactions={transactions as never[]}
-      />
-      <CategoryManagementModal
-        isOpen={categoriesOpen}
-        onClose={() => setCategoriesOpen(false)}
-        categories={categories as never[]}
-        userId={userId}
-        onCategoriesUpdated={refreshData}
-      />
-      <EditTransactionModal
-        isOpen={!!editing}
-        onClose={() => setEditing(null)}
-        transaction={editing as never}
-        categories={activeCategories as never[]}
-        onTransactionUpdated={refreshData}
-      />
-      <WindfallAllocationModal
-        isOpen={!!windfall}
-        onClose={() => setWindfall(null)}
-        incomeSource={windfall}
-        savingsGoals={goals as never[]}
-        userId={userId}
-        onAllocated={refreshData}
-      />
+      {expense && <ExpenseDialog ctx={popupCtx} prefill={expense} onClose={() => setExpense(null)} />}
+      {income && <IncomeDialog ctx={popupCtx} expected={income.expected} onClose={() => setIncome(null)} />}
+      {windfallId && <WindfallDialog ctx={popupCtx} incomeId={windfallId} onClose={() => setWindfallId(null)} />}
+      {editing && <EditEntryDialog ctx={popupCtx} entry={editing} onClose={() => setEditing(null)} />}
+      {categoriesOpen && <CategoriesDialog ctx={popupCtx} onClose={() => setCategoriesOpen(false)} />}
+      {editingItem && <RecurringDialog ctx={popupCtx} item={editingItem} onClose={() => setEditingItem(null)} />}
     </div>
   );
 }
