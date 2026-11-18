@@ -1,6 +1,6 @@
 {
   "name": "budget-tracker-client",
-  "version": "0.27.0",
+  "version": "0.27.1",
   "description": "Frontend web client for Personal Budget Tracker, built with Next.js 16.4.4, Tailwind CSS, and Supabase SSR.",
   "private": true,
   "license": "MIT",
@@ -22,7 +22,6 @@
     "next": "^16.4.5",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
-    "recharts": "^3.10.1",
     "tailwind-merge": "^3.0.2"
   },
   "devDependencies": {

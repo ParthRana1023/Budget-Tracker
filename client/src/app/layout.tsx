@@ -34,7 +34,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" data-theme="dark" className={`dark ${hanken.variable} ${instrument.variable}`} suppressHydrationWarning>
+    <html lang="en" data-theme="dark" className={`${hanken.variable} ${instrument.variable}`} suppressHydrationWarning>
       <head>
         <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=0" />
         <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
