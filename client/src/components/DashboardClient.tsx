@@ -13,10 +13,6 @@ import { recurringStatus } from "@/lib/recurringStatus.mjs";
 import { budgetWarnings } from "@/lib/notices.mjs";
 import { inr } from "@/lib/money.mjs";
 import { transactionsToCsv } from "@/lib/csvExport.mjs";
-import { computeCategoryBudgets } from "@/lib/budgetUtils";
-import { computeMonthlyTrends } from "@/lib/reportsUtils";
-import { computeSpendingPace } from "@/lib/spendingPace.mjs";
-import { generateInsights } from "@/lib/insights.mjs";
 import ThemeToggle from "./ThemeToggle";
 import Dialog from "./ui/Dialog";
 import { useToast } from "./ui/Toast";
@@ -35,7 +31,6 @@ import EditEntryDialog from "./dashboard/popups/EditEntryDialog";
 import CategoriesDialog from "./dashboard/popups/CategoriesDialog";
 import RecurringDialog from "./dashboard/popups/RecurringDialog";
 import type { PopupContext } from "./dashboard/popups/context";
-// Pre-redesign Reports, used here until its redesign (Phase 9).
 import ReportsView from "./ReportsView";
 
 const NOTES_OFF_KEY = "sf-notes-off";
@@ -219,15 +214,6 @@ export default function DashboardClient(props: DashboardClientProps) {
     window.location.href = "/login";
   };
 
-  // Reports (pre-redesign view until Phase 9) still uses the older helpers.
-  const insights = useMemo(() => {
-    const cycleTx = model.cycleTransactions as never[];
-    const categoryBudgets = computeCategoryBudgets(activeCategories as never[], cycleTx);
-    const pace = computeSpendingPace({ flexibleBudget: model.flexBudget, cycleTransactions: cycleTx, period });
-    const now = new Date();
-    const completedMonths = computeMonthlyTrends(transactions as never[], incomeSources, contributions as never[], 6, new Date(now.getFullYear(), now.getMonth() - 1, 1));
-    return generateInsights({ categoryBudgets, period, pace, completedMonths });
-  }, [model, activeCategories, period, transactions, incomeSources, contributions]);
 
   const popupCtx: PopupContext = {
     userId,
@@ -324,14 +310,7 @@ export default function DashboardClient(props: DashboardClientProps) {
         </header>
 
         {view === "reports" ? (
-          <ReportsView
-            transactions={transactions as never[]}
-            categories={activeCategories as never[]}
-            incomeSources={incomeSources}
-            contributions={contributions}
-            insights={insights}
-            targetSavingsRate={settings?.savings_pct ?? null}
-          />
+          <ReportsView transactions={transactions} categories={categories} settings={settings} recurringItems={recurringItems} today={today} onChanged={refreshData} />
         ) : loadFailed ? (
           <section role="alert" className="flex flex-col items-start gap-3.5 rounded-[18px] border border-line bg-tile p-[clamp(24px,5vw,40px)]">
             <span className="eyebrow text-danger">Couldn’t load</span>
