@@ -56,6 +56,14 @@ test("uncategorised and switched-off spending still counts; switched-off categor
   assert.ok(!m.flex.some((c) => c.id === "ent"));
 });
 
+test("no income recorded this cycle: safe to spend is 0, not negative", () => {
+  const m = buildCycleModel({ ...DEMO, transactions: DEMO.transactions.filter((t) => t.type !== "income") });
+  assert.equal(m.income, 0);
+  assert.equal(m.safe, 0);
+  assert.equal(m.perDay, 0);
+  assert.equal(m.bar.safe, 0);
+});
+
 test("no onboarding answers: no savings target, nothing breaks", () => {
   const m = buildCycleModel({ ...DEMO, settings: null });
   assert.equal(m.savingsTarget, 0);

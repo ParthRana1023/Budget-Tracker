@@ -542,7 +542,7 @@ export default function Landing() {
 
       <footer className="border-t border-line">
         <div className="mx-auto flex max-w-[1200px] flex-wrap items-center gap-x-7 gap-y-3.5 px-6 py-7 text-[13px] text-muted">
-          <Logo size={20} />
+          <Logo size={24} />
           <span>Savings-first budgeting for a monthly salary.</span>
           <span className="ml-auto flex flex-wrap gap-x-5 gap-y-2">
             <Link href="/login" className="text-muted hover:text-ink">

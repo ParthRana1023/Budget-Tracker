@@ -293,13 +293,16 @@ export default function DashboardClient(props: DashboardClientProps) {
   return (
     <div className="min-h-screen w-full overflow-x-clip">
       <div className="mx-auto flex max-w-[1240px] flex-col gap-3.5 px-6 pt-[18px] pb-14 max-[480px]:px-3.5">
-        <header className="flex flex-wrap items-center gap-x-6 gap-y-3 pt-0.5 pb-2.5">
-          <Logo />
-          <nav className="flex gap-0.5 rounded-full border border-line p-[3px]">
+        {/* From 1100px the nav sits dead centre (1fr | auto | 1fr); narrower, the header wraps. */}
+        <header className="flex flex-wrap items-center gap-x-6 gap-y-3 pt-0.5 pb-2.5 min-[1100px]:grid min-[1100px]:grid-cols-[1fr_auto_1fr]">
+          <div className="justify-self-start">
+            <Logo />
+          </div>
+          <nav className="flex gap-0.5 justify-self-center rounded-full border border-line p-[3px]">
             {navButton("dashboard", "Dashboard")}
             {navButton("reports", "Reports")}
           </nav>
-          <div className="ml-auto flex items-center gap-2">
+          <div className="ml-auto flex items-center gap-2 justify-self-end">
             <ThemeToggle />
             <button
               type="button"

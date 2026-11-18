@@ -78,7 +78,9 @@ export function buildCycleModel({ settings, categories, transactions, recurringI
     pct = Number(settings?.savings_pct ?? 0);
   const savingsTarget = Math.round((takeHome * pct) / 100);
   const savingsSetAside = Math.max(savingsTarget, regularSaved);
-  const safe = income - savingsSetAside - windfallSaved - reservedThisCycle - fixedCommitted - flexSpent;
+  // No income recorded this cycle yet: nothing is safe to spend (never a negative figure).
+  const safe =
+    income > 0 ? income - savingsSetAside - windfallSaved - reservedThisCycle - fixedCommitted - flexSpent : 0;
 
   const flexBudget = flex.reduce((s, c) => s + Number(c.monthly_limit), 0);
   const expectedByToday = Math.round((flexBudget * period.daysElapsed) / period.totalDays);

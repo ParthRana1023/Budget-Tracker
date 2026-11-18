@@ -40,7 +40,8 @@ test.describe("Popups", () => {
       .getByRole("button", { name: /^Groceries/ })
       .click();
     await expect(dialog(page).getByText("After this")).toBeVisible();
-    await expect(dialog(page)).toContainText("−₹48,500");
+    // No income recorded yet, so safe to spend stays at ₹0.
+    await expect(dialog(page)).toContainText("nothing left to spend this cycle");
     await dialog(page).getByLabel("Payee").fill("DMart");
     await dialog(page).getByRole("button", { name: "Log ₹500" }).click();
 

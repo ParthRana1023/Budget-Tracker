@@ -23,7 +23,7 @@ const instrument = localFont({
 });
 
 export const metadata: Metadata = {
-  title: "Personal Budget Tracker",
+  title: "SaveFirst - Personal Budget Tracker",
   description: "Savings-first budgeting web app with live Safe-to-Spend tracking",
   manifest: "/manifest.json",
   icons: {

@@ -13,8 +13,11 @@ export default function SiteHeader({ nav = false }: { nav?: boolean }) {
 
   return (
     <header className="sticky top-0 z-30 border-b border-line bg-bg">
-      <div className="mx-auto flex h-16 max-w-[1200px] items-center gap-4 px-6 max-[480px]:px-4">
-        <HomeLogo />
+      {/* 1fr | auto | 1fr keeps the nav centred whatever the widths on either side. */}
+      <div className="mx-auto grid h-16 max-w-[1200px] grid-cols-[1fr_auto_1fr] items-center gap-4 px-6 max-[480px]:px-4">
+        <div className="justify-self-start">
+          <HomeLogo />
+        </div>
         {nav && (
           <nav className="flex gap-0.5 rounded-full border border-line p-[3px] text-[13px] font-medium max-[820px]:hidden">
             {[
@@ -32,7 +35,7 @@ export default function SiteHeader({ nav = false }: { nav?: boolean }) {
             ))}
           </nav>
         )}
-        <div className="ml-auto flex items-center gap-2">
+        <div className="col-start-3 flex items-center gap-2 justify-self-end">
           <ThemeToggle />
           {!hideSignIn && (
             <Link

@@ -9,8 +9,8 @@ test.describe("Dashboard", () => {
     await setUpAccount(page);
 
     await expect(page.getByText(/^Cycle .* · Day \d+ of \d+$/)).toBeVisible();
-    // No salary recorded yet: savings and rent already come off, so safe to spend is negative.
-    await expect(page.getByTestId("safe-to-spend")).toHaveText("−₹48,000", { timeout: 5_000 });
+    // No salary recorded yet: nothing is safe to spend.
+    await expect(page.getByTestId("safe-to-spend")).toHaveText("₹0", { timeout: 5_000 });
     await expect(page.getByText(/after ₹20,000 to savings and ₹28,000 in bills still due/)).toBeVisible();
 
     const groceries = page.locator('[data-testid="budget-row"][data-name="Groceries"]');
