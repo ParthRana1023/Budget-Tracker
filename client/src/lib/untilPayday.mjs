@@ -17,11 +17,12 @@ const weekdayOf = (/** @type {string} */ dateStr) => {
  *   model: ReturnType<typeof import("./cycleModel.mjs").buildCycleModel>,
  *   period: { startStr: string, totalDays: number, daysElapsed: number },
  *   today: string,
- *   transactions: Array<any>,   all of the user's transactions (history drives the weekday pattern)
+ *   transactions: Array<any>,
  *   recurringItems: Array<any>,
- *   dailySpend?: number | null, slider value in paise a day; null = the user's own pace
- *   weekPattern?: boolean,      "My week" (true) or "Even" (false)
- * }} input
+ *   dailySpend?: number | null,
+ *   weekPattern?: boolean,
+ * }} input  transactions: all of the user's (history drives the weekday pattern);
+ *   dailySpend: slider value in paise a day, null = the user's own pace; weekPattern: "My week" (true) or "Even".
  */
 export function projectUntilPayday({ model, period, today, transactions, recurringItems, dailySpend = null, weekPattern = true }) {
   const DAY = period.daysElapsed, N = period.totalDays;

@@ -86,3 +86,18 @@ test("budget warnings at 80% and over, dismissed per level", () => {
   spentByCat.set("a", 1001);
   assert.equal(budgetWarnings({ flex, spentByCat, dismissed: ["a:80"] })[0].key, "a:over", "going over shows it again");
 });
+
+test("labels: rupees, dates and the cycle line", async () => {
+  const { inr } = await import("./money.mjs");
+  const { cycleLabel, dayLabel, monthLabel, shortDate } = await import("./cycle.mjs");
+  assert.equal(inr(10000000), "₹1,00,000");
+  assert.equal(inr(-65000), "−₹650");
+  assert.equal(inr(-20), "₹0", "no minus sign on a rounded zero");
+  assert.equal(shortDate("2026-11-20"), "20 Nov");
+  assert.equal(dayLabel("2026-11-16", "2026-11-16"), "Today");
+  assert.equal(dayLabel("2026-11-15", "2026-11-16"), "Yesterday");
+  assert.equal(dayLabel("2026-11-01", "2026-11-16"), "1 Nov");
+  assert.equal(monthLabel("2027-06-01"), "Jun 2027");
+  assert.equal(cycleLabel(DEMO.period), "Cycle 1–30 Nov · Day 16 of 30");
+  assert.equal(cycleLabel(getPeriodRange(new Date(2026, 10, 28, 12), 25)), "Cycle 25 Nov–24 Dec · Day 4 of 30");
+});

@@ -38,12 +38,13 @@ export function simulateGoalCompletion(remaining, monthlyContribution, reference
  * @param {{
  *   targetAmount: number, targetDate: string | null,
  *   contributions: Array<{ amount: number, date?: string | null }>,
+ *   startingAmount?: number,
  *   referenceDate?: Date
- * }} input contributions must already be filtered to this goal
+ * }} input contributions must already be filtered to this goal; startingAmount = saved before tracking (not part of the pace)
  */
-export function analyzeGoal({ targetAmount, targetDate, contributions, referenceDate = new Date() }) {
+export function analyzeGoal({ targetAmount, targetDate, contributions, startingAmount = 0, referenceDate = new Date() }) {
   const today = toLocalDateString(referenceDate);
-  const current = contributions.reduce((s, c) => s + Number(c.amount), 0);
+  const current = Number(startingAmount) + contributions.reduce((s, c) => s + Number(c.amount), 0);
   const remaining = Math.max(0, targetAmount - current);
   const percent = targetAmount > 0 ? Math.min(100, (current / targetAmount) * 100) : 0;
   const needed = calculateNeededPerMonth(targetAmount, current, targetDate, referenceDate);

@@ -24,3 +24,14 @@ export function formatINRDecimal(paise) {
     maximumFractionDigits: 2,
   })}`;
 }
+
+/**
+ * Design-handoff rupee format from paise: whole rupees, Indian grouping, never
+ * abbreviated, with a true minus sign ("₹1,00,000", "−₹650").
+ * @param {number} paise
+ * @returns {string}
+ */
+export function inr(paise) {
+  const rupees = Math.round(Math.abs(paise) / 100);
+  return `${paise <= -50 ? "−" : ""}₹${rupees.toLocaleString("en-IN")}`;
+}

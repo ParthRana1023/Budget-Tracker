@@ -1,7 +1,7 @@
 -- SaveFirst redesign migration: onboarding, annual bills reserve, payee, skip month.
 begin;
 
-select plan(32);
+select plan(34);
 
 insert into auth.users (id, instance_id, aud, role, email, encrypted_password, email_confirmed_at, raw_app_meta_data, raw_user_meta_data)
 values
@@ -85,6 +85,12 @@ values ('a0000000-0000-0000-0000-00000000000a', 'Netflix', 64900, 'expense', 8);
 set local role authenticated;
 select lives_ok($$update public.recurring_items set skip_month = '2026-11' where name = 'Netflix'$$, 'Skip this month is stored as YYYY-MM');
 select throws_ok($$update public.recurring_items set skip_month = '2026-13' where name = 'Netflix'$$, '23514', null, 'an invalid month is rejected');
+
+-- ================================================================ goal opening balance
+select lives_ok($$insert into public.savings_goals (user_id, name, target_amount, saved_before)
+  values ('a0000000-0000-0000-0000-00000000000a', 'Laptop', 9000000, 2000000)$$, 'a goal can start with money already saved');
+select throws_ok($$insert into public.savings_goals (user_id, name, target_amount, saved_before)
+  values ('a0000000-0000-0000-0000-00000000000a', 'Bad', 100, -1)$$, '23514', null, 'a negative opening balance is rejected');
 
 -- ================================================================ isolation
 select set_config('request.jwt.claim.sub', 'b0000000-0000-0000-0000-00000000000b', true);

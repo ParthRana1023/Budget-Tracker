@@ -31,3 +31,32 @@ export function dueDateInCycle(dayOfMonth, period) {
 
 /** 'YYYY-MM' of the cycle start: the month key used for "Skip this month". */
 export const cycleMonthKey = (period) => period.startStr.slice(0, 7);
+
+const MON = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+/** '2026-11-20' -> '20 Nov'. */
+export function shortDate(dateStr) {
+  const [, m, d] = parts(dateStr);
+  return `${d} ${MON[m - 1]}`;
+}
+
+/** 'Today', 'Yesterday' or '14 Nov' (ledger day headings, notices). */
+export function dayLabel(dateStr, today) {
+  if (dateStr === today) return "Today";
+  if (dateStr === addDaysStr(today, -1)) return "Yesterday";
+  return shortDate(dateStr);
+}
+
+/** '2027-06-01' -> 'Jun 2027'. */
+export function monthLabel(dateStr) {
+  const [y, m] = parts(dateStr);
+  return `${MON[m - 1]} ${y}`;
+}
+
+/** Header line: 'Cycle 1–30 Nov · Day 16 of 30', or 'Cycle 25 Nov–24 Dec · Day 4 of 30'. */
+export function cycleLabel(period) {
+  const [, m1, d1] = parts(period.startStr);
+  const [, m2, d2] = parts(period.endStr);
+  const range = m1 === m2 ? `${d1}–${d2} ${MON[m2 - 1]}` : `${d1} ${MON[m1 - 1]}–${d2} ${MON[m2 - 1]}`;
+  return `Cycle ${range} · Day ${period.daysElapsed} of ${period.totalDays}`;
+}

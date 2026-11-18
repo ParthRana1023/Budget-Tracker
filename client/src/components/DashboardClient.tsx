@@ -1,633 +1,482 @@
 "use client";
 
-import { useState, useMemo, useEffect, useRef } from "react";
-import { useRouter } from "next/navigation";
+// Dashboard (design handoff, Dashboard). Numbers come from lib/cycleModel.mjs; this file
+// loads and refreshes the rows, runs the one-tap actions and lays out the cards.
+
+import { useEffect, useMemo, useState } from "react";
+import { LogOut, Plus } from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
-import { 
-  PiggyBank, 
-  TrendingUp, 
-  Calendar, 
-  AlertCircle, 
-  Plus, 
-  Layers, 
-  ArrowDownLeft, 
-  Settings2, 
-  Sparkles,
-  Wallet,
-  CheckCircle2,
-  LogOut,
-  Clock,
-  ShieldAlert,
-  Bell,
-  PartyPopper,
-  BarChart3,
-  LayoutDashboard,
-  Download,
-  ClipboardList
-} from "lucide-react";
-import PlanView from "./PlanView";
-import { BUDGET_PLAN_SELECT, type BudgetPlanRow } from "@/lib/budgetPlans";
-import ThemeToggle from "./ThemeToggle";
-import FastExpenseModal, { Category } from "./FastExpenseModal";
-import IncomeModal from "./IncomeModal";
-import CategoryManagementModal from "./CategoryManagementModal";
-import TransactionList from "./TransactionList";
-import EditTransactionModal, { TransactionItem } from "./EditTransactionModal";
-import BurnRateCard from "./BurnRateCard";
-import AlertBanner from "./AlertBanner";
-import SavingsGoalsSection, { SavingsGoal } from "./SavingsGoalsSection";
-import WindfallAllocationModal from "./WindfallAllocationModal";
-import ReportsView from "./ReportsView";
-import { toLocalDateString } from "@/lib/periods.mjs";
-import { calculateSafeToSpend, computeCycleBudgetInputs } from "@/lib/safeToSpend.mjs";
-import type { RecurringItem } from "@/lib/recurringTypes";
-import { 
-  getPeriodRange, 
-  computeCategoryBudgets, 
-  formatINR
-} from "@/lib/budgetUtils";
+import { getPeriodRange, toLocalDateString } from "@/lib/periods.mjs";
+import { cycleLabel, cycleMonthKey, dayLabel } from "@/lib/cycle.mjs";
+import { buildCycleModel } from "@/lib/cycleModel.mjs";
+import { recurringStatus } from "@/lib/recurringStatus.mjs";
+import { budgetWarnings } from "@/lib/notices.mjs";
+import { inr } from "@/lib/money.mjs";
+import { transactionsToCsv } from "@/lib/csvExport.mjs";
+import { computeCategoryBudgets } from "@/lib/budgetUtils";
 import { computeMonthlyTrends } from "@/lib/reportsUtils";
 import { computeSpendingPace } from "@/lib/spendingPace.mjs";
-import { computeUpcomingObligations } from "@/lib/upcomingObligations.mjs";
-import SpendingPaceChart from "./SpendingPaceChart";
-import BudgetVsActualChart from "./BudgetVsActualChart";
-import UpcomingObligations from "./UpcomingObligations";
 import { generateInsights } from "@/lib/insights.mjs";
-import { getCategoryLimitAlerts, getSavingsTargetAlert, BudgetAlert } from "@/lib/alertUtils";
-import { transactionsToCsv } from "@/lib/csvExport.mjs";
+import ThemeToggle from "./ThemeToggle";
+import Dialog from "./ui/Dialog";
+import { useToast } from "./ui/Toast";
+import SafeToSpend from "./dashboard/SafeToSpend";
+import UntilPayday from "./dashboard/UntilPayday";
+import Notices from "./dashboard/Notices";
+import Budgets from "./dashboard/Budgets";
+import Goals from "./dashboard/Goals";
+import BillsRecurring from "./dashboard/BillsRecurring";
+import Ledger from "./dashboard/Ledger";
+import { LINK_BUTTON, type Category, type Contribution, type Goal, type IncomeSource, type RecurringItem, type Settings, type Tx } from "./dashboard/types";
+// Pre-redesign popups and Reports, used here until their redesign (Phases 8 and 9).
+import FastExpenseModal from "./FastExpenseModal";
+import IncomeModal from "./IncomeModal";
+import CategoryManagementModal from "./CategoryManagementModal";
+import EditTransactionModal from "./EditTransactionModal";
+import WindfallAllocationModal from "./WindfallAllocationModal";
+import ReportsView from "./ReportsView";
+
+const NOTES_OFF_KEY = "sf-notes-off";
+const TX_SELECT = "*, category:categories(name, type)";
 
 interface DashboardClientProps {
   initialUser: { id: string; email?: string };
-  initialSettings: { currency: string; month_start_day: number } | null;
+  initialSettings: Settings | null;
   initialCategories: Category[];
-  initialTransactions: TransactionItem[];
-  initialIncomeSources: any[];
-  initialSavingsGoals: any[];
-  initialContributions: Array<{ goal_id: string; amount: number; date?: string }>;
-  initialRecurringItems: any[];
-  initialPlans: BudgetPlanRow[];
-  /** False until the budget_plans migration has been run. */
-  plansAvailable: boolean;
+  initialTransactions: Tx[];
+  initialIncomeSources: IncomeSource[];
+  initialSavingsGoals: Goal[];
+  initialContributions: Contribution[];
+  initialRecurringItems: RecurringItem[];
 }
 
-export default function DashboardClient({
-  initialUser,
-  initialSettings,
-  initialCategories,
-  initialTransactions,
-  initialIncomeSources,
-  initialSavingsGoals,
-  initialContributions,
-  initialRecurringItems,
-  initialPlans,
-  plansAvailable,
-}: DashboardClientProps) {
-  const router = useRouter();
+export default function DashboardClient(props: DashboardClientProps) {
+  const userId = props.initialUser.id;
+  const toast = useToast();
+  const [view, setView] = useState<"dashboard" | "reports">("dashboard");
+  const [settings] = useState<Settings | null>(props.initialSettings);
+  const [categories, setCategories] = useState(props.initialCategories);
+  const [transactions, setTransactions] = useState(props.initialTransactions);
+  const [incomeSources, setIncomeSources] = useState(props.initialIncomeSources);
+  const [goals, setGoals] = useState(props.initialSavingsGoals);
+  const [contributions, setContributions] = useState(props.initialContributions);
+  const [recurringItems, setRecurringItems] = useState(props.initialRecurringItems);
+  const [notesOff, setNotesOff] = useState<string[]>([]);
+  const [offline, setOffline] = useState(false);
+  const [retrying, setRetrying] = useState(false);
+  const [loadFailed, setLoadFailed] = useState(false);
 
-  // Navigation tab: 'dashboard' vs 'reports'
-  const [activeTab, setActiveTab] = useState<"dashboard" | "reports" | "plan">("dashboard");
-  const [plans, setPlans] = useState<BudgetPlanRow[]>(initialPlans);
+  // Popups.
+  const [expenseOpen, setExpenseOpen] = useState(false);
+  const [incomeOpen, setIncomeOpen] = useState(false);
+  const [categoriesOpen, setCategoriesOpen] = useState(false);
+  const [signOutOpen, setSignOutOpen] = useState(false);
+  const [editing, setEditing] = useState<Tx | null>(null);
+  const [windfall, setWindfall] = useState<{ id: string; name: string; amount: number } | null>(null);
 
-  const [categories, setCategories] = useState<Category[]>(initialCategories);
-  const [transactions, setTransactions] = useState<TransactionItem[]>(initialTransactions);
-  const [incomeSources, setIncomeSources] = useState<any[]>(initialIncomeSources);
-  const [savingsGoals, setSavingsGoals] = useState<any[]>(initialSavingsGoals);
-  const [contributions, setContributions] = useState<any[]>(initialContributions);
-  const [recurringItems, setRecurringItems] = useState<RecurringItem[]>(initialRecurringItems);
-  const [settings] = useState(initialSettings);
+  useEffect(() => {
+    try {
+      setNotesOff(JSON.parse(localStorage.getItem(NOTES_OFF_KEY) ?? "[]"));
+    } catch {}
+    const onNet = () => setOffline(!navigator.onLine);
+    onNet();
+    window.addEventListener("online", onNet);
+    window.addEventListener("offline", onNet);
+    return () => {
+      window.removeEventListener("online", onNet);
+      window.removeEventListener("offline", onNet);
+    };
+  }, []);
 
-  // Modals state
-  const [isExpenseOpen, setIsExpenseOpen] = useState(false);
-  const [isIncomeOpen, setIsIncomeOpen] = useState(false);
-  const [isCategoryOpen, setIsCategoryOpen] = useState(false);
-  const [editingTransaction, setEditingTransaction] = useState<TransactionItem | null>(null);
-  const [windfallToAllocate, setWindfallToAllocate] = useState<{ id: string; name: string; amount: number } | null>(null);
-  const [toastMessage, setToastMessage] = useState<string | null>(null);
-
-  // Current period computation based on month_start_day
-  const period = useMemo(() => {
-    return getPeriodRange(new Date(), settings?.month_start_day || 1);
-  }, [settings?.month_start_day]);
-  const { startStr, endStr } = period; // local YYYY-MM-DD, inclusive
-
-  // Filter transactions within active billing cycle
-  const currentPeriodTransactions = useMemo(
-    () => transactions.filter((t) => t.date >= period.startStr && t.date <= period.endStr),
-    [transactions, period]
+  const today = toLocalDateString();
+  const period = useMemo(() => getPeriodRange(new Date(), settings?.month_start_day || 1), [settings?.month_start_day]);
+  const activeCategories = useMemo(() => categories.filter((c) => c.is_active !== false), [categories]);
+  const model = useMemo(
+    () => buildCycleModel({ settings, categories, transactions, recurringItems, period, today }),
+    [settings, categories, transactions, recurringItems, period, today],
   );
+  const statusCtx = { cycleTransactions: model.cycleTransactions, period, today };
+  const due = recurringItems
+    .map((item) => ({ item, st: recurringStatus(item, statusCtx) }))
+    .filter(({ item, st }) => item.active && st.key === "due")
+    .map(({ item, st }) => ({ item, dueDate: st.dueDate! }));
+  const warnings = budgetWarnings({ flex: model.flex, spentByCat: model.spentByCat, dismissed: notesOff });
+  const held = incomeSources.filter((i) => i.status === "expected");
+  const holdTotal = held.reduce((s, i) => s + Number(i.amount), 0);
 
-  // Function to refresh state from Supabase
   const refreshData = async () => {
     const supabase = createClient();
-
-    const [catRes, txRes, incRes, goalRes, contribRes, recurringRes] = await Promise.all([
-      supabase.from("categories").select("*").eq("user_id", initialUser.id).order("name"),
-      supabase
-        .from("transactions")
-        .select("id, category_id, amount, type, date, note, external_id, category:categories(name, type)")
-        .eq("user_id", initialUser.id)
-        .order("date", { ascending: false }),
-      supabase.from("income_sources").select("*").eq("user_id", initialUser.id),
-      supabase.from("savings_goals").select("*").eq("user_id", initialUser.id),
-      supabase.from("goal_contributions").select("goal_id, amount, date").eq("user_id", initialUser.id),
-      supabase.from("recurring_items").select("*").eq("user_id", initialUser.id),
+    const [cat, tx, inc, goal, contrib, rec] = await Promise.all([
+      supabase.from("categories").select("*").eq("user_id", userId).order("name"),
+      supabase.from("transactions").select(TX_SELECT).eq("user_id", userId).order("date", { ascending: false }),
+      supabase.from("income_sources").select("*").eq("user_id", userId),
+      supabase.from("savings_goals").select("*").eq("user_id", userId),
+      supabase.from("goal_contributions").select("goal_id, amount, date").eq("user_id", userId),
+      supabase.from("recurring_items").select("*").eq("user_id", userId),
     ]);
-
-    if (catRes.data) setCategories(catRes.data as any);
-    if (txRes.data) setTransactions(txRes.data as any);
-    if (incRes.data) setIncomeSources(incRes.data);
-    if (goalRes.data) setSavingsGoals(goalRes.data);
-    if (contribRes.data) setContributions(contribRes.data);
-    if (recurringRes.data) setRecurringItems(recurringRes.data as RecurringItem[]);
-
-    if (plansAvailable) {
-      const plansRes = await supabase
-        .from("budget_plans")
-        .select(BUDGET_PLAN_SELECT)
-        .eq("user_id", initialUser.id)
-        .order("cycle_start", { ascending: true });
-      if (plansRes.data) setPlans(plansRes.data as unknown as BudgetPlanRow[]);
+    if ([cat, tx, inc, goal, contrib, rec].some((r) => r.error)) {
+      setLoadFailed(true);
+      return false;
     }
+    setLoadFailed(false);
+    setCategories(cat.data as Category[]);
+    setTransactions(tx.data as Tx[]);
+    setIncomeSources(inc.data as IncomeSource[]);
+    setGoals(goal.data as Goal[]);
+    setContributions(contrib.data as Contribution[]);
+    setRecurringItems(rec.data as RecurringItem[]);
+    return true;
   };
 
-  // Safe to spend math (shared with the planner/simulator via lib/safeToSpend.mjs)
-  const {
-    confirmedIncome,
-    expectedVariableSources,
-    unreceivedVariable,
-    budgetedFixedBills,
-    paidFixedBills,
-    flexibleSpent,
-    targetSavings,
-  } = computeCycleBudgetInputs({ incomeSources, contributions, categories, cycleTransactions: currentPeriodTransactions, startStr, endStr });
-  const flexibleCategories = categories.filter((c) => c.type === "flexible");
-
-  // Core formula: Safe to spend = Confirmed Income − Target Savings − Remaining Unpaid Fixed Bills − Flexible Spent
-  const { remainingFixedBills, safeToSpend, dailyAllowance } = calculateSafeToSpend({
-    confirmedIncome,
-    targetSavings,
-    budgetedFixedBills,
-    paidFixedBills,
-    flexibleSpent,
-    daysRemaining: period.daysRemaining,
-  });
-
-  // Compute per-category progress
-  const categoryBudgets = useMemo(() => {
-    return computeCategoryBudgets(categories, currentPeriodTransactions);
-  }, [categories, currentPeriodTransactions]);
-
-  // Compute flexible budget burn rate metrics
-  const totalFlexibleBudget = flexibleCategories.reduce((sum, c) => sum + Number(c.monthly_limit), 0);
-  // Cumulative pace for the cycle; its burnRate is the same computeBurnRate result the Pacing card uses.
-  const pace = useMemo(
-    () => computeSpendingPace({ flexibleBudget: totalFlexibleBudget, cycleTransactions: currentPeriodTransactions, period }),
-    [totalFlexibleBudget, currentPeriodTransactions, period]
-  );
-  const burnRate = pace.burnRate;
-
-  const obligations = useMemo(
-    () =>
-      computeUpcomingObligations({
-        recurringItems,
-        categories,
-        transactions,
-        period,
-        today: toLocalDateString(),
-      }),
-    [recurringItems, categories, transactions, period]
-  );
-
-  // Target savings rate for Reports: the plan for the current cycle, else the next saved plan.
-  const targetSavingsRate = useMemo(() => {
-    const plan = plans.find((p) => p.cycle_start === startStr) ?? plans.find((p) => p.cycle_start > startStr);
-    const income = Number(plan?.expected_regular_income ?? 0);
-    return plan && income > 0 ? (Number(plan.planned_savings) / income) * 100 : null;
-  }, [plans, startStr]);
-
-  // Budget chart -> transaction list: filter to the category and bring the list into view.
-  const [txCategoryFilter, setTxCategoryFilter] = useState<string>("all");
-  const transactionListRef = useRef<HTMLDivElement>(null);
-  const inspectCategory = (categoryId: string) => {
-    setTxCategoryFilter(categoryId);
-    transactionListRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-  };
-
-  // Deterministic insights: current cycle + the last 6 completed calendar months.
-  const insights = useMemo(() => {
-    const now = new Date();
-    const completedMonths = computeMonthlyTrends(
-      transactions, incomeSources, contributions, 6, new Date(now.getFullYear(), now.getMonth() - 1, 1)
+  /** One-tap write: refuses offline, refreshes on success, toasts with an optional Undo. */
+  const act = async (
+    write: () => PromiseLike<{ error: unknown; data?: unknown }>,
+    message: string,
+    failMessage: string,
+    undo?: (data: unknown) => PromiseLike<{ error: unknown }>,
+  ) => {
+    if (!navigator.onLine) return toast("You’re offline, so this wasn’t saved.", { error: true });
+    const { error, data } = await write();
+    if (error) return toast(failMessage, { error: true });
+    await refreshData();
+    toast(
+      message,
+      undo && {
+        undo: async () => {
+          const r = await undo(data);
+          if (r.error) throw r.error;
+          await refreshData();
+        },
+      },
     );
-    return generateInsights({ categoryBudgets, period, pace, completedMonths });
-  }, [transactions, incomeSources, contributions, categoryBudgets, period, pace]);
-
-  // Compute active alerts
-  const activeAlerts = useMemo(() => {
-    const categoryAlerts = getCategoryLimitAlerts(categories, currentPeriodTransactions);
-    const savingsAlert = getSavingsTargetAlert({
-      confirmedIncome,
-      targetSavings,
-      budgetedFixedBills,
-      paidFixedBills,
-      flexibleSpent,
-      projectedFlexibleTotal: burnRate.projectedEndOfMonth,
-    });
-
-    const allAlerts: BudgetAlert[] = [];
-    if (savingsAlert) allAlerts.push(savingsAlert);
-    allAlerts.push(...categoryAlerts);
-    return allAlerts;
-  }, [categories, currentPeriodTransactions, confirmedIncome, targetSavings, budgetedFixedBills, paidFixedBills, flexibleSpent, burnRate.projectedEndOfMonth]);
-
-  const handleAlertTriggered = (msg: string) => {
-    setToastMessage(msg);
-    setTimeout(() => {
-      setToastMessage(null);
-    }, 6000);
   };
 
-  const handleExportTransactions = () => {
-    const csv = transactionsToCsv(transactions);
-    const blob = new Blob([`\uFEFF${csv}`], { type: "text/csv;charset=utf-8" });
+  const db = () => createClient();
+  const recordItem = (item: RecurringItem) => {
+    const st = recurringStatus(item, statusCtx);
+    const date = st.dueDate && st.dueDate <= today ? st.dueDate : today;
+    act(
+      () =>
+        db().rpc("record_entry_with_recurring", {
+          p_type: item.type,
+          p_amount: Number(item.amount),
+          p_date: date,
+          p_category_id: item.category_id,
+          p_note: item.name,
+          p_item_id: item.id,
+          p_income_type: item.income_type,
+        }),
+      `Recorded ${item.name} · ${inr(item.amount)}`,
+      `Couldn’t record ${item.name}. Try again.`,
+      (txId) => db().from("transactions").delete().eq("id", txId as string),
+    );
+  };
+  const skipItem = (item: RecurringItem) =>
+    act(
+      () => db().from("recurring_items").update({ skip_month: cycleMonthKey(period) }).eq("id", item.id),
+      `Skipped ${item.name} for this cycle`,
+      `Couldn’t skip ${item.name}. Try again.`,
+      () => db().from("recurring_items").update({ skip_month: null }).eq("id", item.id),
+    );
+  const toggleItem = (item: RecurringItem) =>
+    act(
+      () => db().from("recurring_items").update({ active: !item.active }).eq("id", item.id),
+      item.active ? `${item.name} stopped repeating · past entries kept` : `${item.name} repeats again`,
+      `Couldn’t update ${item.name}. Try again.`,
+      () => db().from("recurring_items").update({ active: item.active }).eq("id", item.id),
+    );
+  const dismiss = (key: string) => {
+    const next = [...notesOff, key];
+    setNotesOff(next);
+    try {
+      localStorage.setItem(NOTES_OFF_KEY, JSON.stringify(next));
+    } catch {}
+  };
+  const retryOnline = async () => {
+    setRetrying(true);
+    const ok = navigator.onLine && (await refreshData());
+    setRetrying(false);
+    setOffline(!ok);
+    toast(ok ? "Back online" : "Still offline. We’ll reconnect when the network is back.", ok ? undefined : { error: true });
+  };
+  const exportCsv = () => {
+    const blob = new Blob([`﻿${transactionsToCsv(transactions as never[])}`], { type: "text/csv;charset=utf-8" });
     const url = URL.createObjectURL(blob);
-    const download = document.createElement("a");
-    download.href = url;
-    download.download = "savefirst-transactions.csv";
-    download.click();
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `savefirst-${period.startStr.slice(0, 7)}.csv`;
+    a.click();
     URL.revokeObjectURL(url);
+    toast(`Exported ${transactions.length} entries as CSV`);
   };
+  const signOut = async () => {
+    await fetch("/auth/signout", { method: "POST" });
+    window.location.href = "/login";
+  };
+
+  // Reports (pre-redesign view until Phase 9) still uses the older helpers.
+  const insights = useMemo(() => {
+    const cycleTx = model.cycleTransactions as never[];
+    const categoryBudgets = computeCategoryBudgets(activeCategories as never[], cycleTx);
+    const pace = computeSpendingPace({ flexibleBudget: model.flexBudget, cycleTransactions: cycleTx, period });
+    const now = new Date();
+    const completedMonths = computeMonthlyTrends(transactions as never[], incomeSources, contributions as never[], 6, new Date(now.getFullYear(), now.getMonth() - 1, 1));
+    return generateInsights({ categoryBudgets, period, pace, completedMonths });
+  }, [model, activeCategories, period, transactions, incomeSources, contributions]);
+
+  const dateLong = new Date(`${today}T12:00:00`)
+    .toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long", year: "numeric" })
+    .replace(/^(\w+) /, "$1, ");
+  const navButton = (v: typeof view, text: string) => (
+    <button
+      type="button"
+      onClick={() => {
+        setView(v);
+        window.scrollTo(0, 0);
+      }}
+      aria-current={view === v ? "page" : undefined}
+      className="flex h-[30px] cursor-pointer items-center rounded-full border-0 px-3.5 text-[13px] font-semibold transition-colors duration-200 hover:text-ink"
+      style={{ background: view === v ? "var(--tile-2)" : "transparent", color: view === v ? "var(--ink)" : "var(--muted)" }}
+    >
+      {text}
+    </button>
+  );
 
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col pb-24 sm:pb-12">
-      {/* Top Navbar */}
-      <header className="bg-white border-b border-slate-200 px-4 sm:px-8 py-3 sticky top-0 z-40 flex items-center justify-between">
-        <div className="flex items-center gap-6">
+    <div className="min-h-screen w-full overflow-x-clip">
+      <div className="mx-auto flex max-w-[1240px] flex-col gap-3.5 px-6 pt-[18px] pb-14 max-[480px]:px-3.5">
+        <header className="flex flex-wrap items-center gap-x-6 gap-y-3 pt-0.5 pb-2.5">
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-xl bg-emerald-600 flex items-center justify-center text-white shadow-xs">
-              <PiggyBank className="w-5 h-5" />
-            </div>
-            <div>
-              <span className="font-bold text-slate-900 text-sm tracking-tight block">SaveFirst Tracker</span>
-              <span className="text-[10px] text-slate-500 hidden sm:block">Savings-First Engine</span>
-            </div>
+            <span aria-hidden className="h-[9px] w-[9px] rounded-full bg-lime shadow-[0_0_0_4px_var(--lime-soft)]" />
+            <span className="font-serif text-[28px] leading-none tracking-[-0.01em]">SaveFirst</span>
           </div>
-
-          {/* Desktop Tab Switcher */}
-          <nav className="hidden sm:flex items-center p-1 bg-slate-100 rounded-xl">
-            <button
-              onClick={() => setActiveTab("dashboard")}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all ${
-                activeTab === "dashboard"
-                  ? "bg-white text-emerald-700 shadow-xs"
-                  : "text-slate-600 hover:text-slate-900"
-              }`}
-            >
-              <LayoutDashboard className="w-3.5 h-3.5" />
-              <span>Dashboard</span>
-            </button>
-            <button
-              onClick={() => setActiveTab("reports")}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all ${
-                activeTab === "reports"
-                  ? "bg-white text-emerald-700 shadow-xs"
-                  : "text-slate-600 hover:text-slate-900"
-              }`}
-            >
-              <BarChart3 className="w-3.5 h-3.5" />
-              <span>Reports & Trends</span>
-            </button>
-            <button
-              onClick={() => setActiveTab("plan")}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all ${
-                activeTab === "plan"
-                  ? "bg-white text-emerald-700 shadow-xs"
-                  : "text-slate-600 hover:text-slate-900"
-              }`}
-            >
-              <ClipboardList className="w-3.5 h-3.5" />
-              <span>Plan</span>
-            </button>
+          <nav className="flex gap-0.5 rounded-full border border-line p-[3px]">
+            {navButton("dashboard", "Dashboard")}
+            {navButton("reports", "Reports")}
           </nav>
-        </div>
-
-        <div className="flex items-center gap-3">
-          <ThemeToggle />
-          <span className="text-xs text-slate-600 hidden md:inline truncate max-w-xs font-medium">
-            {initialUser.email}
-          </span>
-          <form action="/auth/signout" method="post">
+          <div className="ml-auto flex items-center gap-2">
+            <ThemeToggle />
             <button
-              type="submit"
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-600 hover:text-rose-600 bg-slate-100 hover:bg-rose-50 rounded-lg transition-colors"
+              type="button"
+              onClick={() => setIncomeOpen(true)}
+              className="h-[38px] cursor-pointer rounded-full border border-line bg-transparent px-[15px] text-[13px] font-semibold transition-[border-color,transform] hover:border-ink-2 active:scale-[.96] max-[720px]:hidden"
             >
-              <LogOut className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">Sign Out</span>
+              Record income
             </button>
-          </form>
-        </div>
-      </header>
-
-      {/* Mobile Sub-Navigation Bar */}
-      <div className="sm:hidden px-4 pt-3 flex border-b border-slate-200 bg-white">
-        <button
-          onClick={() => setActiveTab("dashboard")}
-          className={`flex-1 py-2 text-xs font-semibold border-b-2 text-center transition-all ${
-            activeTab === "dashboard"
-              ? "border-emerald-600 text-emerald-700"
-              : "border-transparent text-slate-500 hover:text-slate-800"
-          }`}
-        >
-          Dashboard
-        </button>
-        <button
-          onClick={() => setActiveTab("reports")}
-          className={`flex-1 py-2 text-xs font-semibold border-b-2 text-center transition-all ${
-            activeTab === "reports"
-              ? "border-emerald-600 text-emerald-700"
-              : "border-transparent text-slate-500 hover:text-slate-800"
-          }`}
-        >
-          Reports & Trends
-        </button>
-        <button
-          onClick={() => setActiveTab("plan")}
-          className={`flex-1 py-2 text-xs font-semibold border-b-2 text-center transition-all ${
-            activeTab === "plan"
-              ? "border-emerald-600 text-emerald-700"
-              : "border-transparent text-slate-500 hover:text-slate-800"
-          }`}
-        >
-          Plan
-        </button>
-      </div>
-
-      {/* Main Container */}
-      <main className="flex-1 max-w-6xl w-full mx-auto px-4 sm:px-8 py-6 space-y-6">
-        {/* Instant Toast Notification */}
-        {toastMessage && (
-          <div className="fixed top-16 right-4 sm:right-8 z-50 max-w-md p-4 rounded-2xl bg-slate-900 text-white text-xs shadow-2xl border border-slate-700 flex items-start gap-3 animate-in slide-in-from-top-4 duration-200">
-            <Bell className="w-4 h-4 text-amber-400 shrink-0 mt-0.5 animate-bounce" />
-            <div className="flex-1">
-              <span className="font-bold block text-slate-100 mb-0.5">Budget Warning Triggered</span>
-              <p className="text-slate-300 leading-relaxed">{toastMessage}</p>
-            </div>
             <button
-              onClick={() => setToastMessage(null)}
-              className="text-slate-400 hover:text-white"
+              type="button"
+              id="open-fast-expense-btn"
+              onClick={() => setExpenseOpen(true)}
+              className="flex h-[38px] cursor-pointer items-center gap-2 rounded-full border-0 bg-lime px-4 text-sm font-bold text-lime-ink transition-[transform,box-shadow] hover:-translate-y-px hover:shadow-[0_8px_24px_-10px_var(--lime)] active:scale-[.96] max-[720px]:hidden"
             >
-              ✕
+              <Plus size={16} />
+              Log expense
+            </button>
+            <button
+              type="button"
+              onClick={() => setSignOutOpen(true)}
+              aria-label="Sign out"
+              title="Sign out"
+              className="flex h-[38px] w-[38px] cursor-pointer items-center justify-center rounded-full border border-line bg-transparent text-ink-2 transition-colors hover:border-ink-2 hover:text-ink"
+            >
+              <LogOut size={15} />
             </button>
           </div>
-        )}
+        </header>
 
-        {/* VIEW 1: ACTIVE DASHBOARD */}
-        {activeTab === "dashboard" ? (
-          <>
-            {/* Cycle Banner & Action Row */}
-            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-              <div className="flex items-center gap-2 text-xs font-semibold text-slate-600 bg-white px-3.5 py-2 rounded-xl border border-slate-200 shadow-xs">
-                <Calendar className="w-4 h-4 text-emerald-600" />
-                <span>
-                  Active Cycle: <strong>{period.periodLabel}</strong> ({period.daysRemaining} days left)
-                </span>
-              </div>
-
-              <div className="flex items-center gap-2 w-full sm:w-auto">
-                <button
-                  id="open-fast-expense-btn"
-                  onClick={() => setIsExpenseOpen(true)}
-                  className="flex-1 sm:flex-initial px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs sm:text-sm shadow-md shadow-emerald-600/25 flex items-center justify-center gap-2 transition-all transform hover:-translate-y-0.5"
-                >
-                  <Plus className="w-4 h-4" />
-                  <span>3-Tap Expense</span>
-                </button>
-                <button
-                  id="open-income-btn"
-                  onClick={() => setIsIncomeOpen(true)}
-                  className="flex-1 sm:flex-initial px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs sm:text-sm shadow-md shadow-blue-600/25 flex items-center justify-center gap-2 transition-all"
-                >
-                  <ArrowDownLeft className="w-4 h-4" />
-                  <span>Record Income</span>
-                </button>
-                <button
-                  onClick={() => setIsCategoryOpen(true)}
-                  className="p-2.5 rounded-xl bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 transition-colors shadow-xs"
-                  title="Manage Categories"
-                >
-                  <Settings2 className="w-4 h-4" />
-                </button>
-                <button
-                  id="export-transactions-btn"
-                  onClick={handleExportTransactions}
-                  className="p-2.5 rounded-xl bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 transition-colors shadow-xs"
-                  title="Export transactions as CSV"
-                  aria-label="Export transactions as CSV"
-                >
-                  <Download className="w-4 h-4" />
-                </button>
-              </div>
-            </div>
-
-            {/* Active Alerts Banner */}
-            {activeAlerts.length > 0 && (
-              <AlertBanner alerts={activeAlerts} />
-            )}
-
-            {/* Hero Safe-To-Spend Card */}
-            <div className="bg-gradient-to-br from-emerald-800 via-emerald-700 to-teal-800 text-white rounded-3xl p-6 sm:p-8 shadow-xl shadow-emerald-950/10 relative overflow-hidden">
-              <div className="relative z-10">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-emerald-200 text-xs font-semibold uppercase tracking-wider">
-                    Safe To Spend Remaining
-                  </span>
-                  <span className="px-2.5 py-0.5 rounded-full bg-emerald-600/40 text-emerald-100 text-[11px] backdrop-blur-md border border-emerald-400/20">
-                    Savings Deducted First
-                  </span>
-                </div>
-
-                <div className="text-4xl sm:text-5xl font-black tracking-tight mb-2">
-                  {formatINR(safeToSpend)}
-                </div>
-
-                <p className="text-emerald-100/90 text-sm max-w-lg mb-6">
-                  Daily allowance: <strong className="text-white font-bold">{formatINR(dailyAllowance)} / day</strong> for the next {period.daysRemaining} days.
-                </p>
-
-                {/* Formula Breakdown */}
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-4 border-t border-emerald-600/40 text-xs">
-                  <div>
-                    <span className="text-emerald-300 block text-[11px]">Confirmed Income</span>
-                    <span className="font-bold text-white text-sm">{formatINR(confirmedIncome)}</span>
-                  </div>
-                  <div>
-                    <span className="text-emerald-300 block text-[11px]">Savings Target</span>
-                    <span className="font-bold text-white text-sm">− {formatINR(targetSavings)}</span>
-                  </div>
-                  <div>
-                    <span className="text-emerald-300 block text-[11px]">Unpaid Fixed Bills</span>
-                    <span className="font-bold text-white text-sm">− {formatINR(remainingFixedBills)}</span>
-                  </div>
-                  <div>
-                    <span className="text-emerald-300 block text-[11px]">Flexible Spent</span>
-                    <span className="font-bold text-white text-sm">− {formatINR(flexibleSpent)}</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Variable Pay Holding Bucket Banner with Windfall Allocation trigger */}
-            <div className="bg-amber-50/70 border border-amber-200/80 rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-              <div className="flex items-start gap-3.5">
-                <div className="w-8 h-8 rounded-lg bg-amber-100 text-amber-800 flex items-center justify-center shrink-0 mt-0.5">
-                  <AlertCircle className="w-4 h-4" />
-                </div>
-                <div>
-                  <div className="flex items-center gap-2">
-                    <h4 className="font-semibold text-slate-900 text-sm">
-                      Variable Pay Holding Bucket (Not Counted Yet)
-                    </h4>
-                    <span className="font-bold text-amber-900 text-sm">{formatINR(unreceivedVariable)}</span>
-                  </div>
-                  <p className="text-xs text-slate-600 mt-0.5">
-                    Year-end bonuses and variable incentives stay isolated until received.
-                  </p>
-                </div>
-              </div>
-
-              {expectedVariableSources.length > 0 && (
-                <button
-                  onClick={() => setWindfallToAllocate(expectedVariableSources[0])}
-                  className="px-3.5 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-semibold shadow-xs flex items-center gap-1.5 transition-colors shrink-0"
-                >
-                  <PartyPopper className="w-3.5 h-3.5" />
-                  <span>Mark Received & Allocate</span>
-                </button>
-              )}
-            </div>
-
-            {/* Phase 5 Savings Goals Section */}
-            <SavingsGoalsSection
-              goals={savingsGoals}
-              contributions={contributions}
-              userId={initialUser.id}
-              onGoalsUpdated={refreshData}
-            />
-
-            {/* Pacing & Burn Rate Card */}
-            <BurnRateCard
-              period={period}
-              burnRate={burnRate}
-              safeToSpend={safeToSpend}
-              dailyAllowance={dailyAllowance}
-            />
-
-            <SpendingPaceChart pace={pace} periodLabel={period.periodLabel} />
-
-            <UpcomingObligations obligations={obligations} periodLabel={period.periodLabel} />
-
-            <BudgetVsActualChart categoryBudgets={categoryBudgets} onSelectCategory={inspectCategory} />
-
-            {/* Transaction History & Filters */}
-            <div ref={transactionListRef} className="scroll-mt-20">
-              <TransactionList
-                transactions={transactions}
-                categories={categories}
-                onEditTransaction={(item) => setEditingTransaction(item)}
-                onOpenFastExpense={() => setIsExpenseOpen(true)}
-                selectedCategory={txCategoryFilter}
-                onSelectedCategoryChange={setTxCategoryFilter}
-              />
-            </div>
-          </>
-        ) : activeTab === "reports" ? (
-          /* VIEW 2: PHASE 6 REPORTS & TREND ANALYTICS */
+        {view === "reports" ? (
           <ReportsView
-            transactions={transactions}
-            categories={categories}
+            transactions={transactions as never[]}
+            categories={activeCategories as never[]}
             incomeSources={incomeSources}
             contributions={contributions}
             insights={insights}
-            targetSavingsRate={targetSavingsRate}
+            targetSavingsRate={settings?.savings_pct ?? null}
           />
+        ) : loadFailed ? (
+          <section role="alert" className="flex flex-col items-start gap-3.5 rounded-[18px] border border-line bg-tile p-[clamp(24px,5vw,40px)]">
+            <span className="eyebrow text-danger">Couldn’t load</span>
+            <h2 className="m-0 font-serif text-[clamp(34px,5vw,48px)] leading-none font-normal text-pretty">
+              Your numbers didn’t <em>load.</em>
+            </h2>
+            <p className="m-0 max-w-[520px] font-serif text-xl leading-[1.35] text-pretty text-ink-2 italic">
+              Nothing you entered has been lost. Try again, or check the status page if it keeps happening.
+            </p>
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-2.5 pt-1.5">
+              <button type="button" onClick={refreshData} className="h-11 cursor-pointer rounded-full border-0 bg-lime px-5 text-sm font-bold text-lime-ink active:scale-[.97]">
+                Try again
+              </button>
+            </div>
+          </section>
         ) : (
-          /* VIEW 3: BUDGET PLANNER, WHAT-IF SIMULATOR & FORECAST */
-          <PlanView
-            categories={categories}
-            recurringItems={recurringItems}
-            incomeSources={incomeSources}
-            transactions={transactions}
-            contributions={contributions}
-            monthStartDay={settings?.month_start_day || 1}
-            period={period}
-            categoryBudgets={categoryBudgets}
-            actualIncomeThisCycle={confirmedIncome}
-            recurringFixedTotal={obligations.totals.fixed}
-            plans={plans}
-            plansAvailable={plansAvailable}
-            onChanged={refreshData}
-          />
+          <>
+            <div className="eyebrow flex flex-wrap justify-between gap-x-6 gap-y-1.5 px-1 pb-1">
+              <span>{dateLong}</span>
+              <span>{cycleLabel(period)}</span>
+            </div>
+
+            <Notices
+              offline={offline}
+              retrying={retrying}
+              onRetry={retryOnline}
+              due={due}
+              warnings={warnings}
+              daysLeft={period.daysRemaining}
+              today={today}
+              onRecord={recordItem}
+              onSkip={skipItem}
+              onDismiss={dismiss}
+            />
+
+            <div className="flex flex-wrap gap-3.5">
+              <SafeToSpend model={model} daysLeft={period.daysRemaining} />
+              <UntilPayday model={model} period={period} today={today} transactions={transactions} recurringItems={recurringItems} />
+            </div>
+
+            <div className="flex flex-wrap gap-3.5">
+              <section className="sf-rise flex min-w-0 flex-[1_1_300px] flex-col gap-2.5 rounded-[18px] border border-line bg-tile p-[22px]" style={{ animationDelay: ".46s" }}>
+                <span className="eyebrow text-warn">On hold</span>
+                <span className="tabular font-serif text-[44px] leading-none">{inr(holdTotal)}</span>
+                <p className="m-0 text-sm text-pretty text-ink-2">
+                  {held.length === 0
+                    ? "Nothing on hold. Bonuses and incentives you expect will wait here."
+                    : held.length === 1
+                      ? `${held[0].name}${held[0].expected_date ? `, expected ${dayLabel(held[0].expected_date, today)}` : ""}. Not counted until it reaches your bank.`
+                      : `${held.length} payments expected. None count until they reach your bank.`}
+                </p>
+                {held.length > 0 ? (
+                  <button
+                    type="button"
+                    onClick={() => setWindfall({ id: held[0].id, name: held[0].name, amount: Number(held[0].amount) })}
+                    className="mt-auto h-[38px] cursor-pointer self-start rounded-full border border-line-2 bg-transparent px-4 text-[13px] font-semibold transition-colors hover:border-ink hover:bg-ink hover:text-bg"
+                  >
+                    Mark received &amp; allocate
+                  </button>
+                ) : (
+                  <button type="button" onClick={() => setIncomeOpen(true)} className={`${LINK_BUTTON} mt-auto self-start`}>
+                    Record expected income
+                  </button>
+                )}
+              </section>
+              <section className="sf-rise flex min-w-0 flex-[1_1_300px] flex-col gap-2.5 rounded-[18px] border border-line bg-tile p-[22px]" style={{ animationDelay: ".52s" }}>
+                <span className="eyebrow">Annual bills reserve</span>
+                <span className="tabular font-serif text-[44px] leading-none">{inr(model.reserveLeft)}</span>
+                <p className="m-0 text-sm text-pretty text-ink-2">
+                  {model.reserveIn > 0
+                    ? `${inr(model.reserveIn)} set aside from windfalls · ${inr(model.reserveOut)} used`
+                    : "Nothing set aside yet. Split part of a bonus here for insurance, taxes or a car service."}
+                </p>
+              </section>
+            </div>
+
+            <div className="flex flex-wrap gap-3.5">
+              <Budgets flex={model.flex} spentByCat={model.spentByCat} flexSpent={model.flexSpent} flexBudget={model.flexBudget} onManage={() => setCategoriesOpen(true)} />
+              <Goals goals={goals} contributions={contributions} userId={userId} today={today} cycleStart={period.startStr} onChanged={async () => void (await refreshData())} />
+            </div>
+
+            <BillsRecurring
+              items={recurringItems}
+              fixed={model.fixed}
+              byId={model.byId}
+              spentByCat={model.spentByCat}
+              skippedCats={model.skippedCats}
+              cycleTransactions={model.cycleTransactions as Tx[]}
+              unpaidBills={model.unpaidBills}
+              period={period}
+              today={today}
+              onRecord={recordItem}
+              onToggle={toggleItem}
+              onPayBill={() => setExpenseOpen(true)}
+              onManage={() => setCategoriesOpen(true)}
+            />
+
+            <Ledger
+              entries={model.cycleTransactions as Tx[]}
+              byId={model.byId}
+              today={today}
+              onEdit={setEditing}
+              onExport={exportCsv}
+              onIncome={() => setIncomeOpen(true)}
+              onExpense={() => setExpenseOpen(true)}
+            />
+          </>
         )}
-      </main>
+        <div aria-hidden className="h-[76px] min-[720px]:hidden" />
+      </div>
 
-      {/* Floating Action Button (FAB) for fast mobile access */}
-      {activeTab === "dashboard" && (
-        <div className="fixed bottom-6 right-6 sm:hidden z-30">
-          <button
-            onClick={() => setIsExpenseOpen(true)}
-            className="w-14 h-14 rounded-full bg-emerald-600 text-white shadow-xl shadow-emerald-700/40 flex items-center justify-center transition-transform active:scale-95"
-          >
-            <Plus className="w-7 h-7" />
-          </button>
-        </div>
-      )}
+      <nav
+        aria-label="Quick actions"
+        className="fixed inset-x-0 bottom-0 z-40 flex gap-2.5 border-t border-line bg-bg px-3.5 pt-2.5 pb-[calc(10px+env(safe-area-inset-bottom))] min-[720px]:hidden"
+      >
+        <button type="button" onClick={() => setIncomeOpen(true)} className="h-[50px] flex-1 cursor-pointer rounded-full border border-line-2 bg-transparent text-sm font-semibold active:scale-[.97]">
+          Record income
+        </button>
+        <button
+          type="button"
+          onClick={() => setExpenseOpen(true)}
+          className="flex h-[50px] flex-[1.4] cursor-pointer items-center justify-center gap-2 rounded-full border-0 bg-lime text-[15px] font-bold text-lime-ink active:scale-[.97]"
+        >
+          <Plus size={16} />
+          Log expense
+        </button>
+      </nav>
 
-      {/* Modals */}
+      <Dialog
+        open={signOutOpen}
+        onClose={() => setSignOutOpen(false)}
+        eyebrow="SaveFirst"
+        title="Sign out?"
+        size="sm"
+        submitLabel="Sign out"
+        submitTone="ink"
+        onSubmit={signOut}
+        hint=""
+      >
+        <p className="m-0 font-serif text-[22px] leading-[1.3] text-pretty text-ink-2">
+          You’ll need your email and password, or a sign-in link, to get back in. Everything you’ve logged stays saved.
+        </p>
+      </Dialog>
+
       <FastExpenseModal
-        isOpen={isExpenseOpen}
-        onClose={() => setIsExpenseOpen(false)}
-        categories={categories}
-        userId={initialUser.id}
+        isOpen={expenseOpen}
+        onClose={() => setExpenseOpen(false)}
+        categories={activeCategories as never[]}
+        userId={userId}
         onExpenseAdded={refreshData}
-        currentSafeToSpend={safeToSpend}
-        recentTransactions={currentPeriodTransactions}
-        onAlertTriggered={handleAlertTriggered}
+        currentSafeToSpend={model.safe}
+        recentTransactions={model.cycleTransactions as never[]}
+        onAlertTriggered={(msg: string) => toast(msg, { error: true })}
         recurringItems={recurringItems}
-        allTransactions={transactions}
+        allTransactions={transactions as never[]}
       />
-
       <IncomeModal
-        isOpen={isIncomeOpen}
-        onClose={() => setIsIncomeOpen(false)}
-        userId={initialUser.id}
+        isOpen={incomeOpen}
+        onClose={() => setIncomeOpen(false)}
+        userId={userId}
         onIncomeAdded={refreshData}
         recurringItems={recurringItems}
-        allTransactions={transactions}
+        allTransactions={transactions as never[]}
       />
-
       <CategoryManagementModal
-        isOpen={isCategoryOpen}
-        onClose={() => setIsCategoryOpen(false)}
-        categories={categories}
-        userId={initialUser.id}
+        isOpen={categoriesOpen}
+        onClose={() => setCategoriesOpen(false)}
+        categories={categories as never[]}
+        userId={userId}
         onCategoriesUpdated={refreshData}
       />
-
       <EditTransactionModal
-        isOpen={!!editingTransaction}
-        onClose={() => setEditingTransaction(null)}
-        transaction={editingTransaction}
-        categories={categories}
+        isOpen={!!editing}
+        onClose={() => setEditing(null)}
+        transaction={editing as never}
+        categories={activeCategories as never[]}
         onTransactionUpdated={refreshData}
       />
-
-      {/* Windfall Allocation Modal */}
       <WindfallAllocationModal
-        isOpen={!!windfallToAllocate}
-        onClose={() => setWindfallToAllocate(null)}
-        incomeSource={windfallToAllocate}
-        savingsGoals={savingsGoals}
-        userId={initialUser.id}
+        isOpen={!!windfall}
+        onClose={() => setWindfall(null)}
+        incomeSource={windfall}
+        savingsGoals={goals as never[]}
+        userId={userId}
         onAllocated={refreshData}
       />
     </div>

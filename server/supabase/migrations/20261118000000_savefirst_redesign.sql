@@ -30,6 +30,11 @@ alter table public.transactions drop constraint if exists transactions_from_rese
 alter table public.transactions add constraint transactions_from_reserve_check
   check (not from_reserve or type = 'expense');
 
+-- "Already saved" when a goal is created: an opening balance, not a transfer, so it never
+-- touches this cycle's safe to spend. Progress = saved_before + contributions.
+alter table public.savings_goals
+  add column if not exists saved_before bigint not null default 0 check (saved_before >= 0);
+
 alter table public.recurring_items
   add column if not exists skip_month text check (skip_month is null or skip_month ~ '^\d{4}-(0[1-9]|1[0-2])$');
 

@@ -75,3 +75,10 @@ test("goalTrack: on-track bar tag and projection", () => {
   assert.equal(goalTrack(goal([{ amount: 100_000, date: "2026-11-01" }])), null, "finished goal: no bar");
   assert.equal(goalTrack(goal([], null)), null, "no target date: no bar");
 });
+
+test("an opening balance counts towards progress but not the pace", () => {
+  const g = analyzeGoal({ targetAmount: 100_000, targetDate: "2027-05-31", contributions: [], startingAmount: 40_000, referenceDate: ref });
+  assert.equal(g.current, 40_000);
+  assert.equal(g.remaining, 60_000);
+  assert.equal(g.monthlyPace, 0);
+});
