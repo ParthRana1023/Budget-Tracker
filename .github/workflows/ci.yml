@@ -17,7 +17,10 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - run: npm install
+      # Install at the repo root: that also installs root dev tools (Prettier) and both
+      # workspaces. `npm install` inside client/ skips the root's devDependencies.
+      - run: npm ci
+        working-directory: .
       - run: npm run format:check
         working-directory: .
       - run: npm run lint

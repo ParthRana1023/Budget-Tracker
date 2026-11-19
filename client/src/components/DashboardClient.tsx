@@ -13,6 +13,8 @@ import { recurringStatus } from "@/lib/recurringStatus.mjs";
 import { budgetWarnings } from "@/lib/notices.mjs";
 import { inr } from "@/lib/money.mjs";
 import { transactionsToCsv } from "@/lib/csvExport.mjs";
+import { saveSettings } from "@/lib/settings.mjs";
+import { syncSavedTheme } from "@/lib/theme";
 import ThemeToggle from "./ThemeToggle";
 import Dialog from "./ui/Dialog";
 import { useToast } from "./ui/Toast";
@@ -97,6 +99,9 @@ export default function DashboardClient(props: DashboardClientProps) {
       window.removeEventListener("offline", onNet);
     };
   }, []);
+
+  // The theme saved to the account follows the user across devices.
+  useEffect(() => syncSavedTheme(settings?.theme), [settings?.theme]);
 
   const today = toLocalDateString();
   const schedule = useMemo(() => paySchedule(settings), [settings]);
@@ -306,7 +311,7 @@ export default function DashboardClient(props: DashboardClientProps) {
             {navButton("reports", "Reports")}
           </nav>
           <div className="ml-auto flex items-center gap-2 justify-self-end">
-            <ThemeToggle />
+            <ThemeToggle onChange={(theme) => void saveSettings(db(), { theme }, schedule, today)} />
             <button
               type="button"
               onClick={() => openIncome()}

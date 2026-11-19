@@ -54,6 +54,8 @@ export interface Settings {
   month_start_day: number;
   /** Later pay-day changes, each effective from a cycle start ('YYYY-MM-DD'). */
   pay_day_changes?: Array<{ pay_day: number; effective_from: string }> | null;
+  /** Theme saved to the account; null = not chosen yet. */
+  theme?: "dark" | "light" | "system" | null;
   take_home_pay?: number | null;
   savings_pct?: number | null;
   onboarded_at?: string | null;

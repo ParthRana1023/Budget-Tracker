@@ -1,7 +1,7 @@
 -- Pay-day cycle fixes and Settings backend (migration 20261119000000_cycle_settings).
 begin;
 
-select plan(18);
+select plan(29);
 
 insert into auth.users (id, instance_id, aud, role, email, encrypted_password, email_confirmed_at, raw_app_meta_data, raw_user_meta_data)
 values ('88888888-8888-8888-8888-888888888888', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated',
@@ -90,6 +90,38 @@ select is((select counts_from from public.transactions where note = 'Income: Sal
 select hasnt_function('public', 'record_entry_with_recurring',
   array['text', 'bigint', 'date', 'uuid', 'text', 'uuid', 'boolean', 'smallint', 'boolean', 'text', 'text'],
   'the 11-argument version is gone (no ambiguous overloads)');
+
+-- ================================================================ phase 5: settings backend
+select public.update_settings(p_savings_pct => 30::smallint);
+select is((select savings_pct || '|' || coalesce(take_home_pay::text, 'null') from public.user_settings), '30|null',
+  'only the settings passed are changed');
+select public.update_settings(p_theme => 'system');
+select is((select theme from public.user_settings), 'system', 'theme is saved to the account');
+select throws_ok($$select public.update_settings(p_theme => 'blue')$$, 'P0001', 'Theme must be dark, light or system', 'unknown theme rejected');
+
+-- Pay day (31 in force) changes to the 15th from the next cycle start.
+select public.update_settings(p_pay_day => 15::smallint, p_pay_day_from => current_date + 10);
+select is((select string_agg(pay_day || '@' || (effective_from - current_date), ',') from public.pay_day_changes),
+  '15@10', 'a new pay day is recorded from the next cycle start (a later pending change is replaced)');
+select public.update_settings(p_pay_day => 20::smallint, p_pay_day_from => current_date + 10);
+select is((select string_agg(pay_day::text, ',') from public.pay_day_changes), '20',
+  'changing it again before it starts replaces the pending change');
+select public.update_settings(p_pay_day => 31::smallint, p_pay_day_from => current_date + 10);
+select is((select count(*)::int from public.pay_day_changes), 0, 'choosing the pay day already in force cancels the change');
+select throws_ok($$select public.update_settings(p_pay_day => 10::smallint, p_pay_day_from => current_date - 5)$$,
+  'P0001', 'A new pay day starts at the next cycle', 'a start date in the past is rejected');
+
+-- Delete my account.
+select public.delete_my_account();
+reset role;
+select is((select count(*)::int from auth.users where id = '88888888-8888-8888-8888-888888888888'), 0, 'the account is deleted');
+select is((select count(*)::int from public.transactions where user_id = '88888888-8888-8888-8888-888888888888')
+        + (select count(*)::int from public.user_settings where user_id = '88888888-8888-8888-8888-888888888888')
+        + (select count(*)::int from public.recurring_items where user_id = '88888888-8888-8888-8888-888888888888'), 0,
+  'and all of its data with it');
+select is((select count(*)::int from auth.users where id = '99999999-9999-9999-9999-999999999999'), 1, 'other accounts are untouched');
+set local role anon;
+select throws_ok($$select public.delete_my_account()$$, '42501', null, 'signed-out visitors cannot call it');
 
 select * from finish();
 rollback;

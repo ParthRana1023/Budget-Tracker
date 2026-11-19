@@ -1521,4 +1521,86 @@ begin
 end;
 $$;
 
+-- ---------------------------------------------------------------- phase 5: settings backend
+-- Theme follows the user across devices. Null = not chosen yet (the app keeps its local choice).
+alter table public.user_settings
+  add column if not exists theme text check (theme is null or theme in ('dark', 'light', 'system'));
+
+-- Settings screen save. Every argument is optional: null leaves that setting unchanged.
+-- A new pay day starts at the next cycle: p_pay_day_from is that cycle's start date, which
+-- the app works out from the pay-day schedule (client lib/settings.mjs nextCycleStart).
+-- A pending change (not yet in force) is replaced; choosing the pay day already in force
+-- cancels it.
+create or replace function public.update_settings(
+  p_take_home_pay bigint default null,
+  p_savings_pct smallint default null,
+  p_theme text default null,
+  p_pay_day smallint default null,
+  p_pay_day_from date default null
+)
+returns void
+language plpgsql
+security invoker
+set search_path = public
+as $$
+declare
+  v_user uuid := auth.uid();
+  v_current smallint;
+begin
+  if v_user is null then raise exception 'Not authenticated'; end if;
+  if p_take_home_pay is not null and p_take_home_pay < 0 then raise exception 'Take-home pay must be zero or more'; end if;
+  if p_savings_pct is not null and p_savings_pct not between 0 and 100 then raise exception 'Savings must be between 0 and 100 percent'; end if;
+  if p_theme is not null and p_theme not in ('dark', 'light', 'system') then raise exception 'Theme must be dark, light or system'; end if;
+  if p_pay_day is not null then
+    if p_pay_day not between 1 and 28 and p_pay_day <> 31 then
+      raise exception 'Pay day must be between 1 and 28, or 31 for the last day of the month';
+    end if;
+    -- current_date is UTC: allow a day either side of the user's own today.
+    if p_pay_day_from is null or p_pay_day_from < current_date or p_pay_day_from > current_date + 62 then
+      raise exception 'A new pay day starts at the next cycle';
+    end if;
+  end if;
+
+  update public.user_settings
+     set take_home_pay = coalesce(p_take_home_pay, take_home_pay),
+         savings_pct = coalesce(p_savings_pct, savings_pct),
+         theme = coalesce(p_theme, theme),
+         updated_at = now()
+   where user_id = v_user;
+  if not found then raise exception 'Settings not found'; end if;
+
+  if p_pay_day is not null then
+    delete from public.pay_day_changes where user_id = v_user and effective_from >= p_pay_day_from;
+    select coalesce(
+      (select c.pay_day from public.pay_day_changes c
+        where c.user_id = v_user and c.effective_from < p_pay_day_from
+        order by c.effective_from desc limit 1),
+      (select s.month_start_day from public.user_settings s where s.user_id = v_user))
+      into v_current;
+    if v_current <> p_pay_day then
+      insert into public.pay_day_changes (user_id, pay_day, effective_from) values (v_user, p_pay_day, p_pay_day_from);
+    end if;
+  end if;
+end;
+$$;
+
+grant execute on function public.update_settings(bigint, smallint, text, smallint, date) to authenticated;
+
+-- Delete my account: removes the signed-in user; every table cascades from auth.users.
+-- security definer so it may touch auth.users, but it only ever deletes auth.uid().
+create or replace function public.delete_my_account()
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if auth.uid() is null then raise exception 'Not authenticated'; end if;
+  delete from auth.users where id = auth.uid();
+end;
+$$;
+
+revoke execute on function public.delete_my_account() from public, anon;
+grant execute on function public.delete_my_account() to authenticated;
+
 commit;

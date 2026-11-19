@@ -2,17 +2,21 @@
 
 import { useEffect, useState } from "react";
 import { Moon, Sun } from "lucide-react";
-import { applyTheme, THEME_KEY, type Theme } from "@/lib/theme";
+import { applyTheme, THEME_EVENT, THEME_KEY, type ThemeMode } from "@/lib/theme";
 
-export default function ThemeToggle() {
-  const [theme, setTheme] = useState<Theme>("dark");
+/** `onChange` lets a signed-in page save the choice to the account. */
+export default function ThemeToggle({ onChange }: { onChange?: (theme: ThemeMode) => void } = {}) {
+  const [theme, setTheme] = useState<ThemeMode>("dark");
 
   useEffect(() => {
-    setTheme(document.documentElement.dataset.theme === "light" ? "light" : "dark");
+    const read = () => setTheme(document.documentElement.dataset.theme === "light" ? "light" : "dark");
+    read();
+    window.addEventListener(THEME_EVENT, read);
+    return () => window.removeEventListener(THEME_EVENT, read);
   }, []);
 
   const toggleTheme = () => {
-    const next: Theme = theme === "dark" ? "light" : "dark";
+    const next: ThemeMode = theme === "dark" ? "light" : "dark";
     applyTheme(next);
     try {
       window.localStorage.setItem(THEME_KEY, next);
@@ -20,6 +24,7 @@ export default function ThemeToggle() {
       // Storage blocked (private mode): the theme still applies for this visit.
     }
     setTheme(next);
+    onChange?.(next);
   };
 
   const label = theme === "dark" ? "Switch to light mode" : "Switch to dark mode";
