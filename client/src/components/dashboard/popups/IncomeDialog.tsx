@@ -3,7 +3,7 @@
 // Record income (design handoff, Popups): received now, or expected later (on hold).
 
 import { createClient } from "@/utils/supabase/client";
-import { addDaysStr } from "@/lib/cycle.mjs";
+import { addDaysStr, cycleKeyFor } from "@/lib/cycle.mjs";
 import { inr } from "@/lib/money.mjs";
 import { recurringStatus } from "@/lib/recurringStatus.mjs";
 import Dialog from "../../ui/Dialog";
@@ -161,6 +161,7 @@ export default function IncomeDialog({
               p_make_recurring: !form.itemId,
               p_day: form.itemId ? null : day,
               p_income_type: form.type,
+              p_cycle_key: cycleKeyFor(form.date, period),
             })
           : supabase.rpc("record_received_income", {
               p_name: name,

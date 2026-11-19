@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { getPeriodRange } from "./periods.mjs";
-import { addDaysStr, cycleDayOf, dueDateInCycle } from "./cycle.mjs";
+import { addDaysStr, cycleDayOf, cycleKeyFor, dueDateInCycle } from "./cycle.mjs";
 import { recurringStatus } from "./recurringStatus.mjs";
 import { buildCycleModel } from "./cycleModel.mjs";
 import { budgetWarnings } from "./notices.mjs";
@@ -54,6 +54,16 @@ test("uncategorised and switched-off spending still counts; switched-off categor
   const m = buildCycleModel({ ...DEMO, categories: cats, transactions: [...DEMO.transactions, extra] });
   assert.equal(m.flexSpent, (12900 + 100) * R);
   assert.ok(!m.flex.some((c) => c.id === "ent"));
+});
+
+test("recurring key: the start month of the cycle the date falls in", () => {
+  const nov = getPeriodRange(new Date(2026, 10, 30), 25); // 25 Nov - 24 Dec
+  assert.equal(cycleKeyFor("2026-11-25", nov), "2026-11");
+  assert.equal(cycleKeyFor("2026-12-03", nov), "2026-11", "December days of this cycle still use the start month");
+  assert.equal(cycleKeyFor("2026-11-20", nov), "2026-10", "back-dated into the previous cycle (25 Oct - 24 Nov)");
+  assert.equal(cycleKeyFor("2026-12-25", nov), "2026-12", "next cycle");
+  const calendar = getPeriodRange(new Date(2026, 10, 15), 1);
+  assert.equal(cycleKeyFor("2026-10-31", calendar), "2026-10", "pay day 1: the calendar month");
 });
 
 test("no income recorded this cycle: safe to spend is 0, not negative", () => {

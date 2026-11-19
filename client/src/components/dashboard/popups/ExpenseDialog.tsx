@@ -8,6 +8,7 @@ import { recurringStatus } from "@/lib/recurringStatus.mjs";
 import Dialog from "../../ui/Dialog";
 import type { Category } from "../types";
 import type { PopupContext } from "./context";
+import { cycleKeyFor } from "@/lib/cycle.mjs";
 import {
   AmountField,
   DueDayField,
@@ -172,6 +173,7 @@ export default function ExpenseDialog({
           p_item_id: form.itemId,
           p_make_recurring: !form.itemId,
           p_day: form.itemId ? null : day,
+          p_cycle_key: cycleKeyFor(form.date, period),
         });
         // The recurring path doesn't take these two; set them on the new entry.
         if (!r.error && (payee || form.fromReserve)) {

@@ -1,6 +1,6 @@
 -- Legacy-category migration + starter-category function.
 --
--- The migration (server/src/db/migrations/20261103_canonical_categories.sql) is
+-- The backfill in the baseline migration (20261103000000_budget_tracker_schema.sql) is
 -- `select public.ensure_starter_categories(id) from auth.users;`, so running that
 -- statement twice here is exactly "apply the migration, then apply it again".
 begin;

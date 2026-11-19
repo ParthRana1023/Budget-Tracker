@@ -5,7 +5,7 @@ import { fileURLToPath } from "node:url";
 import { STARTER_CATEGORIES } from "./starterCategories.mjs";
 
 const sqlPath = fileURLToPath(
-  new URL("../../../server/src/db/migrations/20261103_canonical_categories.sql", import.meta.url),
+  new URL("../../../server/supabase/migrations/20261103000000_budget_tracker_schema.sql", import.meta.url),
 );
 
 test("the JS fallback list matches the SQL function exactly (names, types, order)", () => {

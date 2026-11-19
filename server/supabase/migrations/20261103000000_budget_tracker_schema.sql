@@ -1,5 +1,4 @@
--- Local Supabase baseline. Keep in sync with server/src/db/schema.sql and
--- the follow-up migrations in server/src/db/migrations.
+-- Baseline schema. server/supabase/migrations is the only source of database changes.
 create extension if not exists "uuid-ossp";
 
 create table public.user_settings (

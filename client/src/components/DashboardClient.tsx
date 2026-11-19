@@ -7,7 +7,7 @@ import { useEffect, useMemo, useState } from "react";
 import { LogOut, Plus } from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
 import { getPeriodRange, toLocalDateString } from "@/lib/periods.mjs";
-import { cycleLabel, cycleMonthKey, dayLabel } from "@/lib/cycle.mjs";
+import { cycleKeyFor, cycleLabel, cycleMonthKey, dayLabel } from "@/lib/cycle.mjs";
 import { buildCycleModel } from "@/lib/cycleModel.mjs";
 import { recurringStatus } from "@/lib/recurringStatus.mjs";
 import { budgetWarnings } from "@/lib/notices.mjs";
@@ -175,6 +175,7 @@ export default function DashboardClient(props: DashboardClientProps) {
           p_note: item.name,
           p_item_id: item.id,
           p_income_type: item.income_type,
+          p_cycle_key: cycleKeyFor(date, period),
         }),
       `Recorded ${item.name} · ${inr(item.amount)}`,
       `Couldn’t record ${item.name}. Try again.`,

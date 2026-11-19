@@ -1,7 +1,7 @@
 // Date helpers for a pay-day cycle (see getPeriodRange in periods.mjs).
 // Dates are local 'YYYY-MM-DD' strings; cycle days are 1-based (day 1 = cycle start).
 
-import { toLocalDateString } from "./periods.mjs";
+import { getPeriodRange, toLocalDateString } from "./periods.mjs";
 
 /** @param {string} s YYYY-MM-DD */
 const parts = (s) => s.split("-").map(Number);
@@ -31,6 +31,18 @@ export function dueDateInCycle(dayOfMonth, period) {
 
 /** 'YYYY-MM' of the cycle start: the month key used for "Skip this month". */
 export const cycleMonthKey = (period) => period.startStr.slice(0, 7);
+
+/**
+ * 'YYYY-MM' of the start of the cycle a date falls in, for a recurring entry's unique key
+ * (record_entry_with_recurring's p_cycle_key). The date may be outside the current cycle
+ * when an entry is back-dated. Uses the current cycle's start day as the pay day.
+ * @param {string} dateStr @param {{ startStr: string, endStr: string }} period
+ */
+export function cycleKeyFor(dateStr, period) {
+  if (dateStr >= period.startStr && dateStr <= period.endStr) return cycleMonthKey(period);
+  const [y, m, d] = parts(dateStr);
+  return getPeriodRange(new Date(y, m - 1, d), parts(period.startStr)[2]).startStr.slice(0, 7);
+}
 
 const MON = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
