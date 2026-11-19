@@ -1,6 +1,14 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { cycleHistory, flexByDay, forecastNext, suggestLimits, topPayees, weekdayAverages } from "./reports.mjs";
+import {
+  cycleHistory,
+  flexByDay,
+  forecastNext,
+  reportSchedule,
+  suggestLimits,
+  topPayees,
+  weekdayAverages,
+} from "./reports.mjs";
 import { demoAccount, R } from "./demoAccount.fixture.mjs";
 
 const DEMO = demoAccount();
@@ -91,4 +99,42 @@ test("suggested limits and the next-cycle forecast", () => {
   assert.equal(f.savings, 30000 * R);
   assert.equal(f.fixedTotal, 35300 * R);
   assert.equal(f.left, (100000 - 30000 - 35300) * R, "every recurring item here belongs to a fixed bill");
+});
+
+test("grouping: pay-day cycles or calendar months", () => {
+  const txs = [
+    { id: "a", type: "income", amount: 100 * R, date: "2026-10-25" },
+    { id: "b", type: "expense", category_id: "groc", amount: 10 * R, date: "2026-11-03" },
+    // Early salary: arrives 23 Nov, counted toward the cycle starting 25 Nov.
+    { id: "c", type: "income", amount: 120 * R, date: "2026-11-23", counts_from: "2026-11-25" },
+  ];
+  const base = {
+    transactions: txs,
+    categories: DEMO.categories,
+    schedule: [{ payDay: 25 }],
+    today: "2026-11-28",
+    count: 2,
+  };
+
+  const cycles = cycleHistory(base);
+  assert.deepEqual(
+    cycles.map((c) => [c.period.startStr, c.period.endStr, c.income / R, c.flex / R]),
+    [
+      ["2026-10-25", "2026-11-24", 100, 10],
+      ["2026-11-25", "2026-12-24", 120, 0],
+    ],
+    "cycle mode: the early salary counts toward the cycle it was meant for",
+  );
+
+  const months = cycleHistory({ ...base, grouping: "month" });
+  assert.deepEqual(
+    months.map((c) => [c.period.startStr, c.period.endStr, c.label, c.income / R, c.flex / R, c.partial]),
+    [
+      ["2026-10-01", "2026-10-31", "Oct", 100, 0, false],
+      ["2026-11-01", "2026-11-30", "Nov", 120, 10, true],
+    ],
+    "month mode: calendar months, entries by their real date (as on a bank statement)",
+  );
+  assert.deepEqual(reportSchedule([{ payDay: 25 }], "month"), [{ payDay: 1 }]);
+  assert.deepEqual(reportSchedule([{ payDay: 25 }]), [{ payDay: 25 }]);
 });

@@ -22,16 +22,35 @@ const MON_L = [
 const amt = (t) => Number(t.amount);
 
 /**
- * The last `count` cycles, oldest first; the last one is the current (partial) cycle.
- * @param {{ transactions: any[], categories: any[], schedule: import("./periods.mjs").PayDayEntry[], today: string, count: number }} input
+ * How Reports groups history: by pay-day cycle, or by calendar month (to match bank
+ * statements).
+ * @typedef {"cycle" | "month"} Grouping
  */
-export function cycleHistory({ transactions, categories, schedule, today, count }) {
+
+/** Calendar months are pay-day cycles with pay day 1 and no changes. */
+const CALENDAR_MONTHS = [{ payDay: 1 }];
+
+/**
+ * The schedule Reports periods follow for a grouping.
+ * @param {import("./periods.mjs").PayDayEntry[]} schedule @param {Grouping} [grouping]
+ */
+export const reportSchedule = (schedule, grouping = "cycle") => (grouping === "month" ? CALENDAR_MONTHS : schedule);
+
+/**
+ * The last `count` periods (pay-day cycles or calendar months), oldest first; the last one
+ * is the current (partial) period. In cycle mode an entry counts in the cycle of
+ * counts_from ?? date (early income); in month mode by its real date, as on a bank statement.
+ * @param {{ transactions: any[], categories: any[], schedule: import("./periods.mjs").PayDayEntry[], today: string, count: number, grouping?: Grouping }} input
+ */
+export function cycleHistory({ transactions, categories, schedule, today, count, grouping = "cycle" }) {
   const byId = new Map(categories.map((c) => [c.id, c]));
-  // Walk back one cycle at a time, so cycles keep their real dates across pay-day changes.
+  const placeOn = grouping === "month" ? (t) => t.date : effectiveDate;
+  const periodSchedule = reportSchedule(schedule, grouping);
+  // Walk back one period at a time, so cycles keep their real dates across pay-day changes.
   const periods = [];
   for (let ref = today; periods.length < count;) {
     const [y, m, d] = ref.split("-").map(Number);
-    const p = cycleFor(new Date(y, m - 1, d, 12), schedule);
+    const p = cycleFor(new Date(y, m - 1, d, 12), periodSchedule);
     periods.unshift(p);
     ref = addDaysStr(p.startStr, -1);
   }
@@ -56,7 +75,7 @@ export function cycleHistory({ transactions, categories, schedule, today, count 
       rate: /** @type {number | null} */ (null),
     };
     for (const t of transactions) {
-      if (effectiveDate(t) < period.startStr || effectiveDate(t) > period.endStr) continue;
+      if (placeOn(t) < period.startStr || placeOn(t) > period.endStr) continue;
       cy.entries.push(t);
       if (t.type === "income") cy.income += amt(t);
       else if (t.type === "savings_transfer") {

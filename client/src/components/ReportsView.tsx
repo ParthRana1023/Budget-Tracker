@@ -8,7 +8,16 @@ import { createClient } from "@/utils/supabase/client";
 import { inr } from "@/lib/money.mjs";
 import { addDaysStr, dayLabel, shortDate } from "@/lib/cycle.mjs";
 import { cycleFor, paySchedule } from "@/lib/periods.mjs";
-import { cycleHistory, flexByDay, forecastNext, suggestLimits, topPayees, weekdayAverages } from "@/lib/reports.mjs";
+import {
+  cycleHistory,
+  flexByDay,
+  forecastNext,
+  reportSchedule,
+  suggestLimits,
+  topPayees,
+  weekdayAverages,
+  type Grouping,
+} from "@/lib/reports.mjs";
 import Drawer from "./ui/Drawer";
 import { useToast } from "./ui/Toast";
 import { CARD_H2, type Category, type RecurringItem, type Settings, type Tx } from "./dashboard/types";
@@ -90,6 +99,7 @@ export default function ReportsView({
   recurringItems,
   today,
   onChanged,
+  grouping = "cycle",
 }: {
   transactions: Tx[];
   categories: Category[];
@@ -97,6 +107,8 @@ export default function ReportsView({
   recurringItems: RecurringItem[];
   today: string;
   onChanged: () => Promise<unknown>;
+  /** Group every tab by pay-day cycle or by calendar month (no toggle yet: designed later). */
+  grouping?: Grouping;
 }) {
   const toast = useToast();
   const [tab, setTab] = useState<Tab>("overview");
@@ -111,8 +123,8 @@ export default function ReportsView({
     fixed = active.filter((c) => c.type === "fixed");
   const byId = new Map(categories.map((c) => [c.id, c]));
   const hist = useMemo(
-    () => cycleHistory({ transactions, categories, schedule, today, count: 12 }),
-    [transactions, categories, schedule, today],
+    () => cycleHistory({ transactions, categories, schedule, today, count: 12, grouping }),
+    [transactions, categories, schedule, today, grouping],
   );
   const cur = hist[hist.length - 1],
     prev: Cycle | undefined = hist[hist.length - 2];
@@ -971,7 +983,7 @@ export default function ReportsView({
 
   // ------------------------------------------------------------------ Plan ahead
   const plan = () => {
-    const next = cycleFor(new Date(`${addDaysStr(cur.period.endStr, 1)}T12:00:00`), schedule);
+    const next = cycleFor(new Date(`${addDaysStr(cur.period.endStr, 1)}T12:00:00`), reportSchedule(schedule, grouping));
     const nextName = new Date(`${next.startStr}T12:00:00`).toLocaleDateString("en-GB", { month: "long" });
     const f = forecastNext({
       settings,
