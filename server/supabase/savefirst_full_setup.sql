@@ -1205,6 +1205,7 @@ grant execute on function public.complete_onboarding(bigint, smallint, smallint,
 -- entry's date falls in (a date, not a month: after a pay-day change two cycles can start in
 -- the same month). Null keeps the old calendar-month key.
 drop function if exists public.record_entry_with_recurring(text, bigint, date, uuid, text, uuid, boolean, smallint, boolean, text);
+drop function if exists public.record_entry_with_recurring(text, bigint, date, uuid, text, uuid, boolean, smallint, boolean, text, text);
 create or replace function public.record_entry_with_recurring(
   p_type text,
   p_amount bigint,
@@ -1216,7 +1217,8 @@ create or replace function public.record_entry_with_recurring(
   p_day smallint default null,
   p_update_item boolean default false,
   p_income_type text default 'salary',
-  p_cycle_key text default null
+  p_cycle_key text default null,
+  p_counts_from date default null -- phase 3: early income counted toward the next cycle
 )
 returns uuid
 language plpgsql
@@ -1248,6 +1250,12 @@ begin
   end if;
   if p_item_id is null and not coalesce(p_make_recurring, false) then
     raise exception 'Nothing recurring to record';
+  end if;
+  if p_counts_from is not null and p_type <> 'income' then
+    raise exception 'Only income can count toward the next cycle';
+  end if;
+  if p_counts_from is not null and (p_counts_from <= p_date or p_counts_from > p_date + 5) then
+    raise exception 'Income can only count toward a cycle that starts within 5 days';
   end if;
   if p_cycle_key is not null and p_cycle_key !~ '^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$' then
     raise exception 'Invalid cycle';
@@ -1287,10 +1295,10 @@ begin
 
   -- A second manual record for the same month hits the unique index (23505) and
   -- rolls the whole call back, including any schedule update above.
-  insert into public.transactions (user_id, category_id, amount, type, date, note, source, external_id)
+  insert into public.transactions (user_id, category_id, amount, type, date, note, source, external_id, counts_from)
   values (auth.uid(), case when p_type = 'expense' then p_category_id end, p_amount, p_type, p_date,
           case when p_type = 'income' then 'Income: ' || v_name else nullif(btrim(p_note), '') end,
-          'manual', v_key)
+          'manual', v_key, p_counts_from)
   returning id into v_tx;
 
   if p_type = 'income' then
@@ -1302,7 +1310,7 @@ begin
 end;
 $$;
 
-grant execute on function public.record_entry_with_recurring(text, bigint, date, uuid, text, uuid, boolean, smallint, boolean, text, text) to authenticated;
+grant execute on function public.record_entry_with_recurring(text, bigint, date, uuid, text, uuid, boolean, smallint, boolean, text, text, date) to authenticated;
 
 -- ---------------------------------------------------------------- phase 2: pay-day model
 -- Pay day is 1-28, or 31 = the last day of every month (30 Nov, 28/29 Feb, ...).
@@ -1417,6 +1425,99 @@ begin
       values (v_user, r.name, r.type, r.amount, r.due_day);
     end if;
   end loop;
+end;
+$$;
+
+-- ---------------------------------------------------------------- phase 3: early income
+-- Salary that lands a few days before pay day (a weekend or holiday) can count toward the
+-- cycle that starts on pay day. counts_from is that cycle's start date; the entry keeps its
+-- real date. The app counts an entry in the cycle of coalesce(counts_from, date). Only income,
+-- and only 1-5 days before the cycle starts (the app checks it is exactly a cycle start).
+alter table public.transactions add column if not exists counts_from date;
+alter table public.transactions drop constraint if exists transactions_counts_from_check;
+alter table public.transactions add constraint transactions_counts_from_check
+  check (counts_from is null or (type = 'income' and counts_from > date and counts_from <= date + 5));
+
+-- record_entry_with_recurring takes p_counts_from (see phase 1 above).
+drop function if exists public.record_received_income(text, bigint, date, text);
+create or replace function public.record_received_income(
+  p_name text,
+  p_amount bigint,
+  p_date date default current_date,
+  p_type text default 'salary',
+  p_counts_from date default null
+)
+returns void
+language plpgsql
+security invoker
+set search_path = public
+as $$
+declare
+  v_tx uuid;
+begin
+  if auth.uid() is null then raise exception 'Not authenticated'; end if;
+  if p_amount is null or p_amount <= 0 then raise exception 'Income must be positive'; end if;
+  if p_type not in ('salary', 'variable', 'other') then raise exception 'Invalid income type'; end if;
+  if p_counts_from is not null and (p_counts_from <= coalesce(p_date, current_date) or p_counts_from > coalesce(p_date, current_date) + 5) then
+    raise exception 'Income can only count toward a cycle that starts within 5 days';
+  end if;
+
+  insert into public.transactions(user_id, amount, type, date, note, source, counts_from)
+  values(auth.uid(), p_amount, 'income', coalesce(p_date, current_date), 'Income: ' || p_name, 'manual', p_counts_from)
+  returning id into v_tx;
+
+  insert into public.income_sources(user_id, name, type, status, amount, received_date, transaction_id)
+  values(auth.uid(), p_name, p_type, 'received', p_amount, coalesce(p_date, current_date), v_tx);
+end;
+$$;
+
+grant execute on function public.record_received_income(text, bigint, date, text, date) to authenticated;
+
+-- Editing an entry's date drops counts_from once it no longer fits.
+create or replace function public.update_financial_transaction(
+  p_transaction_id uuid,
+  p_amount bigint,
+  p_date date,
+  p_category_id uuid,
+  p_note text
+)
+returns void
+language plpgsql
+security invoker
+set search_path = public
+as $$
+declare
+  v_type text;
+begin
+  if auth.uid() is null then raise exception 'Not authenticated'; end if;
+  if p_amount is null or p_amount <= 0 then raise exception 'Amount must be positive'; end if;
+  if p_date is null then raise exception 'Date is required'; end if;
+  if p_category_id is not null and not exists (
+    select 1 from public.categories where id = p_category_id and user_id = auth.uid()
+  ) then
+    raise exception 'Category not found';
+  end if;
+
+  update public.transactions
+     set amount = p_amount,
+         date = p_date,
+         category_id = p_category_id,
+         note = p_note,
+         -- keep 'counts toward next cycle' only while the new date is still 1-5 days before it
+         counts_from = case when counts_from > p_date and counts_from <= p_date + 5 then counts_from end
+   where id = p_transaction_id and user_id = auth.uid()
+   returning type into v_type;
+  if not found then raise exception 'Transaction not found'; end if;
+
+  if v_type = 'savings_transfer' then
+    update public.goal_contributions
+       set amount = p_amount, date = p_date
+     where transaction_id = p_transaction_id and user_id = auth.uid();
+  elsif v_type = 'income' then
+    update public.income_sources
+       set amount = p_amount, received_date = p_date
+     where transaction_id = p_transaction_id and user_id = auth.uid();
+  end if;
 end;
 $$;
 

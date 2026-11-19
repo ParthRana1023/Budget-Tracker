@@ -2,7 +2,7 @@
 // pay-day cycle (same as calendar months when salary lands on the 1st). Amounts in paise.
 
 import { cycleFor } from "./periods.mjs";
-import { addDaysStr, cycleDayOf } from "./cycle.mjs";
+import { addDaysStr, cycleDayOf, effectiveDate } from "./cycle.mjs";
 
 const MON = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 const MON_L = [
@@ -56,7 +56,7 @@ export function cycleHistory({ transactions, categories, schedule, today, count 
       rate: /** @type {number | null} */ (null),
     };
     for (const t of transactions) {
-      if (t.date < period.startStr || t.date > period.endStr) continue;
+      if (effectiveDate(t) < period.startStr || effectiveDate(t) > period.endStr) continue;
       cy.entries.push(t);
       if (t.type === "income") cy.income += amt(t);
       else if (t.type === "savings_transfer") {

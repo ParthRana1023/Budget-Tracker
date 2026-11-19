@@ -48,6 +48,28 @@ export function cycleKeyFor(dateStr, schedule) {
 
 const MON = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
+/** Income dated up to this many days before a cycle starts can count toward that cycle. */
+export const EARLY_INCOME_DAYS = 5;
+
+/**
+ * The date that decides which cycle an entry counts in: counts_from (early income counted
+ * toward the next cycle) or its own date.
+ * @param {{ date: string, counts_from?: string | null }} t
+ */
+export const effectiveDate = (t) => t.counts_from ?? t.date;
+
+/**
+ * When income dated `dateStr` arrives 1-EARLY_INCOME_DAYS days before the next cycle starts,
+ * that cycle's start date (the value for counts_from); otherwise null. When it is used for a
+ * recurring entry, its cycle key is cycleKeyFor(counts_from, schedule).
+ * @param {string} dateStr @param {import("./periods.mjs").PayDayEntry[]} schedule
+ */
+export function nextCycleOffer(dateStr, schedule) {
+  const [y, m, d] = parts(dateStr);
+  const next = addDaysStr(cycleFor(new Date(y, m - 1, d), schedule).endStr, 1);
+  return cycleDayOf(next, { startStr: dateStr }) - 1 <= EARLY_INCOME_DAYS ? next : null;
+}
+
 /** '2026-11-20' -> '20 Nov'. */
 export function shortDate(dateStr) {
   const [, m, d] = parts(dateStr);

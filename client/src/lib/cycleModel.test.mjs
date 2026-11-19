@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { getPeriodRange } from "./periods.mjs";
-import { addDaysStr, cycleDayOf, cycleKeyFor, dueDateInCycle } from "./cycle.mjs";
+import { addDaysStr, cycleDayOf, cycleKeyFor, dueDateInCycle, nextCycleOffer } from "./cycle.mjs";
 import { recurringStatus } from "./recurringStatus.mjs";
 import { buildCycleModel } from "./cycleModel.mjs";
 import { budgetWarnings } from "./notices.mjs";
@@ -66,6 +66,33 @@ test("recurring key: the start date of the cycle the date falls in", () => {
   const changed = [{ payDay: 1 }, { payDay: 20, from: "2027-01-01" }];
   assert.equal(cycleKeyFor("2027-01-05", changed), "2027-01-01");
   assert.equal(cycleKeyFor("2027-01-25", changed), "2027-01-20");
+});
+
+test("early income: offered for the next cycle only within 5 days of it", () => {
+  const s25 = [{ payDay: 25 }];
+  assert.equal(nextCycleOffer("2026-11-20", s25), "2026-11-25", "5 days before");
+  assert.equal(nextCycleOffer("2026-11-24", s25), "2026-11-25", "the day before");
+  assert.equal(nextCycleOffer("2026-11-19", s25), null, "6 days before is too early");
+  assert.equal(nextCycleOffer("2026-11-25", s25), null, "on pay day it is already this cycle");
+  assert.equal(nextCycleOffer("2027-01-27", [{ payDay: 31 }]), "2027-01-31", "last day of the month");
+});
+
+test("early income counts in the cycle it was counted toward, not the one it arrived in", () => {
+  const salary = { id: "s", type: "income", amount: 100000 * R, date: "2026-11-23", counts_from: "2026-11-25" };
+  const build = (period) =>
+    buildCycleModel({
+      settings: null,
+      categories: [],
+      transactions: [salary],
+      recurringItems: [],
+      period,
+      today: period.startStr,
+    });
+  const oct = getPeriodRange(new Date(2026, 10, 20, 12), 25); // 25 Oct - 24 Nov
+  const nov = getPeriodRange(new Date(2026, 10, 28, 12), 25); // 25 Nov - 24 Dec
+  assert.equal(build(oct).income, 0, "not in the cycle it arrived in");
+  assert.equal(build(nov).income, 100000 * R, "counted toward the cycle starting 25 Nov");
+  assert.equal(build(nov).safe, 100000 * R);
 });
 
 test("no income recorded this cycle: safe to spend is 0, not negative", () => {

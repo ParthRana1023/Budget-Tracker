@@ -21,6 +21,8 @@ export interface Tx {
   source?: string | null;
   from_reserve?: boolean;
   payee?: string | null;
+  /** Early income counted toward the cycle starting on this date ('YYYY-MM-DD'). */
+  counts_from?: string | null;
   category?: { name: string; type: string } | null;
 }
 

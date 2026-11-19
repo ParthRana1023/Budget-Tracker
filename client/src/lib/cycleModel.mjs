@@ -3,6 +3,7 @@
 // All amounts are integer paise. Dates are local 'YYYY-MM-DD'.
 
 import { recurringStatus } from "./recurringStatus.mjs";
+import { effectiveDate } from "./cycle.mjs";
 
 /**
  * @typedef {{ id: string, name: string, type: "fixed" | "flexible", monthly_limit: number, due_day?: number | null, is_active?: boolean }} Category
@@ -26,7 +27,9 @@ export function buildCycleModel({ settings, categories, transactions, recurringI
   const flex = active.filter((c) => c.type === "flexible");
   const fixed = active.filter((c) => c.type === "fixed");
 
-  const cycleTransactions = transactions.filter((t) => t.date >= period.startStr && t.date <= period.endStr);
+  const cycleTransactions = transactions.filter(
+    (t) => effectiveDate(t) >= period.startStr && effectiveDate(t) <= period.endStr,
+  );
   const spentByCat = new Map(active.map((c) => [c.id, 0]));
   let income = 0,
     regularSaved = 0,
