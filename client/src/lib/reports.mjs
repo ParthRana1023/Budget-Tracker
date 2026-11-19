@@ -1,7 +1,7 @@
 // Reports numbers (design handoff, Reports), built from real transactions, one entry per
 // pay-day cycle (same as calendar months when salary lands on the 1st). Amounts in paise.
 
-import { getPeriodRange } from "./periods.mjs";
+import { cycleFor } from "./periods.mjs";
 import { addDaysStr, cycleDayOf } from "./cycle.mjs";
 
 const MON = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
@@ -23,14 +23,20 @@ const amt = (t) => Number(t.amount);
 
 /**
  * The last `count` cycles, oldest first; the last one is the current (partial) cycle.
- * @param {{ transactions: any[], categories: any[], monthStartDay: number, today: string, count: number }} input
+ * @param {{ transactions: any[], categories: any[], schedule: import("./periods.mjs").PayDayEntry[], today: string, count: number }} input
  */
-export function cycleHistory({ transactions, categories, monthStartDay, today, count }) {
+export function cycleHistory({ transactions, categories, schedule, today, count }) {
   const byId = new Map(categories.map((c) => [c.id, c]));
-  const [y, m, d] = today.split("-").map(Number);
+  // Walk back one cycle at a time, so cycles keep their real dates across pay-day changes.
+  const periods = [];
+  for (let ref = today; periods.length < count;) {
+    const [y, m, d] = ref.split("-").map(Number);
+    const p = cycleFor(new Date(y, m - 1, d, 12), schedule);
+    periods.unshift(p);
+    ref = addDaysStr(p.startStr, -1);
+  }
   const out = [];
-  for (let i = count - 1; i >= 0; i--) {
-    const period = getPeriodRange(new Date(y, m - 1 - i, Math.min(d, 28), 12), monthStartDay);
+  for (const [i, period] of periods.entries()) {
     const [sy, sm] = period.startStr.split("-").map(Number);
     const cy = {
       key: period.startStr,
@@ -38,7 +44,7 @@ export function cycleHistory({ transactions, categories, monthStartDay, today, c
       labelLong: MON_L[sm - 1],
       year: sy,
       period,
-      partial: i === 0,
+      partial: i === periods.length - 1,
       income: 0,
       fixed: 0,
       flex: 0,

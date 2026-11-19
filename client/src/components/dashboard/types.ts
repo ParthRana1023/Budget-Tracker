@@ -48,7 +48,10 @@ export interface IncomeSource {
 }
 
 export interface Settings {
+  /** Pay day from onboarding: 1-28, or 31 for the last day of the month. */
   month_start_day: number;
+  /** Later pay-day changes, each effective from a cycle start ('YYYY-MM-DD'). */
+  pay_day_changes?: Array<{ pay_day: number; effective_from: string }> | null;
   take_home_pay?: number | null;
   savings_pct?: number | null;
   onboarded_at?: string | null;

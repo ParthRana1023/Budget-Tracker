@@ -1,4 +1,5 @@
 import type { buildCycleModel } from "@/lib/cycleModel.mjs";
+import type { PayDayEntry } from "@/lib/periods.mjs";
 import type { Category, Goal, IncomeSource, RecurringItem, Tx } from "../types";
 
 /** What every dashboard popup needs from the dashboard. */
@@ -6,6 +7,8 @@ export type PopupContext = {
   userId: string;
   today: string;
   period: { startStr: string; endStr: string; daysRemaining: number; totalDays: number; daysElapsed: number };
+  /** Pay-day schedule (onboarding pay day + changes), for the cycle of a back-dated entry. */
+  schedule: PayDayEntry[];
   model: ReturnType<typeof buildCycleModel>;
   categories: Category[];
   transactions: Tx[];

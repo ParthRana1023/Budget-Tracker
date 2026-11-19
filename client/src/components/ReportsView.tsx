@@ -7,7 +7,7 @@ import { useMemo, useState, type KeyboardEvent, type ReactNode } from "react";
 import { createClient } from "@/utils/supabase/client";
 import { inr } from "@/lib/money.mjs";
 import { addDaysStr, dayLabel, shortDate } from "@/lib/cycle.mjs";
-import { getPeriodRange } from "@/lib/periods.mjs";
+import { cycleFor, paySchedule } from "@/lib/periods.mjs";
 import { cycleHistory, flexByDay, forecastNext, suggestLimits, topPayees, weekdayAverages } from "@/lib/reports.mjs";
 import Drawer from "./ui/Drawer";
 import { useToast } from "./ui/Toast";
@@ -104,15 +104,15 @@ export default function ReportsView({
   const [calPrev, setCalPrev] = useState(false);
   const [drill, setDrill] = useState<{ title: string; sub: string; rows: DrillRow[] } | null>(null);
   const [decided, setDecided] = useState<Record<string, "kept" | { from: number; to: number }>>({});
-  const startDay = settings?.month_start_day || 1;
+  const schedule = useMemo(() => paySchedule(settings), [settings]);
 
   const active = categories.filter((c) => c.is_active !== false);
   const flex = active.filter((c) => c.type === "flexible"),
     fixed = active.filter((c) => c.type === "fixed");
   const byId = new Map(categories.map((c) => [c.id, c]));
   const hist = useMemo(
-    () => cycleHistory({ transactions, categories, monthStartDay: startDay, today, count: 12 }),
-    [transactions, categories, startDay, today],
+    () => cycleHistory({ transactions, categories, schedule, today, count: 12 }),
+    [transactions, categories, schedule, today],
   );
   const cur = hist[hist.length - 1],
     prev: Cycle | undefined = hist[hist.length - 2];
@@ -971,7 +971,7 @@ export default function ReportsView({
 
   // ------------------------------------------------------------------ Plan ahead
   const plan = () => {
-    const next = getPeriodRange(new Date(`${addDaysStr(cur.period.endStr, 1)}T12:00:00`), startDay);
+    const next = cycleFor(new Date(`${addDaysStr(cur.period.endStr, 1)}T12:00:00`), schedule);
     const nextName = new Date(`${next.startStr}T12:00:00`).toLocaleDateString("en-GB", { month: "long" });
     const f = forecastNext({
       settings,

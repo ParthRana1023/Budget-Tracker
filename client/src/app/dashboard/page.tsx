@@ -17,7 +17,7 @@ export default async function DashboardPage() {
   // Fetch user settings
   const { data: settings, error: settingsError } = await supabase
     .from("user_settings")
-    .select("*")
+    .select("*, pay_day_changes(pay_day, effective_from)")
     .eq("user_id", user.id)
     .maybeSingle();
   if (settingsError) throw new Error(`Could not load your settings: ${settingsError.message}`);

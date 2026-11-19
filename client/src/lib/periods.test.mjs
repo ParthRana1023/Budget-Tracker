@@ -1,6 +1,13 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { getPeriodRange, msUntilNextLocalMidnight, toLocalDateString, toLocalMonthKey } from "./periods.mjs";
+import {
+  cycleFor,
+  getPeriodRange,
+  msUntilNextLocalMidnight,
+  paySchedule,
+  toLocalDateString,
+  toLocalMonthKey,
+} from "./periods.mjs";
 
 // These tests are timezone-sensitive by design. `npm run test:unit` runs this file
 // under several TZ values (see scripts/run-unit-tests.mjs); the assertions must hold
@@ -56,8 +63,9 @@ test("start day 28 (the maximum) across February", () => {
   assert.deepEqual(range(at(2028, 2, 28), 28), ["2028-02-28", "2028-03-27", 29, 1, 29]);
 });
 
-test("start days above 28, below 1 or invalid are clamped into 1-28", () => {
-  assert.equal(getPeriodRange(at(2026, 11, 29), 31).startStr, "2026-11-28");
+test("start days 29-30, below 1 or invalid are clamped into 1-28; 31 is the last day", () => {
+  assert.equal(getPeriodRange(at(2026, 11, 29), 30).startStr, "2026-11-28");
+  assert.equal(getPeriodRange(at(2026, 11, 29), 31).startStr, "2026-10-31", "pay day 31 = last day of the month");
   assert.equal(getPeriodRange(at(2026, 11, 10), 0).startStr, "2026-11-01");
   assert.equal(getPeriodRange(at(2026, 11, 10), -5).startStr, "2026-11-01");
   assert.equal(getPeriodRange(at(2026, 11, 10), NaN).startStr, "2026-11-01");
@@ -109,5 +117,70 @@ test("msUntilNextLocalMidnight counts to the end of the LOCAL day", () => {
       new Date(at(2026, 12, 31, 23, 0, 0).getTime() + msUntilNextLocalMidnight(at(2026, 12, 31, 23, 0, 0))),
     ),
     "2027-01-01",
+  );
+});
+
+// ---------------------------------------------------------------- pay-day schedules
+const span = (sched, y, m, d) => {
+  const p = cycleFor(at(y, m, d), sched);
+  return `${p.startStr}..${p.endStr}`;
+};
+
+test("pay day 31 is the last day of every month, leap years included", () => {
+  const last = [{ payDay: 31 }];
+  assert.equal(span(last, 2026, 11, 30), "2026-11-30..2026-12-30");
+  assert.equal(span(last, 2027, 2, 27), "2027-01-31..2027-02-27");
+  assert.equal(span(last, 2027, 2, 28), "2027-02-28..2027-03-30");
+  assert.equal(span(last, 2028, 2, 28), "2028-01-31..2028-02-28");
+  assert.equal(span(last, 2028, 2, 29), "2028-02-29..2028-03-30");
+});
+
+test("a pay-day change starts at its effective date; the transition cycle is at least 15 days", () => {
+  // 25th -> last day, effective 25 Dec: 31 Dec is only 6 days later, so the next cycle starts 31 Jan.
+  const a = [{ payDay: 25 }, { payDay: 31, from: "2026-12-25" }];
+  assert.equal(span(a, 2026, 12, 24), "2026-11-25..2026-12-24", "cycles before the change keep their dates");
+  assert.equal(span(a, 2026, 12, 25), "2026-12-25..2027-01-30");
+  assert.equal(span(a, 2027, 1, 30), "2026-12-25..2027-01-30");
+  assert.equal(span(a, 2027, 1, 31), "2027-01-31..2027-02-27");
+  // 1st -> 15th, effective 1 Jan: 15 Jan is 14 days later, so the transition runs to 14 Feb.
+  const b = [{ payDay: 1 }, { payDay: 15, from: "2027-01-01" }];
+  assert.equal(span(b, 2027, 1, 10), "2027-01-01..2027-02-14");
+  assert.equal(span(b, 2027, 2, 15), "2027-02-15..2027-03-14");
+  // 1st -> 20th: 20 Jan is 19 days later, so it starts a cycle (two cycles start in January).
+  const c = [{ payDay: 1 }, { payDay: 20, from: "2027-01-01" }];
+  assert.equal(span(c, 2027, 1, 5), "2027-01-01..2027-01-19");
+  assert.equal(span(c, 2027, 1, 20), "2027-01-20..2027-02-19");
+});
+
+test("a later change cuts the running cycle at its effective date", () => {
+  const s = [{ payDay: 10 }, { payDay: 20, from: "2027-03-10" }];
+  assert.equal(span(s, 2027, 3, 1), "2027-02-10..2027-03-09");
+  assert.equal(span(s, 2027, 3, 10), "2027-03-10..2027-04-19");
+});
+
+test("cycles tile the calendar across pay-day changes: no gaps, no overlaps, 15+ days each", () => {
+  const schedules = [
+    [{ payDay: 25 }, { payDay: 31, from: "2026-12-25" }, { payDay: 5, from: "2027-05-31" }],
+    [{ payDay: 1 }, { payDay: 15, from: "2027-01-01" }],
+    [{ payDay: 28 }, { payDay: 1, from: "2027-02-28" }],
+  ];
+  for (const sched of schedules) {
+    let p = cycleFor(at(2026, 10, 1), sched);
+    for (let i = 0; i < 18; i++) {
+      const [y, m, d] = p.endStr.split("-").map(Number);
+      const next = cycleFor(at(y, m, d + 1), sched);
+      assert.equal(next.startStr, toLocalDateString(at(y, m, d + 1)), `no gap after ${p.endStr}`);
+      assert.ok(next.totalDays >= 15, `${next.startStr} lasts ${next.totalDays} days`);
+      assert.equal(cycleFor(at(y, m, d), sched).startStr, p.startStr, "last day still in its own cycle");
+      p = next;
+    }
+  }
+});
+
+test("paySchedule: onboarding pay day plus changes", () => {
+  assert.deepEqual(paySchedule(null), [{ payDay: 1 }]);
+  assert.deepEqual(
+    paySchedule({ month_start_day: 25, pay_day_changes: [{ pay_day: 31, effective_from: "2026-12-25" }] }),
+    [{ payDay: 25 }, { payDay: 31, from: "2026-12-25" }],
   );
 });

@@ -161,7 +161,7 @@ export default function IncomeDialog({
               p_make_recurring: !form.itemId,
               p_day: form.itemId ? null : day,
               p_income_type: form.type,
-              p_cycle_key: cycleKeyFor(form.date, period),
+              p_cycle_key: cycleKeyFor(form.date, ctx.schedule),
             })
           : supabase.rpc("record_received_income", {
               p_name: name,

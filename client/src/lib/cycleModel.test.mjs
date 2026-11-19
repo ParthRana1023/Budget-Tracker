@@ -42,7 +42,7 @@ test("windfall savings, reserve and reserve-paid bills", () => {
 });
 
 test("skipping a fixed bill's recurring item removes it from this cycle", () => {
-  const items = DEMO.recurringItems.map((r) => (r.id === "r6" ? { ...r, skip_month: "2026-11" } : r));
+  const items = DEMO.recurringItems.map((r) => (r.id === "r6" ? { ...r, skip_month: "2026-11-01" } : r));
   const m = buildCycleModel({ ...DEMO, recurringItems: items });
   assert.equal(m.unpaidBills, 2500 * R);
   assert.equal(m.safe, (16800 + 3000) * R);
@@ -56,14 +56,16 @@ test("uncategorised and switched-off spending still counts; switched-off categor
   assert.ok(!m.flex.some((c) => c.id === "ent"));
 });
 
-test("recurring key: the start month of the cycle the date falls in", () => {
-  const nov = getPeriodRange(new Date(2026, 10, 30), 25); // 25 Nov - 24 Dec
-  assert.equal(cycleKeyFor("2026-11-25", nov), "2026-11");
-  assert.equal(cycleKeyFor("2026-12-03", nov), "2026-11", "December days of this cycle still use the start month");
-  assert.equal(cycleKeyFor("2026-11-20", nov), "2026-10", "back-dated into the previous cycle (25 Oct - 24 Nov)");
-  assert.equal(cycleKeyFor("2026-12-25", nov), "2026-12", "next cycle");
-  const calendar = getPeriodRange(new Date(2026, 10, 15), 1);
-  assert.equal(cycleKeyFor("2026-10-31", calendar), "2026-10", "pay day 1: the calendar month");
+test("recurring key: the start date of the cycle the date falls in", () => {
+  const s25 = [{ payDay: 25 }];
+  assert.equal(cycleKeyFor("2026-11-25", s25), "2026-11-25");
+  assert.equal(cycleKeyFor("2026-12-03", s25), "2026-11-25", "December days of this cycle share its key");
+  assert.equal(cycleKeyFor("2026-11-20", s25), "2026-10-25", "back-dated into the previous cycle (25 Oct - 24 Nov)");
+  assert.equal(cycleKeyFor("2026-12-25", s25), "2026-12-25", "next cycle");
+  // After a change from the 1st to the 20th, two cycles start in January: keys must differ.
+  const changed = [{ payDay: 1 }, { payDay: 20, from: "2027-01-01" }];
+  assert.equal(cycleKeyFor("2027-01-05", changed), "2027-01-01");
+  assert.equal(cycleKeyFor("2027-01-25", changed), "2027-01-20");
 });
 
 test("no income recorded this cycle: safe to spend is 0, not negative", () => {
@@ -99,7 +101,8 @@ test("pay-day cycle dates and recurring status (salary on the 25th)", () => {
   assert.equal(s({ day_of_month: 3 }).key, "upcoming");
   assert.equal(s({ day_of_month: null }).key, "suggested");
   assert.equal(s({ active: false }).key, "paused");
-  assert.equal(s({ skip_month: "2026-11" }).key, "skipped");
+  assert.equal(s({ skip_month: "2026-11-25" }).key, "skipped");
+  assert.equal(s({ skip_month: "2026-10-25" }).key, "due", "a skip of the previous cycle does not carry over");
   assert.equal(s({ id: "rec" }).key, "recorded", "recorded beats every other state");
 });
 

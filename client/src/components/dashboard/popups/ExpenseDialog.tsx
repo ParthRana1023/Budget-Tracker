@@ -173,7 +173,7 @@ export default function ExpenseDialog({
           p_item_id: form.itemId,
           p_make_recurring: !form.itemId,
           p_day: form.itemId ? null : day,
-          p_cycle_key: cycleKeyFor(form.date, period),
+          p_cycle_key: cycleKeyFor(form.date, ctx.schedule),
         });
         // The recurring path doesn't take these two; set them on the new entry.
         if (!r.error && (payee || form.fromReserve)) {

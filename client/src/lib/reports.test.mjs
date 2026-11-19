@@ -23,7 +23,7 @@ const october = [
 const hist = cycleHistory({
   transactions: [...DEMO.transactions, ...october],
   categories: DEMO.categories,
-  monthStartDay: 1,
+  schedule: [{ payDay: 1 }],
   today: DEMO.today,
   count: 3,
 });

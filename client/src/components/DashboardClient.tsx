@@ -6,8 +6,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { LogOut, Plus } from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
-import { getPeriodRange, toLocalDateString } from "@/lib/periods.mjs";
-import { cycleKeyFor, cycleLabel, cycleMonthKey, dayLabel } from "@/lib/cycle.mjs";
+import { cycleFor, paySchedule, toLocalDateString } from "@/lib/periods.mjs";
+import { cycleKey, cycleKeyFor, cycleLabel, dayLabel } from "@/lib/cycle.mjs";
 import { buildCycleModel } from "@/lib/cycleModel.mjs";
 import { recurringStatus } from "@/lib/recurringStatus.mjs";
 import { budgetWarnings } from "@/lib/notices.mjs";
@@ -99,7 +99,8 @@ export default function DashboardClient(props: DashboardClientProps) {
   }, []);
 
   const today = toLocalDateString();
-  const period = useMemo(() => getPeriodRange(new Date(), settings?.month_start_day || 1), [settings?.month_start_day]);
+  const schedule = useMemo(() => paySchedule(settings), [settings]);
+  const period = useMemo(() => cycleFor(new Date(), schedule), [schedule]);
   const activeCategories = useMemo(() => categories.filter((c) => c.is_active !== false), [categories]);
   const model = useMemo(
     () => buildCycleModel({ settings, categories, transactions, recurringItems, period, today }),
@@ -175,7 +176,7 @@ export default function DashboardClient(props: DashboardClientProps) {
           p_note: item.name,
           p_item_id: item.id,
           p_income_type: item.income_type,
-          p_cycle_key: cycleKeyFor(date, period),
+          p_cycle_key: cycleKeyFor(date, schedule),
         }),
       `Recorded ${item.name} · ${inr(item.amount)}`,
       `Couldn’t record ${item.name}. Try again.`,
@@ -191,7 +192,7 @@ export default function DashboardClient(props: DashboardClientProps) {
       () =>
         db()
           .from("recurring_items")
-          .update({ skip_month: cycleMonthKey(period) })
+          .update({ skip_month: cycleKey(period) })
           .eq("id", item.id),
       `Skipped ${item.name} for this cycle`,
       `Couldn’t skip ${item.name}. Try again.`,
@@ -240,6 +241,7 @@ export default function DashboardClient(props: DashboardClientProps) {
     userId,
     today,
     period,
+    schedule,
     model,
     categories,
     transactions,

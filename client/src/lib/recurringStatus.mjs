@@ -1,7 +1,7 @@
 // Where a recurring item stands this cycle (design handoff: items never record
 // themselves; on/after their due day they are Due until the user records or skips them).
 
-import { cycleMonthKey, dueDateInCycle } from "./cycle.mjs";
+import { cycleKey, dueDateInCycle } from "./cycle.mjs";
 
 /**
  * @typedef {{ id: string, day_of_month: number | null, active: boolean, skip_month?: string | null }} Item
@@ -29,7 +29,7 @@ export function recurringStatus(item, { cycleTransactions, period, today }) {
   let key;
   if (entry) key = "recorded";
   else if (!item.active) key = "paused";
-  else if (item.skip_month && item.skip_month === cycleMonthKey(period)) key = "skipped";
+  else if (item.skip_month && item.skip_month === cycleKey(period)) key = "skipped";
   else if (dueDate && dueDate <= today) key = "due";
   else if (dueDate) key = "upcoming";
   else key = "suggested";

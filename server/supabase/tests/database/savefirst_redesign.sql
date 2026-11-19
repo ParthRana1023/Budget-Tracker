@@ -51,7 +51,7 @@ select is((select coalesce(take_home_pay::text, 'none') || '|' || month_start_da
 select is((select count(*)::int from public.categories where is_active), 0, 'no bills or categories chosen: none active');
 select is((select count(*)::int from public.categories where name = 'Rent'), 1, 'the earlier bill row is kept (switched off)');
 
-select throws_ok($$select public.complete_onboarding(null, 29::smallint, null)$$, 'P0001', 'Pay day must be between 1 and 28', 'pay day 29 rejected');
+select throws_ok($$select public.complete_onboarding(null, 29::smallint, null)$$, 'P0001', 'Pay day must be between 1 and 28, or 31 for the last day of the month', 'pay day 29 rejected');
 select throws_ok($$select public.complete_onboarding(null, null, 101::smallint)$$, 'P0001', 'Savings must be between 0 and 100 percent', 'savings over 100% rejected');
 select throws_ok($$select public.complete_onboarding(null, null, null, '[{"name":"Rent","amount":0}]')$$, 'P0001', 'Bill amounts must be greater than zero', 'a bill without an amount rejected');
 select throws_ok($$select public.complete_onboarding(null, null, null, '[{"name":"Rent","amount":100,"due_day":31}]')$$, 'P0001', 'Due day must be between 1 and 28', 'due day 31 rejected');
@@ -83,7 +83,7 @@ reset role;
 insert into public.recurring_items (user_id, name, amount, type, day_of_month)
 values ('a0000000-0000-0000-0000-00000000000a', 'Netflix', 64900, 'expense', 8);
 set local role authenticated;
-select lives_ok($$update public.recurring_items set skip_month = '2026-11' where name = 'Netflix'$$, 'Skip this month is stored as YYYY-MM');
+select lives_ok($$update public.recurring_items set skip_month = '2026-11-01' where name = 'Netflix'$$, 'Skip this month is stored as the cycle start date');
 select throws_ok($$update public.recurring_items set skip_month = '2026-13' where name = 'Netflix'$$, '23514', null, 'an invalid month is rejected');
 
 -- ================================================================ goal opening balance
