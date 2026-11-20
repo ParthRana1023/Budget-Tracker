@@ -4,7 +4,7 @@ import { Suspense, useState, type FormEvent } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/utils/supabase/client";
-import { authErrorFor } from "@/lib/auth.mjs";
+import { authErrorFor, signInVia } from "@/lib/auth.mjs";
 import {
   AuthAlert,
   LinkButton,
@@ -28,7 +28,7 @@ function VerifyForm() {
     if (!email) return setError({ message: "Open the link in the email, or sign up again to get a new code." });
     setBusy("Verifying…");
     setError(null);
-    const { error } = await createClient().auth.verifyOtp({ email, token: code, type: "email" });
+    const { error } = await signInVia("code", email, code);
     if (error) {
       setBusy(null);
       return setError(authErrorFor(error));

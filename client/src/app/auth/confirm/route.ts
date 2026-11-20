@@ -1,6 +1,7 @@
 import { createServerClient } from "@supabase/ssr";
 import { type EmailOtpType } from "@supabase/supabase-js";
 import { type NextRequest, NextResponse } from "next/server";
+import { recordSignIn } from "@/utils/supabase/admin";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!;
@@ -48,8 +49,16 @@ export async function GET(request: NextRequest) {
 
   // Handle token_hash verification (email confirmation / magic link fallback)
   if (token_hash && type) {
-    const { error } = await supabase.auth.verifyOtp({ type, token_hash });
+    const { data, error } = await supabase.auth.verifyOtp({ type, token_hash });
     if (!error) {
+      // Sign-in and sign-up links count as sign-ins; email-change and reset links don't.
+      if ((type === "magiclink" || type === "signup" || type === "email") && data.user?.email)
+        await recordSignIn(request.headers, {
+          email: data.user.email,
+          method: "link",
+          success: true,
+          accessToken: data.session?.access_token,
+        });
       return response;
     }
   }

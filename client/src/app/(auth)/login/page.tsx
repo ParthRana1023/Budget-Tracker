@@ -3,7 +3,7 @@
 import { Suspense, useState, type FormEvent } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/utils/supabase/client";
-import { authErrorFor, errorFromQuery, isValidEmail } from "@/lib/auth.mjs";
+import { authErrorFor, errorFromQuery, isValidEmail, signInVia } from "@/lib/auth.mjs";
 import {
   AuthAlert,
   AuthHeading,
@@ -54,7 +54,7 @@ function LoginForm() {
   const verify = async (code: string) => {
     setBusy("Verifying…");
     setError(null);
-    const { error } = await createClient().auth.verifyOtp({ email: email.trim(), token: code, type: "email" });
+    const { error } = await signInVia("code", email, code);
     if (error) return fail(authErrorFor(error));
     toDashboard();
   };
@@ -67,7 +67,7 @@ function LoginForm() {
       if (!isValidEmail(email)) return setError({ message: "Enter the email you signed up with." });
       if (!password) return setError({ message: "Enter your password." });
       setBusy("Signing in…");
-      const { error } = await createClient().auth.signInWithPassword({ email: email.trim(), password });
+      const { error } = await signInVia("password", email, password);
       if (error) return fail(authErrorFor(error));
       return toDashboard();
     }

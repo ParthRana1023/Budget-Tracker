@@ -251,6 +251,107 @@ export async function exportAllCsv(supabase) {
 }
 
 /**
+ * Every entry as JSON (Settings › Data › Export entries › JSON), amounts in paise.
+ * @param {any} supabase
+ * @returns {Promise<{ json: string, count: number, error: any }>}
+ */
+export async function exportAllJson(supabase) {
+  const { data, error } = await fetchAllTransactions(supabase);
+  if (error) return { json: "", count: 0, error };
+  const entries = data.map(({ user_id, category, ...t }) => ({ ...t, category: category?.name ?? null }));
+  return {
+    json: JSON.stringify({ amountsIn: "paise", currency: "INR", entries }, null, 2),
+    count: data.length,
+    error: null,
+  };
+}
+
+/**
+ * "Download all my data": profile, plan, plan history, preferences, categories, entries,
+ * recurring items, goals and income on hold, as one JSON document (export_my_data).
+ * @param {any} supabase
+ * @returns {Promise<{ json: string, error: any }>}
+ */
+export async function exportMyData(supabase) {
+  const { data, error } = await supabase.rpc("export_my_data");
+  return error ? { json: "", error } : { json: JSON.stringify(data, null, 2), error: null };
+}
+
+/**
+ * Save checked CSV rows (lib/csvImport.mjs) in one go; all or nothing.
+ * @param {any} supabase @param {import("./csvImport.mjs").ImportRow[]} rows
+ * @returns {Promise<{ added: number, duplicates: number, error: any }>}
+ */
+export async function importEntries(supabase, rows) {
+  const { data, error } = await supabase.rpc("import_transactions", { p_rows: rows });
+  return error ? { added: 0, duplicates: 0, error } : { added: data.added, duplicates: data.duplicates, error: null };
+}
+
+// ---------------------------------------------------------------- devices and sign-ins
+
+/**
+ * "Chrome on macOS" from a browser's user agent; "Unknown browser" when it can't tell.
+ * @param {string | null | undefined} ua
+ */
+export function deviceName(ua) {
+  if (!ua) return "Unknown browser";
+  const browser = /Edg\//.test(ua)
+    ? "Edge"
+    : /OPR\//.test(ua)
+      ? "Opera"
+      : /Firefox\//.test(ua)
+        ? "Firefox"
+        : /Chrome\//.test(ua)
+          ? "Chrome"
+          : /Safari\//.test(ua)
+            ? "Safari"
+            : null;
+  const os = /iPhone/.test(ua)
+    ? "iPhone"
+    : /iPad/.test(ua)
+      ? "iPad"
+      : /Android/.test(ua)
+        ? "Android"
+        : /Mac OS X|Macintosh/.test(ua)
+          ? "macOS"
+          : /Windows/.test(ua)
+            ? "Windows"
+            : /Linux/.test(ua)
+              ? "Linux"
+              : null;
+  if (!browser) return os ? `Browser on ${os}` : "Unknown browser";
+  return os ? `${browser} on ${os}` : browser;
+}
+/** Phone or tablet (for the device icon). @param {string | null | undefined} ua */
+export const isMobile = (ua) => /iPhone|iPad|Android|Mobile/.test(ua ?? "");
+
+/** The signed-in user's devices, newest activity first (list_my_sessions). @param {any} supabase */
+export const listSessions = (supabase) => supabase.rpc("list_my_sessions");
+/** Sign one other device out. @param {any} supabase @param {string} id */
+export const revokeSession = (supabase, id) => supabase.rpc("revoke_my_session", { p_session_id: id });
+/** Sign out every device except this one. @param {any} supabase */
+export const signOutOthers = (supabase) => supabase.auth.signOut({ scope: "others" });
+/** Latest sign-in attempts, newest first. @param {any} supabase @param {number} [limit] */
+export const signInHistory = (supabase, limit = 50) =>
+  supabase
+    .from("sign_in_events")
+    .select("id, created_at, method, success, user_agent, city")
+    .order("created_at", { ascending: false })
+    .limit(limit);
+
+/** Notification switches (Settings › Notifications). Email ones stay hidden in the app for now. */
+export const NOTIFY_TOGGLES = /** @type {const} */ ([
+  ["notify_due", "Bills and recurring items due", "A notice when something is about to be due"],
+  ["notify_warn", "Category reaches 80%", "Warns before a spending limit runs out"],
+  ["notify_over", "Over a limit", "When a category goes past its limit"],
+]);
+
+/** 0 -> "12:00 am", 13 -> "1:00 pm". @param {number} h */
+export const hourLabel = (h) => `${h % 12 || 12}:00 ${h < 12 ? "am" : "pm"}`;
+/** Length of a quiet-hours window that may wrap past midnight. @param {number} from @param {number} to */
+export const quietLength = (from, to) => (to - from + 24) % 24 || 24;
+
+/**
  * Permanently delete the signed-in account and all its data, then end the session.
  * The profile photo goes first: storage files can't be removed from SQL, and after the
  * account is gone nothing could remove them.

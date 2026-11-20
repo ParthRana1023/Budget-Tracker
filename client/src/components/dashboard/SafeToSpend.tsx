@@ -10,14 +10,19 @@ type Model = ReturnType<typeof buildCycleModel>;
 
 /** Hero: safe to spend this cycle, the per-day line and the pay-yourself-first bar. */
 export default function SafeToSpend({ model, daysLeft }: { model: Model; daysLeft: number }) {
-  const base = Math.max(model.income, 1);
-  const pct = (v: number) => `${((Math.max(0, v) / base) * 100).toFixed(2)}%`;
   const bar: Array<[number, string]> = [
     [model.bar.savings, "var(--lime)"],
     [model.bar.bills, "var(--fixed)"],
     [model.bar.spent, "var(--flex)"],
     [model.bar.safe, "var(--ink)"],
   ];
+  // Income can be below the parts (none recorded yet, or overspent): scale to whichever is bigger.
+  const base = Math.max(
+    model.income,
+    bar.reduce((s, [v]) => s + Math.max(0, v), 0),
+    1,
+  );
+  const pct = (v: number) => `${((Math.max(0, v) / base) * 100).toFixed(2)}%`;
 
   return (
     <Reveal
@@ -43,7 +48,7 @@ export default function SafeToSpend({ model, daysLeft }: { model: Model; daysLef
         </p>
       </div>
       <div className="mt-auto flex flex-col gap-2.5">
-        <div aria-hidden className="flex h-3.5 gap-[3px]">
+        <div aria-hidden className="flex h-3.5 gap-[3px] overflow-hidden">
           {bar.map(([v, c], i) => (
             <div
               key={c}

@@ -7,6 +7,7 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/utils/supabase/client";
 import { formatMoney } from "@/lib/money.mjs";
+import { authErrorFor, isValidEmail } from "@/lib/auth.mjs";
 import {
   AVATAR_TYPES,
   avatarProblem,
@@ -18,7 +19,9 @@ import {
 import type { Settings } from "../dashboard/types";
 import { Avatar, BTN_LINK, Card, INPUT, Row, SAVE_ERROR, SaveState, useSave } from "./parts";
 
-export type AccountUser = { id: string; email: string; verified: boolean; createdAt: string };
+/** `providers`: how the user can sign in ("email", "google"). */
+export type AccountUser = { id: string; email: string; verified: boolean; createdAt: string; providers: string[] };
+const EMAIL_IDLE = { editing: false, value: "", busy: false, error: null as string | null, sentTo: "" };
 
 export default function ProfileSection({
   user,
@@ -37,6 +40,22 @@ export default function ProfileSection({
   const [photoBusy, setPhotoBusy] = useState(false);
   const [photoError, setPhotoError] = useState<string | null>(null);
   useEffect(() => () => clearTimeout(timer.current), []);
+  const [email, setEmail] = useState(EMAIL_IDLE);
+
+  // Supabase emails a confirmation link; the address changes once it's opened.
+  const changeEmail = async () => {
+    const value = email.value.trim();
+    if (!isValidEmail(value)) return setEmail({ ...email, error: "Enter a valid email address." });
+    if (value.toLowerCase() === user.email.toLowerCase())
+      return setEmail({ ...email, error: "That’s already your email." });
+    setEmail({ ...email, busy: true, error: null });
+    const { error } = await db.auth.updateUser(
+      { email: value },
+      { emailRedirectTo: `${window.location.origin}/auth/confirm?next=/settings/account` },
+    );
+    if (error) return setEmail({ ...email, busy: false, error: authErrorFor(error).message });
+    setEmail({ ...EMAIL_IDLE, sentTo: value });
+  };
 
   const saveName = (v: string) => {
     clearTimeout(timer.current);
@@ -132,18 +151,67 @@ export default function ProfileSection({
           <SaveState status={nameSave.status} />
         </Row>
         <Row label="Email">
-          <span className="flex min-w-0 flex-[1_1_220px] flex-wrap items-center gap-2.5 text-[15px] [overflow-wrap:anywhere]">
-            {user.email}
-            <span
-              className="flex h-6 items-center rounded-full px-[9px] text-xs font-bold"
-              style={{
-                background: user.verified ? "var(--lime-soft)" : "var(--warn-soft)",
-                color: user.verified ? "var(--lime-text)" : "var(--warn)",
-              }}
-            >
-              {user.verified ? "Verified" : "Not verified"}
+          {email.sentTo ? (
+            <span className="flex min-w-0 flex-[1_1_220px] flex-col text-sm [overflow-wrap:anywhere]">
+              {user.email}
+              <span role="status" className="text-[13px] font-semibold text-warn">
+                Check {email.sentTo} for a link. Your email changes once you open it.
+              </span>
             </span>
-          </span>
+          ) : email.editing ? (
+            <span className="flex min-w-0 flex-[1_1_220px] flex-wrap gap-2">
+              <input
+                type="email"
+                autoComplete="email"
+                aria-label="New email address"
+                placeholder="New email address"
+                value={email.value}
+                onChange={(e) => setEmail({ ...email, value: e.target.value, error: null })}
+                onKeyDown={(e) => e.key === "Enter" && changeEmail()}
+                className={`${INPUT} h-11 flex-[1_1_200px] text-[15px]`}
+              />
+              <button
+                type="button"
+                onClick={changeEmail}
+                disabled={email.busy}
+                className="h-11 cursor-pointer rounded-full border-0 bg-lime px-4 text-[13px] font-bold text-lime-ink disabled:opacity-60"
+              >
+                {email.busy ? "Sending…" : "Send link"}
+              </button>
+              <button
+                type="button"
+                onClick={() => setEmail(EMAIL_IDLE)}
+                className="h-11 cursor-pointer border-0 bg-transparent px-2.5 text-[13px] font-semibold text-muted"
+              >
+                Cancel
+              </button>
+              {email.error && (
+                <span role="alert" className="basis-full text-[13px] font-semibold text-danger">
+                  {email.error}
+                </span>
+              )}
+            </span>
+          ) : (
+            <span className="flex min-w-0 flex-[1_1_220px] flex-wrap items-center gap-2.5 text-[15px] [overflow-wrap:anywhere]">
+              {user.email}
+              <span
+                className="flex h-6 items-center rounded-full px-[9px] text-xs font-bold"
+                style={{
+                  background: user.verified ? "var(--lime-soft)" : "var(--warn-soft)",
+                  color: user.verified ? "var(--lime-text)" : "var(--warn)",
+                }}
+              >
+                {user.verified ? "Verified" : "Not verified"}
+              </span>
+              <button
+                type="button"
+                onClick={() => setEmail({ ...EMAIL_IDLE, editing: true })}
+                className={`${BTN_LINK} ml-auto`}
+              >
+                Change
+              </button>
+            </span>
+          )}
         </Row>
       </Card>
 

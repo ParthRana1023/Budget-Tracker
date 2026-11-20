@@ -116,9 +116,12 @@ export default function DashboardClient(props: DashboardClientProps) {
   const statusCtx = { cycleTransactions: model.cycleTransactions, period, today };
   const due = recurringItems
     .map((item) => ({ item, st: recurringStatus(item, statusCtx) }))
-    .filter(({ item, st }) => item.active && st.key === "due")
+    .filter(({ item, st }) => settings?.notify_due !== false && item.active && st.key === "due")
     .map(({ item, st }) => ({ item, dueDate: st.dueDate! }));
-  const warnings = budgetWarnings({ flex: model.flex, spentByCat: model.spentByCat, dismissed: notesOff });
+  // Settings › Notifications: 80% warnings and over-limit warnings can each be turned off.
+  const warnings = budgetWarnings({ flex: model.flex, spentByCat: model.spentByCat, dismissed: notesOff }).filter(
+    (w) => (w.level === "80" ? settings?.notify_warn : settings?.notify_over) !== false,
+  );
   const held = incomeSources.filter((i) => i.status === "expected");
   const holdTotal = held.reduce((s, i) => s + Number(i.amount), 0);
 

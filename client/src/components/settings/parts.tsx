@@ -14,6 +14,29 @@ export const BTN_LINK =
   "cursor-pointer border-0 bg-transparent p-0 text-[13px] font-semibold text-lime-text hover:text-ink";
 export const SAVE_ERROR = "Couldn’t save. Check your connection and try again.";
 
+/** Hands the browser a file to save. CSV gets a BOM so Excel reads ₹ and accents right. */
+export function download(name: string, text: string, type: "text/csv" | "application/json") {
+  const url = URL.createObjectURL(
+    new Blob([type === "text/csv" ? `﻿${text}` : text], { type: `${type};charset=utf-8` }),
+  );
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = name;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+/** "2 hours ago", "6 days ago" from an ISO time. */
+export function ago(iso: string, now = Date.now()) {
+  const min = Math.max(0, Math.round((now - new Date(iso).getTime()) / 60_000));
+  if (min < 2) return "active now";
+  if (min < 60) return `${min} minutes ago`;
+  const h = Math.round(min / 60);
+  if (h < 24) return `${h} hour${h === 1 ? "" : "s"} ago`;
+  const d = Math.round(h / 24);
+  return `${d} day${d === 1 ? "" : "s"} ago`;
+}
+
 /** Eyebrow + italic serif line above a card. */
 export function SectionHead({ title, lede, danger }: { title: string; lede: string; danger?: boolean }) {
   return (

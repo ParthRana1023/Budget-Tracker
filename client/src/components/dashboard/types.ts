@@ -65,6 +65,19 @@ export interface Settings {
   take_home_pay?: number | null;
   savings_pct?: number | null;
   onboarded_at?: string | null;
+  /** Settings › Notifications (Notices on the Dashboard; email is backend-only for now). */
+  notify_due?: boolean;
+  notify_warn?: boolean;
+  notify_over?: boolean;
+  email_notifications?: boolean;
+  weekly_summary?: boolean;
+  /** Email reminders this many days before a bill is due: 1, 3 or 7. */
+  bill_reminder_days?: number;
+  quiet_hours_on?: boolean;
+  /** Local hours 0-23 in `timezone`; the window may wrap past midnight. */
+  quiet_from?: number;
+  quiet_to?: number;
+  timezone?: string;
 }
 
 /** Small pill buttons used across the dashboard cards. */

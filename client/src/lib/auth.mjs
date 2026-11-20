@@ -3,6 +3,28 @@
 export const isValidEmail = (/** @type {string} */ email) => /\S+@\S+\.\S+/.test(email.trim());
 
 /**
+ * Sign in through the app's server route (app/api/auth/sign-in), so the attempt is kept in the
+ * user's sign-in history. `secret` is the password, or the 6-digit code for method "code".
+ * The session cookies come back on the response.
+ * @param {"password" | "code"} method @param {string} email @param {string} secret
+ * @returns {Promise<{ error: { code?: string, name?: string, message?: string, status?: number } | null }>}
+ */
+export async function signInVia(method, email, secret) {
+  try {
+    const res = await fetch("/api/auth/sign-in", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ method, email: email.trim(), [method === "password" ? "password" : "token"]: secret }),
+    });
+    if (res.ok) return { error: null };
+    const body = await res.json().catch(() => null);
+    return { error: body?.error ?? { status: res.status } };
+  } catch {
+    return { error: { name: "AuthRetryableFetchError", status: 0 } };
+  }
+}
+
+/**
  * Password strength 0-4 for the 4-segment meter. Anything under 6 characters is 1 ("Too weak").
  * @param {string} pw
  */

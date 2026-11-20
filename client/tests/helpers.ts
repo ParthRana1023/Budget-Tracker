@@ -41,8 +41,8 @@ export async function skipOnboarding(page: Page) {
 }
 
 /** Sign up and onboard: ₹1,00,000 pay, 20% savings, ₹28,000 rent due on the 3rd, ₹10,000 groceries limit. */
-export async function setUpAccount(page: Page) {
-  await signUpFreshUser(page);
+export async function setUpAccount(page: Page): Promise<string> {
+  const email = await signUpFreshUser(page);
   await page.fill("#ob-sal", "100000");
   await onboardingNext(page).click();
   await page.getByRole("button", { name: "20%" }).click();
@@ -53,4 +53,6 @@ export async function setUpAccount(page: Page) {
   await onboardingNext(page).click();
   await page.getByRole("button", { name: "Open my dashboard" }).click();
   await page.waitForURL("**/dashboard", { timeout: 20_000 });
+
+  return email;
 }

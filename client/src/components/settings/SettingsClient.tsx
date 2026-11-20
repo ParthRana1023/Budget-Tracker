@@ -5,12 +5,12 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Download, Search } from "lucide-react";
+import { Search } from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
 import { cycleFor, paySchedule, toLocalDateString } from "@/lib/periods.mjs";
 import { buildCycleModel } from "@/lib/cycleModel.mjs";
 import { formatMoney, setNumberFormat } from "@/lib/money.mjs";
-import { deleteAccount, exportAllCsv, SETTINGS_SELECT, undoPlan } from "@/lib/settings.mjs";
+import { deleteAccount, SETTINGS_SELECT, undoPlan } from "@/lib/settings.mjs";
 import AppHeader from "../AppHeader";
 import { useToast } from "../ui/Toast";
 import CategoriesDialog from "../dashboard/popups/CategoriesDialog";
@@ -20,6 +20,10 @@ import type { Category, RecurringItem, Settings, Tx } from "../dashboard/types";
 import PlanSection from "./PlanSection";
 import PrefsSection from "./PrefsSection";
 import ProfileSection, { type AccountUser } from "./ProfileSection";
+import DataSection, { downloadAllData } from "./DataSection";
+import NotifSection from "./NotifSection";
+import SecuritySection from "./SecuritySection";
+import { GOOGLE_ON, GoogleSection, PasswordSection, VerifyBanner } from "./AccountSections";
 import { BTN_LINE, Card, INPUT, Row, SectionHead } from "./parts";
 
 export type SettingsPageData = {
@@ -35,20 +39,30 @@ const SECTIONS = {
   settings: [
     ["plan", "Budget plan"],
     ["cats", "Categories & fixed bills"],
+    ["notif", "Notifications"],
     ["prefs", "Preferences"],
     ["data", "Data"],
+    ["sec", "Security"],
     ["del", "Delete account"],
   ],
-  account: [["profile", "Profile"]],
+  account: [
+    ["profile", "Profile"],
+    ["pw", "Password"],
+    ["google", "Linked accounts"],
+  ],
 } as const;
 type Section = (typeof SECTIONS)[View][number][0];
 const WHERE: Record<Section, string> = {
   plan: "Budget plan",
   cats: "Categories & fixed bills",
+  notif: "Notifications",
   prefs: "Preferences",
   data: "Data",
+  sec: "Security",
   del: "Delete account",
   profile: "Account · Profile",
+  pw: "Account · Password",
+  google: "Account · Linked accounts",
 };
 /** Search: [setting, section, field to focus, extra words it answers to]. */
 const INDEX: [string, Section, string | null, string][] = [
@@ -59,17 +73,26 @@ const INDEX: [string, Section, string | null, string][] = [
   ["Categories", "cats", null, "limits budget flexible"],
   ["Fixed bills", "cats", null, "rent due"],
   ["Recurring items", "cats", null, "subscriptions repeat"],
+  ["Bill reminders", "notif", null, "notifications due notices alerts"],
+  ["Category 80% warning", "notif", null, "alerts limit notices"],
+  ["Over a limit", "notif", null, "alerts overspent notices"],
   ["Theme", "prefs", null, "dark light mode appearance"],
   ["Currency", "prefs", "f-cur", "rupee inr symbol"],
   ["Number format", "prefs", "f-num", "commas decimal lakh thousands separator"],
   ["Week starts on", "prefs", "f-wk", "monday sunday"],
-  ["Export entries", "data", null, "csv spreadsheet download backup"],
+  ["Download all my data", "data", null, "export account backup json"],
+  ["Export entries", "data", null, "csv json spreadsheet download"],
+  ["Import CSV", "data", null, "upload bring in spreadsheet"],
+  ["Signed-in devices", "sec", null, "sessions sign out everywhere"],
+  ["Sign-in history", "sec", null, "login activity recent"],
   ["Delete account", "del", "f-del", "remove close"],
   ["Name", "profile", "f-name", "profile"],
   ["Email address", "profile", null, "verify"],
   ["Profile photo", "profile", null, "avatar picture upload"],
+  ["Password", "pw", null, "change reset"],
+  ...(GOOGLE_ON ? [["Google sign-in", "google", null, "linked account"] as [string, Section, null, string]] : []),
 ];
-const viewOf = (s: Section): View => (s === "profile" ? "account" : "settings");
+const viewOf = (s: Section): View => (s === "profile" || s === "pw" || s === "google" ? "account" : "settings");
 
 export default function SettingsClient({
   view,
@@ -85,7 +108,8 @@ export default function SettingsClient({
   const router = useRouter();
   const toast = useToast();
   const userId = data.user.id;
-  const sections = SECTIONS[view];
+  // Linked accounts only when Google sign-in is switched on (NEXT_PUBLIC_GOOGLE_AUTH).
+  const sections = SECTIONS[view].filter(([id]) => id !== "google" || GOOGLE_ON);
   const [section, setSection] = useState<Section>(
     sections.find(([id]) => id === initialSection)?.[0] ?? sections[0][0],
   );
@@ -97,7 +121,6 @@ export default function SettingsClient({
   const [q, setQ] = useState("");
   const [dialog, setDialog] = useState<"cats" | "rec" | null>(null);
   const [exporting, setExporting] = useState(false);
-  const [exported, setExported] = useState<number | null>(null);
   const [delText, setDelText] = useState("");
   const [deleting, setDeleting] = useState(false);
   const [delError, setDelError] = useState<string | null>(null);
@@ -174,18 +197,11 @@ export default function SettingsClient({
     },
   };
 
-  const exportCsv = async () => {
+  const downloadFirst = async () => {
     setExporting(true);
-    const { csv, count, error } = await exportAllCsv(createClient());
+    const ok = await downloadAllData();
     setExporting(false);
-    if (error) return toast("Couldn’t export your entries. Check your connection and try again.", { error: true });
-    const url = URL.createObjectURL(new Blob([`﻿${csv}`], { type: "text/csv;charset=utf-8" }));
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "savefirst-entries.csv";
-    a.click();
-    URL.revokeObjectURL(url);
-    setExported(count);
+    if (!ok) toast("Couldn’t download your data. Check your connection and try again.", { error: true });
   };
   const removeAccount = async () => {
     if (delText.trim() !== "DELETE" || deleting) return;
@@ -303,6 +319,7 @@ export default function SettingsClient({
           </aside>
 
           <main className="flex max-w-[720px] min-w-0 flex-[1_1_520px] flex-col gap-[22px]">
+            {!data.user.verified && <VerifyBanner email={data.user.email} />}
             {section === "plan" && (
               <PlanSection
                 settings={settings}
@@ -351,26 +368,13 @@ export default function SettingsClient({
               <PrefsSection settings={settings} onSaved={(patch) => setSettings((s) => ({ ...s, ...patch }))} />
             )}
 
-            {section === "data" && (
-              <>
-                <SectionHead title="Data" lede="Take your entries with you." />
-                <Card>
-                  <Row
-                    label="Export entries"
-                    help={
-                      exported === null
-                        ? "Every entry since you joined, as a file you can open in a spreadsheet."
-                        : `Exported just now · ${exported} ${exported === 1 ? "entry" : "entries"}`
-                    }
-                  >
-                    <button type="button" onClick={exportCsv} disabled={exporting} className={BTN_LINE}>
-                      <Download size={14} className="mr-2" />
-                      {exporting ? "Exporting…" : "CSV"}
-                    </button>
-                  </Row>
-                </Card>
-              </>
+            {section === "notif" && (
+              <NotifSection settings={settings} onSaved={(patch) => setSettings((s) => ({ ...s, ...patch }))} />
             )}
+
+            {section === "data" && <DataSection categories={categories} onImported={refresh} />}
+
+            {section === "sec" && <SecuritySection onChangePassword={() => goTo("pw")} />}
 
             {section === "del" && (
               <>
@@ -384,8 +388,8 @@ export default function SettingsClient({
                     <span className="flex-[1_1_240px] text-sm">
                       Want a copy first? Download your entries before you go.
                     </span>
-                    <button type="button" onClick={exportCsv} disabled={exporting} className={`${BTN_LINE} h-9`}>
-                      {exporting ? "Exporting…" : "Download my data"}
+                    <button type="button" onClick={downloadFirst} disabled={exporting} className={`${BTN_LINE} h-9`}>
+                      {exporting ? "Preparing…" : "Download my data"}
                     </button>
                   </div>
                   <label htmlFor="f-del" className="text-sm font-semibold">
@@ -422,6 +426,9 @@ export default function SettingsClient({
                 </div>
               </>
             )}
+
+            {section === "pw" && <PasswordSection hasPassword={data.user.providers.includes("email")} />}
+            {section === "google" && GOOGLE_ON && <GoogleSection email={data.user.email} />}
 
             {section === "profile" && (
               <ProfileSection

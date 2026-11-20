@@ -178,3 +178,24 @@ test("photo checks", () => {
   assert.match(avatarProblem({ type: "image/gif", size: 1000 }), /PNG, JPG or WebP/);
   assert.match(avatarProblem({ type: "image/jpeg", size: 3 * 1024 * 1024 }), /over 2 MB/);
 });
+
+test("device names from a user agent", async () => {
+  const { deviceName, isMobile, hourLabel, quietLength } = await import("./settings.mjs");
+  const mac =
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 14_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0 Safari/537.36";
+  const iphone =
+    "Mozilla/5.0 (iPhone; CPU iPhone OS 18_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.1 Mobile/15E148 Safari/604.1";
+  assert.equal(deviceName(mac), "Chrome on macOS");
+  assert.equal(deviceName(iphone), "Safari on iPhone");
+  assert.equal(
+    deviceName("Mozilla/5.0 (Windows NT 10.0; rv:133.0) Gecko/20100101 Firefox/133.0"),
+    "Firefox on Windows",
+  );
+  assert.equal(deviceName(null), "Unknown browser");
+  assert.equal(isMobile(iphone), true);
+  assert.equal(isMobile(mac), false);
+  assert.equal(hourLabel(0), "12:00 am");
+  assert.equal(hourLabel(22), "10:00 pm");
+  assert.equal(quietLength(22, 8), 10);
+  assert.equal(quietLength(9, 9), 24);
+});

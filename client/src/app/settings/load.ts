@@ -39,6 +39,7 @@ export async function loadSettingsPage(): Promise<SettingsPageData> {
       email: user.email ?? "",
       verified: !!user.email_confirmed_at,
       createdAt: user.created_at,
+      providers: (user.identities ?? []).map((i) => i.provider),
     },
     settings: settings.data,
     categories: categories.data ?? [],
