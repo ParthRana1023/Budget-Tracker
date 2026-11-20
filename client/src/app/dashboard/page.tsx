@@ -1,10 +1,16 @@
 import { createClient } from "@/utils/supabase/server";
 import { STARTER_CATEGORIES } from "@/lib/starterCategories.mjs";
 import { errorFields, log } from "@/lib/log.mjs";
+import { SETTINGS_SELECT } from "@/lib/settings.mjs";
 import { redirect } from "next/navigation";
 import DashboardClient from "@/components/DashboardClient";
 
-export default async function DashboardPage() {
+export default async function DashboardPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
+}) {
+  const { view } = await searchParams;
   const supabase = await createClient();
 
   const {
@@ -18,7 +24,7 @@ export default async function DashboardPage() {
   // Fetch user settings
   const { data: settings, error: settingsError } = await supabase
     .from("user_settings")
-    .select("*, plan_changes(field, from_value, to_value, applies, effective_from, superseded_at, created_at)")
+    .select(SETTINGS_SELECT)
     .eq("user_id", user.id)
     .maybeSingle();
   if (settingsError) throw new Error(`Could not load your settings: ${settingsError.message}`);
@@ -106,6 +112,7 @@ export default async function DashboardPage() {
       initialSavingsGoals={savingsGoals || []}
       initialContributions={contributions || []}
       initialRecurringItems={recurringItems || []}
+      initialView={view === "reports" ? "reports" : "dashboard"}
     />
   );
 }

@@ -1,7 +1,7 @@
 -- Pay-day cycle fixes and Settings backend (migration 20261119000000_cycle_settings).
 begin;
 
-select plan(34);
+select plan(35);
 
 insert into auth.users (id, instance_id, aud, role, email, encrypted_password, email_confirmed_at, raw_app_meta_data, raw_user_meta_data)
 values ('88888888-8888-8888-8888-888888888888', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated',
@@ -123,6 +123,13 @@ select throws_ok($$select public.update_plan(p_payday => 10::smallint, p_effecti
   'P0001', 'The change must start at this cycle or the next one', 'a next-cycle start in the past is rejected');
 select throws_ok($$select public.update_plan(p_salary => 100, p_applies => 'later', p_effective_from => current_date)$$,
   'P0001', 'Choose when the change applies', 'only now or next');
+-- Undo (toast): the 20th change goes, the 15th it replaced is pending again, and the pay day is back to 15.
+select public.undo_plan_change();
+select is((select s.month_start_day || '|' || string_agg(p.to_value::text, ',') filter (where p.superseded_at is null)
+                || ' of ' || count(*)
+             from public.user_settings s join public.plan_changes p using (user_id)
+            where p.field = 'payday' and p.applies <> 'start' group by s.month_start_day),
+  '15|15 of 2', 'undo takes back the last change and restores the one it replaced');
 
 -- Delete my account.
 select public.delete_my_account();

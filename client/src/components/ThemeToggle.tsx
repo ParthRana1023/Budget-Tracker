@@ -24,6 +24,8 @@ export default function ThemeToggle({ onChange }: { onChange?: (theme: ThemeMode
       // Storage blocked (private mode): the theme still applies for this visit.
     }
     setTheme(next);
+    // Settings › Preferences shows the choice too.
+    window.dispatchEvent(new Event(THEME_EVENT));
     onChange?.(next);
   };
 

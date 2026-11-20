@@ -25,6 +25,20 @@ export function formatINRDecimal(paise) {
   })}`;
 }
 
+/** Number format preference (user_settings.number_format) -> the locale that writes it. */
+export const NUMBER_LOCALES = { indian: "en-IN", international: "en-US", european: "de-DE" };
+
+/**
+ * Whole rupees from paise in the user's number format, with a true minus sign
+ * ("₹1,00,000" Indian, "₹100,000" international, "₹100.000" European). Display only.
+ * @param {number} paise @param {keyof typeof NUMBER_LOCALES | null | undefined} [format]
+ * @returns {string}
+ */
+export function formatMoney(paise, format) {
+  const rupees = Math.round(Math.abs(paise) / 100);
+  return `${paise <= -50 ? "−" : ""}₹${rupees.toLocaleString(NUMBER_LOCALES[format ?? "indian"] ?? "en-IN")}`;
+}
+
 /**
  * Design-handoff rupee format from paise: whole rupees, Indian grouping, never
  * abbreviated, with a true minus sign ("₹1,00,000", "−₹650").

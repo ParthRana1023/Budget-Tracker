@@ -125,6 +125,8 @@ grant execute on function public.update_preferences(jsonb) to authenticated;
 -- current cycle start ('now') or the next cycle start ('next'), worked out by the app from
 -- the pay-day schedule. A new change supersedes older changes to the same field that start
 -- on or after it, so the newest decision wins. user_settings keeps the latest chosen values.
+-- Rows written (and superseded) by one call share its statement timestamp: undo_plan_change
+-- uses it to take the whole call back.
 create or replace function public.update_plan(
   p_salary bigint default null,
   p_payday smallint default null,
@@ -169,11 +171,11 @@ begin
      where t.to_value is not null and t.to_value is distinct from t.from_value
   loop
     update public.plan_changes
-       set superseded_at = now()
+       set superseded_at = statement_timestamp()
      where user_id = v_user and field = f.field and applies <> 'start'
        and superseded_at is null and effective_from >= p_effective_from;
-    insert into public.plan_changes (user_id, field, from_value, to_value, applies, effective_from)
-    values (v_user, f.field, f.from_value, f.to_value, p_applies, p_effective_from);
+    insert into public.plan_changes (user_id, field, from_value, to_value, applies, effective_from, created_at)
+    values (v_user, f.field, f.from_value, f.to_value, p_applies, p_effective_from, statement_timestamp());
   end loop;
 
   update public.user_settings
@@ -185,6 +187,41 @@ begin
 end;
 $$;
 grant execute on function public.update_plan(bigint, smallint, smallint, text, date) to authenticated;
+
+-- Undo in the "Plan updated" toast: takes back the latest update_plan call (its rows share one
+-- statement timestamp), puts back the values it replaced and the pending changes it superseded.
+-- Only within 15 minutes, so an old decision can't be undone by accident.
+create or replace function public.undo_plan_change()
+returns void
+language plpgsql
+security invoker
+set search_path = public
+as $$
+declare
+  v_user uuid := auth.uid();
+  v_at timestamptz;
+  r record;
+begin
+  if v_user is null then raise exception 'Not authenticated'; end if;
+  perform 1 from public.user_settings where user_id = v_user for update;
+  select max(created_at) into v_at from public.plan_changes where user_id = v_user and applies <> 'start';
+  if v_at is null or v_at < now() - interval '15 minutes' then raise exception 'Nothing to undo'; end if;
+
+  for r in select field, from_value from public.plan_changes
+            where user_id = v_user and created_at = v_at and applies <> 'start'
+  loop
+    update public.user_settings
+       set take_home_pay = case when r.field = 'salary' then r.from_value else take_home_pay end,
+           month_start_day = case when r.field = 'payday' then r.from_value::smallint else month_start_day end,
+           savings_pct = case when r.field = 'save_pct' then r.from_value::smallint else savings_pct end,
+           updated_at = now()
+     where user_id = v_user;
+  end loop;
+  update public.plan_changes set superseded_at = null where user_id = v_user and superseded_at = v_at;
+  delete from public.plan_changes where user_id = v_user and created_at = v_at and applies <> 'start';
+end;
+$$;
+grant execute on function public.undo_plan_change() to authenticated;
 
 -- ---------------------------------------------------------------- onboarding writes "Start" rows
 create or replace function public.complete_onboarding(

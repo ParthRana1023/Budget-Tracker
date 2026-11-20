@@ -1,14 +1,31 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { applyPlan, deleteAccount, exportAllCsv, nextCycleStart, payDayStatus, savePreferences } from "./settings.mjs";
+import {
+  applyPlan,
+  avatarProblem,
+  deleteAccount,
+  exportAllCsv,
+  nextCycleStart,
+  payDayPreview,
+  payDayStatus,
+  pendingPlan,
+  planHistory,
+  savePreferences,
+} from "./settings.mjs";
 
-/** Records rpc calls; serves `rows` in pages for from("transactions"). */
-function fakeSupabase({ rows = [], rpcError = null } = {}) {
+/** Records rpc and storage calls; serves `rows` in pages for from("transactions"). */
+function fakeSupabase({ rows = [], rpcError = null, files = [], listError = null } = {}) {
   const calls = [];
   return {
     calls,
     rpc: async (name, args) => (calls.push([name, args]), { error: rpcError }),
     auth: { signOut: async () => calls.push(["signOut"]) },
+    storage: {
+      from: () => ({
+        list: async (dir) => (calls.push(["list", dir]), { data: files.map((name) => ({ name })), error: listError }),
+        remove: async (paths) => (calls.push(["remove", paths]), { error: null }),
+      }),
+    },
     from: () => {
       const q = {
         select: () => q,
@@ -74,11 +91,90 @@ test("export fetches every page, not just the first 1000 rows", async () => {
   );
 });
 
-test("deleteAccount signs out only after the account is gone", async () => {
-  const ok = fakeSupabase();
-  assert.deepEqual(await deleteAccount(ok), { error: null });
-  assert.deepEqual(ok.calls, [["delete_my_account", undefined], ["signOut"]]);
+test("deleteAccount removes the photo first and signs out only after the account is gone", async () => {
+  const ok = fakeSupabase({ files: ["1.png"] });
+  assert.deepEqual(await deleteAccount(ok, "u1"), { error: null });
+  assert.deepEqual(ok.calls, [["list", "u1"], ["remove", ["u1/1.png"]], ["delete_my_account", undefined], ["signOut"]]);
   const failed = fakeSupabase({ rpcError: { message: "nope" } });
-  assert.deepEqual(await deleteAccount(failed), { error: { message: "nope" } });
-  assert.deepEqual(failed.calls, [["delete_my_account", undefined]], "no sign-out when the delete failed");
+  assert.deepEqual(await deleteAccount(failed, "u1"), { error: { message: "nope" } });
+  assert.deepEqual(
+    failed.calls,
+    [
+      ["list", "u1"],
+      ["delete_my_account", undefined],
+    ],
+    "no sign-out when the delete failed",
+  );
+  const noPhoto = fakeSupabase({ listError: { message: "offline" } });
+  assert.deepEqual(await deleteAccount(noPhoto, "u1"), { error: { message: "offline" } });
+  assert.equal(noPhoto.calls.length, 1, "the account stays when its photo couldn't be removed");
+});
+
+test("payday preview: this cycle keeps its start, next cycle keeps the 15-day minimum", () => {
+  // 25th -> 1st on 28 Nov.
+  assert.deepEqual(payDayPreview([{ payDay: 25 }], "2026-11-28", 1), {
+    now: { startStr: "2026-11-25", endStr: "2026-11-30" },
+    next: { startStr: "2026-12-25", endStr: "2027-01-31" },
+  });
+});
+
+const changes = [
+  {
+    field: "salary",
+    to_value: 7800000,
+    applies: "start",
+    effective_from: "2026-09-10",
+    created_at: "2026-09-10T09:30:00Z",
+  },
+  { field: "payday", to_value: 1, applies: "start", effective_from: "2026-09-10", created_at: "2026-09-10T09:30:00Z" },
+  {
+    field: "save_pct",
+    from_value: 15,
+    to_value: 20,
+    applies: "now",
+    effective_from: "2026-11-01",
+    created_at: "2026-11-05T09:00:00Z",
+  },
+  {
+    field: "salary",
+    from_value: 7800000,
+    to_value: 8500000,
+    applies: "next",
+    effective_from: "2026-12-01",
+    created_at: "2026-11-20T09:00:00Z",
+  },
+  {
+    field: "payday",
+    from_value: 1,
+    to_value: 25,
+    applies: "next",
+    effective_from: "2026-12-01",
+    superseded_at: "2026-11-20T09:00:00Z",
+    created_at: "2026-11-10T09:00:00Z",
+  },
+];
+
+test("plan history: newest first, onboarding as one row", () => {
+  const h = planHistory({ plan_changes: changes });
+  assert.deepEqual(
+    h.map((r) => [r.date, r.field, r.from, r.to, r.applies, r.superseded]),
+    [
+      ["2026-11-20", "salary", 7800000, 8500000, "next", false],
+      ["2026-11-10", "payday", 1, 25, "next", true],
+      ["2026-11-05", "save_pct", 15, 20, "now", false],
+      ["2026-09-10", "created", null, null, "start", false],
+    ],
+  );
+  assert.deepEqual(planHistory(null), []);
+});
+
+test("pending plan: only next-cycle changes still waiting", () => {
+  assert.deepEqual(pendingPlan({ plan_changes: changes }, "2026-11-28"), { salary: "2026-12-01" });
+  assert.deepEqual(pendingPlan({ plan_changes: changes }, "2026-12-01"), {});
+});
+
+test("photo checks", () => {
+  assert.equal(avatarProblem({ type: "image/png", size: 1000 }), null);
+  assert.match(avatarProblem({ type: "image/gif", size: 1000 }), /PNG, JPG or WebP/);
+  assert.match(avatarProblem({ type: "image/jpeg", size: 3 * 1024 * 1024 }), /over 2 MB/);
 });

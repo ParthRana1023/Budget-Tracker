@@ -4,7 +4,7 @@
 // loads and refreshes the rows, runs the one-tap actions and lays out the cards.
 
 import { useEffect, useMemo, useState } from "react";
-import { LogOut, Plus } from "lucide-react";
+import { Plus } from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
 import { cycleFor, paySchedule, toLocalDateString } from "@/lib/periods.mjs";
 import { cycleKey, cycleKeyFor, cycleLabel, dayLabel } from "@/lib/cycle.mjs";
@@ -13,10 +13,8 @@ import { recurringStatus } from "@/lib/recurringStatus.mjs";
 import { budgetWarnings } from "@/lib/notices.mjs";
 import { inr } from "@/lib/money.mjs";
 import { transactionsToCsv } from "@/lib/csvExport.mjs";
-import { savePreferences } from "@/lib/settings.mjs";
 import { syncSavedTheme } from "@/lib/theme";
-import ThemeToggle from "./ThemeToggle";
-import Dialog from "./ui/Dialog";
+import AppHeader, { type Tab } from "./AppHeader";
 import { useToast } from "./ui/Toast";
 import SafeToSpend from "./dashboard/SafeToSpend";
 import UntilPayday from "./dashboard/UntilPayday";
@@ -43,7 +41,6 @@ import CategoriesDialog from "./dashboard/popups/CategoriesDialog";
 import RecurringDialog from "./dashboard/popups/RecurringDialog";
 import type { PopupContext } from "./dashboard/popups/context";
 import ReportsView from "./ReportsView";
-import Logo from "./Logo";
 
 const NOTES_OFF_KEY = "sf-notes-off";
 const TX_SELECT = "*, category:categories(name, type)";
@@ -57,12 +54,14 @@ interface DashboardClientProps {
   initialSavingsGoals: Goal[];
   initialContributions: Contribution[];
   initialRecurringItems: RecurringItem[];
+  /** "reports" when opened from another page's Reports tab (/dashboard?view=reports). */
+  initialView?: Tab;
 }
 
 export default function DashboardClient(props: DashboardClientProps) {
   const userId = props.initialUser.id;
   const toast = useToast();
-  const [view, setView] = useState<"dashboard" | "reports">("dashboard");
+  const [view, setView] = useState<Tab>(props.initialView ?? "dashboard");
   const [settings] = useState<Settings | null>(props.initialSettings);
   const [categories, setCategories] = useState(props.initialCategories);
   const [transactions, setTransactions] = useState(props.initialTransactions);
@@ -79,7 +78,6 @@ export default function DashboardClient(props: DashboardClientProps) {
   const [expense, setExpense] = useState<ExpensePrefill | null>(null);
   const [income, setIncome] = useState<{ expected: boolean } | null>(null);
   const [categoriesOpen, setCategoriesOpen] = useState(false);
-  const [signOutOpen, setSignOutOpen] = useState(false);
   const [editing, setEditing] = useState<Tx | null>(null);
   const [windfallId, setWindfallId] = useState<string | null>(null);
   const [editingItem, setEditingItem] = useState<RecurringItem | null>(null);
@@ -237,10 +235,6 @@ export default function DashboardClient(props: DashboardClientProps) {
     URL.revokeObjectURL(url);
     toast(`Exported ${transactions.length} entries as CSV`);
   };
-  const signOut = async () => {
-    await fetch("/auth/signout", { method: "POST" });
-    window.location.href = "/login";
-  };
 
   const popupCtx: PopupContext = {
     userId,
@@ -280,65 +274,34 @@ export default function DashboardClient(props: DashboardClientProps) {
   const dateLong = new Date(`${today}T12:00:00`)
     .toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long", year: "numeric" })
     .replace(/^(\w+) /, "$1, ");
-  const navButton = (v: typeof view, text: string) => (
-    <button
-      type="button"
-      onClick={() => {
-        setView(v);
-        window.scrollTo(0, 0);
-      }}
-      aria-current={view === v ? "page" : undefined}
-      className="flex h-[30px] cursor-pointer items-center rounded-full border-0 px-3.5 text-[13px] font-semibold transition-colors duration-200 hover:text-ink"
-      style={{
-        background: view === v ? "var(--tile-2)" : "transparent",
-        color: view === v ? "var(--ink)" : "var(--muted)",
-      }}
-    >
-      {text}
-    </button>
-  );
 
   return (
     <div className="min-h-screen w-full overflow-x-clip">
       <div className="mx-auto flex max-w-[1240px] flex-col gap-3.5 px-6 pt-[18px] pb-14 max-[480px]:px-3.5">
-        {/* From 1100px the nav sits dead centre (1fr | auto | 1fr); narrower, the header wraps. */}
-        <header className="flex flex-wrap items-center gap-x-6 gap-y-3 pt-0.5 pb-2.5 min-[1100px]:grid min-[1100px]:grid-cols-[1fr_auto_1fr]">
-          <div className="justify-self-start">
-            <Logo />
-          </div>
-          <nav className="flex gap-0.5 justify-self-center rounded-full border border-line p-[3px]">
-            {navButton("dashboard", "Dashboard")}
-            {navButton("reports", "Reports")}
-          </nav>
-          <div className="ml-auto flex items-center gap-2 justify-self-end">
-            <ThemeToggle onChange={(theme) => void savePreferences(db(), { theme })} />
-            <button
-              type="button"
-              onClick={() => openIncome()}
-              className="h-[38px] cursor-pointer rounded-full border border-line bg-transparent px-[15px] text-[13px] font-semibold transition-[border-color,transform] hover:border-ink-2 active:scale-[.96] max-[720px]:hidden"
-            >
-              Record income
-            </button>
-            <button
-              type="button"
-              id="open-fast-expense-btn"
-              onClick={() => openExpense()}
-              className="flex h-[38px] cursor-pointer items-center gap-2 rounded-full border-0 bg-lime px-4 text-sm font-bold text-lime-ink transition-[transform,box-shadow] hover:-translate-y-px hover:shadow-[0_8px_24px_-10px_var(--lime)] active:scale-[.96] max-[720px]:hidden"
-            >
-              <Plus size={16} />
-              Log expense
-            </button>
-            <button
-              type="button"
-              onClick={() => setSignOutOpen(true)}
-              aria-label="Sign out"
-              title="Sign out"
-              className="flex h-[38px] w-[38px] cursor-pointer items-center justify-center rounded-full border border-line bg-transparent text-ink-2 transition-colors hover:border-ink-2 hover:text-ink"
-            >
-              <LogOut size={15} />
-            </button>
-          </div>
-        </header>
+        <AppHeader
+          current={view}
+          onTab={(v) => {
+            setView(v);
+            window.scrollTo(0, 0);
+          }}
+        >
+          <button
+            type="button"
+            onClick={() => openIncome()}
+            className="h-[38px] cursor-pointer rounded-full border border-line bg-transparent px-[15px] text-[13px] font-semibold transition-[border-color,transform] hover:border-ink-2 active:scale-[.96] max-[720px]:hidden"
+          >
+            Record income
+          </button>
+          <button
+            type="button"
+            id="open-fast-expense-btn"
+            onClick={() => openExpense()}
+            className="flex h-[38px] cursor-pointer items-center gap-2 rounded-full border-0 bg-lime px-4 text-sm font-bold text-lime-ink transition-[transform,box-shadow] hover:-translate-y-px hover:shadow-[0_8px_24px_-10px_var(--lime)] active:scale-[.96] max-[720px]:hidden"
+          >
+            <Plus size={16} />
+            Log expense
+          </button>
+        </AppHeader>
 
         {view === "reports" ? (
           <ReportsView
@@ -532,22 +495,6 @@ export default function DashboardClient(props: DashboardClientProps) {
           Log expense
         </button>
       </nav>
-
-      <Dialog
-        open={signOutOpen}
-        onClose={() => setSignOutOpen(false)}
-        eyebrow="SaveFirst"
-        title="Sign out?"
-        size="sm"
-        submitLabel="Sign out"
-        submitTone="ink"
-        onSubmit={signOut}
-        hint=""
-      >
-        <p className="m-0 font-serif text-[22px] leading-[1.3] text-pretty text-ink-2">
-          You’ll need your email and password, or a sign-in link, to get back in. Everything you’ve logged stays saved.
-        </p>
-      </Dialog>
 
       {expense && <ExpenseDialog ctx={popupCtx} prefill={expense} onClose={() => setExpense(null)} />}
       {income && <IncomeDialog ctx={popupCtx} expected={income.expected} onClose={() => setIncome(null)} />}
