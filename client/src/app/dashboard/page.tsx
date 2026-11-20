@@ -104,7 +104,7 @@ export default async function DashboardPage({
 
   return (
     <DashboardClient
-      initialUser={{ id: user.id, email: user.email }}
+      initialUser={{ id: user.id, email: user.email, verified: !!user.email_confirmed_at }}
       initialSettings={settings}
       initialCategories={(categories || []) as any}
       initialTransactions={(transactions || []) as any}

@@ -46,7 +46,7 @@ const NOTES_OFF_KEY = "sf-notes-off";
 const TX_SELECT = "*, category:categories(name, type)";
 
 interface DashboardClientProps {
-  initialUser: { id: string; email?: string };
+  initialUser: { id: string; email?: string; verified: boolean };
   initialSettings: Settings | null;
   initialCategories: Category[];
   initialTransactions: Tx[];
@@ -279,28 +279,38 @@ export default function DashboardClient(props: DashboardClientProps) {
     <div className="min-h-screen w-full overflow-x-clip">
       <div className="mx-auto flex max-w-[1240px] flex-col gap-3.5 px-6 pt-[18px] pb-14 max-[480px]:px-3.5">
         <AppHeader
+          account={{
+            name: settings?.display_name ?? null,
+            email: props.initialUser.email ?? "",
+            avatarUrl: settings?.avatar_url ?? null,
+            verified: props.initialUser.verified,
+          }}
           current={view}
           onTab={(v) => {
             setView(v);
             window.scrollTo(0, 0);
           }}
         >
-          <button
-            type="button"
-            onClick={() => openIncome()}
-            className="h-[38px] cursor-pointer rounded-full border border-line bg-transparent px-[15px] text-[13px] font-semibold transition-[border-color,transform] hover:border-ink-2 active:scale-[.96] max-[720px]:hidden"
-          >
-            Record income
-          </button>
-          <button
-            type="button"
-            id="open-fast-expense-btn"
-            onClick={() => openExpense()}
-            className="flex h-[38px] cursor-pointer items-center gap-2 rounded-full border-0 bg-lime px-4 text-sm font-bold text-lime-ink transition-[transform,box-shadow] hover:-translate-y-px hover:shadow-[0_8px_24px_-10px_var(--lime)] active:scale-[.96] max-[720px]:hidden"
-          >
-            <Plus size={16} />
-            Log expense
-          </button>
+          {view === "dashboard" && (
+            <>
+              <button
+                type="button"
+                onClick={() => openIncome()}
+                className="h-[38px] cursor-pointer rounded-full border border-line bg-transparent px-[15px] text-[13px] font-semibold transition-[border-color,transform] hover:border-ink-2 active:scale-[.96] max-[720px]:hidden"
+              >
+                Record income
+              </button>
+              <button
+                type="button"
+                id="open-fast-expense-btn"
+                onClick={() => openExpense()}
+                className="flex h-[38px] cursor-pointer items-center gap-2 rounded-full border-0 bg-lime px-4 text-sm font-bold text-lime-ink transition-[transform,box-shadow] hover:-translate-y-px hover:shadow-[0_8px_24px_-10px_var(--lime)] active:scale-[.96] max-[720px]:hidden"
+              >
+                <Plus size={16} />
+                Log expense
+              </button>
+            </>
+          )}
         </AppHeader>
 
         {view === "reports" ? (
@@ -472,29 +482,31 @@ export default function DashboardClient(props: DashboardClientProps) {
             />
           </>
         )}
-        <div aria-hidden className="h-[76px] min-[720px]:hidden" />
+        {view === "dashboard" && <div aria-hidden className="h-[76px] min-[720px]:hidden" />}
       </div>
 
-      <nav
-        aria-label="Quick actions"
-        className="fixed inset-x-0 bottom-0 z-40 flex gap-2.5 border-t border-line bg-bg px-3.5 pt-2.5 pb-[calc(10px+env(safe-area-inset-bottom))] min-[720px]:hidden"
-      >
-        <button
-          type="button"
-          onClick={() => openIncome()}
-          className="h-[50px] flex-1 cursor-pointer rounded-full border border-line-2 bg-transparent text-sm font-semibold active:scale-[.97]"
+      {view === "dashboard" && (
+        <nav
+          aria-label="Quick actions"
+          className="fixed inset-x-0 bottom-0 z-40 flex gap-2.5 border-t border-line bg-bg px-3.5 pt-2.5 pb-[calc(10px+env(safe-area-inset-bottom))] min-[720px]:hidden"
         >
-          Record income
-        </button>
-        <button
-          type="button"
-          onClick={() => openExpense()}
-          className="flex h-[50px] flex-[1.4] cursor-pointer items-center justify-center gap-2 rounded-full border-0 bg-lime text-[15px] font-bold text-lime-ink active:scale-[.97]"
-        >
-          <Plus size={16} />
-          Log expense
-        </button>
-      </nav>
+          <button
+            type="button"
+            onClick={() => openIncome()}
+            className="h-[50px] flex-1 cursor-pointer rounded-full border border-line-2 bg-transparent text-sm font-semibold active:scale-[.97]"
+          >
+            Record income
+          </button>
+          <button
+            type="button"
+            onClick={() => openExpense()}
+            className="flex h-[50px] flex-[1.4] cursor-pointer items-center justify-center gap-2 rounded-full border-0 bg-lime text-[15px] font-bold text-lime-ink active:scale-[.97]"
+          >
+            <Plus size={16} />
+            Log expense
+          </button>
+        </nav>
+      )}
 
       {expense && <ExpenseDialog ctx={popupCtx} prefill={expense} onClose={() => setExpense(null)} />}
       {income && <IncomeDialog ctx={popupCtx} expected={income.expected} onClose={() => setIncome(null)} />}

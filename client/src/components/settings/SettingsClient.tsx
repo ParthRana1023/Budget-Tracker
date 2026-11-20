@@ -211,7 +211,15 @@ export default function SettingsClient({
   return (
     <div className="min-h-screen w-full overflow-x-clip">
       <div className="mx-auto flex max-w-[1240px] flex-col gap-3.5 px-6 pt-[18px] pb-14 max-[480px]:px-4">
-        <AppHeader onSettings />
+        <AppHeader
+          inAccount
+          account={{
+            name: settings.display_name ?? null,
+            email: data.user.email,
+            avatarUrl: settings.avatar_url ?? null,
+            verified: data.user.verified,
+          }}
+        />
         <div className="flex flex-wrap gap-x-12 gap-y-8 pt-[22px] max-[860px]:gap-y-4 max-[860px]:pt-4">
           <aside className="flex min-w-0 flex-[0_1_240px] flex-col gap-1 self-start max-[860px]:flex-[1_1_100%] min-[861px]:sticky min-[861px]:top-6 min-[861px]:max-h-[calc(100vh-48px)] min-[861px]:overflow-y-auto">
             <h1 className="m-0 mb-3.5 font-serif text-[44px] leading-none font-normal max-[860px]:text-[36px]">

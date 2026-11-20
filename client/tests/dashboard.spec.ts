@@ -78,9 +78,31 @@ test.describe("Dashboard", () => {
     await expect(page.getByRole("button", { name: "Ledger" })).toHaveAttribute("aria-expanded", "false");
   });
 
-  test("sign out asks first", async ({ page }) => {
+  test("account menu: keyboard, links, and sign out asks first", async ({ page }) => {
     await setUpAccount(page);
-    await page.getByRole("button", { name: "Sign out" }).click();
+    const avatar = page.getByRole("button", { name: /^Account menu/ });
+    await avatar.click();
+    const menu = page.getByRole("menu", { name: "Account" });
+    await expect(menu.getByRole("menuitem").first()).toBeFocused();
+    await page.keyboard.press("ArrowDown");
+    await expect(menu.getByRole("menuitem", { name: "Settings" })).toBeFocused();
+    await page.keyboard.press("Escape");
+    await expect(menu).toHaveCount(0);
+    await expect(avatar).toBeFocused();
+
+    // Log expense and Record income live on the Dashboard tab only.
+    await page.getByRole("button", { name: "Reports", exact: true }).click();
+    await expect(page.getByRole("button", { name: "Log expense" })).toHaveCount(0);
+    await page.getByRole("button", { name: "Dashboard", exact: true }).click();
+
+    await avatar.click();
+    await menu.getByRole("menuitem", { name: "Account profile" }).click();
+    await page.waitForURL("**/settings/account");
+    await page.getByRole("link", { name: "Dashboard", exact: true }).click();
+    await page.waitForURL("**/dashboard");
+
+    await avatar.click();
+    await menu.getByRole("menuitem", { name: "Sign out" }).click();
     await expect(page.getByRole("dialog")).toContainText("Everything you’ve logged stays saved.");
     await page.getByRole("dialog").getByRole("button", { name: "Sign out" }).click();
     await page.waitForURL("**/login");

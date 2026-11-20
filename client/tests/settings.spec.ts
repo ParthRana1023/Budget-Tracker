@@ -12,7 +12,8 @@ const section = (page: Page, name: string) =>
 test.describe("Settings", () => {
   test("Budget plan: changes wait for Apply from when?, land in history, and Undo", async ({ page }) => {
     await setUpAccount(page);
-    await page.getByRole("link", { name: "Settings" }).click();
+    await page.getByRole("button", { name: /^Account menu/ }).click();
+    await page.getByRole("menuitem", { name: "Settings" }).click();
     await page.waitForURL("**/settings");
     await expect(page.getByLabel("Monthly salary")).toHaveValue("1,00,000");
     await expect(history(page)).toContainText("Plan created during onboarding");
@@ -59,7 +60,7 @@ test.describe("Settings", () => {
     await expect(page.getByText("₹123,456.78")).toBeVisible();
     await expect(page.getByText("✓ Saved").first()).toBeVisible();
     await page.getByLabel("Week starts on").selectOption("0");
-    await expect(page.getByText("✓ Saved").first()).toBeVisible();
+    await expect(page.getByText("Saving…")).toHaveCount(0);
 
     await page.reload();
     await expect(page.getByRole("radio", { name: "Light" })).toHaveAttribute("aria-checked", "true");
@@ -69,7 +70,7 @@ test.describe("Settings", () => {
     await expect(page.getByText("₹ Indian rupee")).toBeVisible();
   });
 
-  test("Recurring items: add, apply on close, Undo", async ({ page }) => {
+  test("Recurring items: add and delete apply on close; Undo brings a deleted item back", async ({ page }) => {
     await setUpAccount(page);
     await page.goto("/settings?s=cats");
     await page.getByRole("button", { name: "Edit recurring" }).click();
@@ -83,12 +84,17 @@ test.describe("Settings", () => {
     await expect(dialog).toHaveCount(0);
     await expect(toast(page, "Recurring items updated")).toBeVisible();
 
+    const gym = dialog.locator('[data-testid="recurring-edit-row"][data-name="Gym"]');
+
+    await page.reload();
     await page.getByRole("button", { name: "Edit recurring" }).click();
-    await expect(dialog.locator('[data-testid="recurring-edit-row"][data-name="Gym"]')).toBeVisible();
+    await expect(gym).toBeVisible();
+    await dialog.getByRole("button", { name: "Delete Gym" }).click();
     await dialog.getByRole("button", { name: "Done" }).click();
     await toast(page, "Recurring items updated").getByRole("button", { name: "Undo" }).click();
+    await expect(toast(page, "Recurring items updated")).toHaveCount(0);
     await page.getByRole("button", { name: "Edit recurring" }).click();
-    await expect(dialog.locator('[data-testid="recurring-edit-row"][data-name="Gym"]')).toHaveCount(0);
+    await expect(gym).toBeVisible();
   });
 
   test("Search finds a setting by its other names and opens the Account view", async ({ page }) => {
@@ -114,7 +120,8 @@ test.describe("Settings", () => {
     await expect(page.getByText("Verified", { exact: true })).toBeVisible();
     await page.reload();
     await expect(page.getByLabel("Name", { exact: true })).toHaveValue("Asha Rao");
-    await expect(page.getByText("AR", { exact: true })).toBeVisible();
+    await expect(page.getByRole("main").getByText("AR", { exact: true })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Account menu" })).toContainText("AR");
     await page.getByRole("link", { name: "Edit in Settings" }).click();
     await page.waitForURL("**/settings?s=plan");
   });
@@ -127,16 +134,17 @@ test.describe("Settings", () => {
       "base64",
     );
     await page.locator('input[type="file"]').setInputFiles({ name: "me.png", mimeType: "image/png", buffer: png });
-    await expect(page.locator('img[src*="/avatars/"]')).toBeVisible();
+    await expect(page.getByRole("main").locator('img[src*="/avatars/"]')).toBeVisible();
     await expect(page.getByText("Change photo")).toBeVisible();
     await page.reload();
-    await expect(page.locator('img[src*="/avatars/"]')).toBeVisible();
+    await expect(page.getByRole("main").locator('img[src*="/avatars/"]')).toBeVisible();
+    await expect(page.getByRole("button", { name: "Account menu" }).locator("img")).toHaveAttribute("src", /avatars/);
 
     await page.locator('input[type="file"]').setInputFiles({ name: "x.gif", mimeType: "image/gif", buffer: png });
     await expect(page.getByText("Choose a PNG, JPG or WebP image.")).toBeVisible();
 
     await page.getByRole("button", { name: "Remove" }).click();
-    await expect(page.locator('img[src*="/avatars/"]')).toHaveCount(0);
+    await expect(page.getByRole("main").locator('img[src*="/avatars/"]')).toHaveCount(0);
     await expect(page.getByText("Upload photo")).toBeVisible();
   });
 
