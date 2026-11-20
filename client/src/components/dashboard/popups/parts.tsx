@@ -5,10 +5,11 @@
 import { useState, type ReactNode } from "react";
 import { Repeat, Trash2, TriangleAlert } from "lucide-react";
 import { cleanTyped, inr, showTyped } from "@/lib/money.mjs";
+import { errorFields, reportClientError } from "@/lib/log.mjs";
 
 export const FIELD =
   "h-12 w-full min-w-0 rounded-xl border border-line-2 bg-tile-2 px-3.5 text-[15px] text-ink outline-none transition-[border-color,box-shadow] duration-200 focus:border-lime focus:shadow-[0_0_0_3px_var(--lime-soft)] focus-visible:outline-none";
-export const SAVE_FAILED = "Couldn’t save. Check your connection and try again. Nothing was changed.";
+export const SAVE_FAILED = "Couldn’t reach SaveFirst. Check your connection and try again.";
 export const OFFLINE = "You’re offline, so this wasn’t saved. Reconnect and try again.";
 
 /** Rupees typed into a field -> paise (0 when blank or invalid). */
@@ -36,11 +37,17 @@ export function usePopupForm<T extends object>(initial: T) {
     write: () => PromiseLike<{ error: unknown; data?: unknown }>,
     done: (data: unknown) => void | Promise<void>,
   ) => {
-    if (!navigator.onLine) return setError(OFFLINE);
+    if (!navigator.onLine) {
+      reportClientError("popup_save_offline", { source: "usePopupForm" });
+      return setError(OFFLINE);
+    }
     setBusy(true);
     const { error, data } = await write();
     setBusy(false);
-    if (error) return setError(SAVE_FAILED);
+    if (error) {
+      reportClientError("popup_save_failed", { source: "usePopupForm", ...errorFields(error) });
+      return setError(SAVE_FAILED);
+    }
     await done(data);
   };
   return { form, set, dirty, error, setError, busy, save };

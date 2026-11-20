@@ -7,6 +7,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Laptop, Smartphone } from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
 import { deviceName, isMobile, listSessions, revokeSession, signInHistory, signOutOthers } from "@/lib/settings.mjs";
+import { errorFields, reportClientError } from "@/lib/log.mjs";
 import { useToast } from "../ui/Toast";
 import { BTN_LINE, BTN_LINK, Card, SectionHead, ago } from "./parts";
 
@@ -39,7 +40,13 @@ export default function SecuritySection({ onChangePassword }: { onChangePassword
   const load = useCallback(async () => {
     const db = createClient();
     const [s, h] = await Promise.all([listSessions(db), signInHistory(db)]);
-    setFailed(!!(s.error || h.error));
+    const hasError = !!(s.error || h.error);
+    setFailed(hasError);
+    if (hasError) {
+      reportClientError("security_data_load_failed", {
+        ...(s.error ? errorFields(s.error) : errorFields(h.error)),
+      });
+    }
     if (!s.error) setSessions(s.data);
     if (!h.error) setHistory(h.data);
   }, []);
@@ -52,7 +59,10 @@ export default function SecuritySection({ onChangePassword }: { onChangePassword
     const db = createClient();
     const { error } = id === "others" ? await signOutOthers(db) : await revokeSession(db, id);
     setBusy(null);
-    if (error) return toast(FAILED, { error: true });
+    if (error) {
+      reportClientError("session_revoke_failed", { ...errorFields(error), target: id });
+      return toast(FAILED, { error: true });
+    }
     toast(id === "others" ? "Signed out of every other device" : "That device is signed out");
     await load();
   };

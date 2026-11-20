@@ -131,11 +131,13 @@ export default function Notices({
           {warnings.map((w) => (
             <div key={w.key} className={ROW}>
               <span className={TAG} style={{ color: w.level === "over" ? "var(--danger)" : "var(--warn)" }}>
-                {w.level === "over" ? "Over limit" : "Note"}
+                {w.level === "over" ? (w.spent > w.limit ? "Over limit" : "At limit") : "Note"}
               </span>
               <span className="min-w-0 flex-[1_1_240px] font-serif text-xl text-pretty">
                 {w.level === "over"
-                  ? `${w.name} is ${inr(w.spent - w.limit)} over its limit, with ${daysLeft} days to go.`
+                  ? w.spent > w.limit
+                    ? `${w.name} is ${inr(w.spent - w.limit)} over its limit, with ${daysLeft} days to go.`
+                    : `${w.name} has reached its limit, with ${daysLeft} days to go.`
                   : `${w.name} has reached ${w.pct}% of its limit, with ${inr(w.limit - w.spent)} left for ${daysLeft} days.`}
               </span>
               <button type="button" onClick={() => onDismiss(w.key)} className={PILL_LINE}>

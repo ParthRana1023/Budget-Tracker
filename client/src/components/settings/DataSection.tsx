@@ -9,6 +9,7 @@ import { createClient } from "@/utils/supabase/client";
 import { checkImport } from "@/lib/csvImport.mjs";
 import { inr } from "@/lib/money.mjs";
 import { exportAllCsv, exportAllJson, exportMyData, fetchAllTransactions, importEntries } from "@/lib/settings.mjs";
+import { errorFields, reportClientError } from "@/lib/log.mjs";
 import Dialog from "../ui/Dialog";
 import { useToast } from "../ui/Toast";
 import type { Category } from "../dashboard/types";
@@ -37,14 +38,20 @@ export default function DataSection({ categories, onImported }: { categories: Ca
     setBusy("all");
     const ok = await downloadAllData();
     setBusy(null);
-    if (!ok) toast(FAILED, { error: true });
+    if (!ok) {
+      reportClientError("download_all_data_failed");
+      toast(FAILED, { error: true });
+    }
   };
   const entries = async (kind: "csv" | "json") => {
     setBusy(kind);
     const db = createClient();
     const r = kind === "csv" ? await exportAllCsv(db) : await exportAllJson(db);
     setBusy(null);
-    if (r.error) return toast(FAILED, { error: true });
+    if (r.error) {
+      reportClientError("export_entries_failed", { kind, ...errorFields(r.error) });
+      return toast(FAILED, { error: true });
+    }
     download(
       `savefirst-entries.${kind}`,
       "csv" in r ? r.csv : r.json,
@@ -70,7 +77,10 @@ export default function DataSection({ categories, onImported }: { categories: Ca
     setBusy("import");
     const { added, duplicates, error } = await importEntries(createClient(), preview.rows);
     setBusy(null);
-    if (error) return setImportError(`Nothing was imported. ${error.message ?? FAILED}`);
+    if (error) {
+      reportClientError("import_entries_failed", { ...errorFields(error), rowsCount: preview.rows.length });
+      return setImportError(`Nothing was imported. ${error.message ?? FAILED}`);
+    }
     setPreview(null);
     onImported();
     toast(

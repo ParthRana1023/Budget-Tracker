@@ -16,6 +16,7 @@ import {
   savePreferences,
   uploadAvatar,
 } from "@/lib/settings.mjs";
+import { errorFields, reportClientError } from "@/lib/log.mjs";
 import type { Settings } from "../dashboard/types";
 import { Avatar, BTN_LINK, Card, INPUT, Row, SAVE_ERROR, SaveState, useSave } from "./parts";
 
@@ -79,7 +80,10 @@ export default function ProfileSection({
     setPhotoBusy(true);
     const { url, error } = await uploadAvatar(db, user.id, file);
     setPhotoBusy(false);
-    if (error) return setPhotoError(SAVE_ERROR);
+    if (error) {
+      reportClientError("avatar_upload_failed", { userId: user.id, ...errorFields(error) });
+      return setPhotoError(SAVE_ERROR);
+    }
     onSaved({ avatar_url: url });
   };
   const dropPhoto = async () => {
@@ -87,7 +91,10 @@ export default function ProfileSection({
     setPhotoBusy(true);
     const { error } = await removeAvatar(db, user.id);
     setPhotoBusy(false);
-    if (error) return setPhotoError(SAVE_ERROR);
+    if (error) {
+      reportClientError("avatar_remove_failed", { userId: user.id, ...errorFields(error) });
+      return setPhotoError(SAVE_ERROR);
+    }
     onSaved({ avatar_url: null });
   };
 

@@ -2,6 +2,7 @@ import { createServerClient } from "@supabase/ssr";
 import { type EmailOtpType } from "@supabase/supabase-js";
 import { type NextRequest, NextResponse } from "next/server";
 import { recordSignIn } from "@/utils/supabase/admin";
+import { errorFields, log } from "@/lib/log.mjs";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!;
@@ -45,6 +46,7 @@ export async function GET(request: NextRequest) {
     if (!error) {
       return response;
     }
+    log.warn("auth_confirm_exchange_failed", { ...errorFields(error), route: "/auth/confirm" });
   }
 
   // Handle token_hash verification (email confirmation / magic link fallback)
@@ -61,6 +63,7 @@ export async function GET(request: NextRequest) {
         });
       return response;
     }
+    log.warn("auth_confirm_verify_otp_failed", { ...errorFields(error), route: "/auth/confirm" });
   }
 
   // Verification failed — redirect to login with error message

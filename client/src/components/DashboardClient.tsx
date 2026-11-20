@@ -15,6 +15,7 @@ import { budgetWarnings } from "@/lib/notices.mjs";
 import { inr, setNumberFormat } from "@/lib/money.mjs";
 import { transactionsToCsv } from "@/lib/csvExport.mjs";
 import { syncSavedTheme } from "@/lib/theme";
+import { errorFields, reportClientError } from "@/lib/log.mjs";
 import AppHeader, { type Tab } from "./AppHeader";
 import { useToast } from "./ui/Toast";
 import SafeToSpend from "./dashboard/SafeToSpend";
@@ -135,7 +136,9 @@ export default function DashboardClient(props: DashboardClientProps) {
       supabase.from("goal_contributions").select("goal_id, amount, date").eq("user_id", userId),
       supabase.from("recurring_items").select("*").eq("user_id", userId),
     ]);
-    if ([cat, tx, inc, goal, contrib, rec].some((r) => r.error)) {
+    const failedQuery = [cat, tx, inc, goal, contrib, rec].find((r) => r.error);
+    if (failedQuery) {
+      reportClientError("dashboard_refresh_failed", { ...errorFields(failedQuery.error), userId });
       setLoadFailed(true);
       return false;
     }
@@ -156,9 +159,15 @@ export default function DashboardClient(props: DashboardClientProps) {
     failMessage: string,
     undo?: (data: unknown) => PromiseLike<{ error: unknown }>,
   ) => {
-    if (!navigator.onLine) return toast("You’re offline, so this wasn’t saved.", { error: true });
+    if (!navigator.onLine) {
+      reportClientError("dashboard_action_offline", { userId, message });
+      return toast("You’re offline, so this wasn’t saved.", { error: true });
+    }
     const { error, data } = await write();
-    if (error) return toast(failMessage, { error: true });
+    if (error) {
+      reportClientError("dashboard_action_failed", { userId, ...errorFields(error), message });
+      return toast(failMessage, { error: true });
+    }
     await refreshData();
     toast(
       message,

@@ -18,6 +18,7 @@ import {
 } from "@/lib/onboarding.mjs";
 import { PAYDAY_OPTIONS } from "@/lib/settings.mjs";
 import { inr as money } from "@/lib/money.mjs";
+import { errorFields, reportClientError } from "@/lib/log.mjs";
 
 const STEPS: Array<[eyebrow: string, title: string, em: string, lede: string]> = [
   [
@@ -109,6 +110,7 @@ export default function Onboarding() {
       onboardingPayload({ salary, payDay, pct, bills, cats }),
     );
     if (error) {
+      reportClientError("onboarding_save_failed", { ...errorFields(error) });
       setBusy(false);
       return setErr("Couldn’t save your setup. Check your connection and try again.");
     }

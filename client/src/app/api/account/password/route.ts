@@ -11,17 +11,17 @@ export async function POST(request: Request) {
   const body = (await request.json().catch(() => null)) as { current?: unknown; next?: unknown } | null;
   const current = typeof body?.current === "string" ? body.current : "";
   const next = typeof body?.next === "string" ? body.next : "";
-  if (!current) return NextResponse.json({ error: "Enter your current password." }, { status: 400 });
+  if (!current) return NextResponse.json({ error: { message: "Enter your current password." } }, { status: 400 });
   if (next.length < MIN_LENGTH || next.length > 200)
-    return NextResponse.json({ error: "New password needs at least 8 characters." }, { status: 400 });
+    return NextResponse.json({ error: { message: "New password needs at least 8 characters." } }, { status: 400 });
   if (next === current)
-    return NextResponse.json({ error: "Choose a password you haven’t used here before." }, { status: 400 });
+    return NextResponse.json({ error: { message: "Choose a password you haven’t used here before." } }, { status: 400 });
 
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user?.email) return NextResponse.json({ error: "Sign in again to change your password." }, { status: 401 });
+  if (!user?.email) return NextResponse.json({ error: { message: "Sign in again to change your password." } }, { status: 401 });
 
   const check = createSupabaseClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -33,10 +33,12 @@ export async function POST(request: Request) {
     const status = wrong.status && wrong.status < 500 ? 400 : 503;
     return NextResponse.json(
       {
-        error:
-          status === 400
-            ? "Your current password isn’t right."
-            : "We couldn’t check your password. Try again in a minute.",
+        error: {
+          message:
+            status === 400
+              ? "Your current password isn’t right."
+              : "We couldn’t check your password. Try again in a minute.",
+        },
       },
       { status },
     );
@@ -48,10 +50,12 @@ export async function POST(request: Request) {
     log.warn("password_change_failed", { ...errorFields(error), route: "/api/account/password", userId: user.id });
     return NextResponse.json(
       {
-        error:
-          error.code === "weak_password"
-            ? "Choose a stronger password."
-            : "Couldn’t change your password. Check your connection and try again.",
+        error: {
+          message:
+            error.code === "weak_password"
+              ? "Choose a stronger password."
+              : "Couldn’t change your password. Check your connection and try again.",
+        },
       },
       { status: 400 },
     );

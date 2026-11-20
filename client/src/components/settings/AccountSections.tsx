@@ -8,6 +8,7 @@ import { MailWarning } from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
 import type { UserIdentity } from "@supabase/supabase-js";
 import { authErrorFor } from "@/lib/auth.mjs";
+import { errorFields, reportClientError } from "@/lib/log.mjs";
 import { BTN_LINE, INPUT, SectionHead } from "./parts";
 
 export const GOOGLE_ON = process.env.NEXT_PUBLIC_GOOGLE_AUTH === "1";
@@ -34,7 +35,10 @@ export function VerifyBanner({ email }: { email: string }) {
       email,
       options: { emailRedirectTo: confirmUrl() },
     });
-    if (error) return setError(authErrorFor(error).message);
+    if (error) {
+      reportClientError("verify_resend_failed", { ...errorFields(error) });
+      return setError(authErrorFor(error).message);
+    }
     setSentAt(Date.now());
     setNow(Date.now());
   };
@@ -98,7 +102,8 @@ export function PasswordSection({ hasPassword }: { hasPassword: boolean }) {
     setBusy(false);
     if (!res?.ok) {
       const body = await res?.json().catch(() => null);
-      return setError(body?.error ?? "Couldn’t change your password. Check your connection and try again.");
+      reportClientError("password_change_request_failed", { status: res?.status });
+      return setError(body?.error?.message ?? body?.error ?? "Couldn’t change your password. Check your connection and try again.");
     }
     setForm({ current: "", next: "", confirm: "" });
     setDone(true);
@@ -171,7 +176,10 @@ export function GoogleSection({ email }: { email: string }) {
   const [busy, setBusy] = useState(false);
   const load = async () => {
     const { data, error } = await createClient().auth.getUserIdentities();
-    if (error) return setError("Couldn’t load your linked accounts. Reload to try again.");
+    if (error) {
+      reportClientError("load_identities_failed", { ...errorFields(error) });
+      return setError("Couldn’t load your linked accounts. Reload to try again.");
+    }
     setIds(data.identities);
   };
   useEffect(() => {
@@ -190,6 +198,7 @@ export function GoogleSection({ email }: { email: string }) {
         options: { redirectTo: `${window.location.origin}/auth/callback?next=/settings/account&linked=1` },
       });
       if (error) {
+        reportClientError("google_link_failed", { ...errorFields(error) });
         setBusy(false);
         setError("Couldn’t start linking Google. Try again.");
       }
@@ -197,7 +206,10 @@ export function GoogleSection({ email }: { email: string }) {
     }
     const { error } = await db.auth.unlinkIdentity(google);
     setBusy(false);
-    if (error) return setError("Couldn’t unlink Google. Try again.");
+    if (error) {
+      reportClientError("google_unlink_failed", { ...errorFields(error) });
+      return setError("Couldn’t unlink Google. Try again.");
+    }
     await load();
   };
 

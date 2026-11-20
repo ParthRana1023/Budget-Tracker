@@ -11,6 +11,7 @@ import { cycleFor, paySchedule, toLocalDateString } from "@/lib/periods.mjs";
 import { buildCycleModel } from "@/lib/cycleModel.mjs";
 import { formatMoney, setNumberFormat } from "@/lib/money.mjs";
 import { deleteAccount, SETTINGS_SELECT, undoPlan } from "@/lib/settings.mjs";
+import { errorFields, reportClientError } from "@/lib/log.mjs";
 import AppHeader from "../AppHeader";
 import { useToast } from "../ui/Toast";
 import CategoriesDialog from "../dashboard/popups/CategoriesDialog";
@@ -166,7 +167,11 @@ export default function SettingsClient({
       db.from("categories").select("*").eq("user_id", userId).order("name"),
       db.from("recurring_items").select("*").eq("user_id", userId).order("created_at"),
     ]);
-    if (s.error || c.error || r.error) return toast("Saved, but couldn’t refresh. Reload the page.", { error: true });
+    const failedQuery = [s, c, r].find((res) => res.error);
+    if (failedQuery) {
+      reportClientError("settings_refresh_failed", { userId, ...errorFields(failedQuery.error) });
+      return toast("Saved, but couldn’t refresh. Reload the page.", { error: true });
+    }
     setSettings(s.data as Settings);
     setCategories(c.data as Category[]);
     setRecurringItems(r.data as RecurringItem[]);
@@ -205,11 +210,15 @@ export default function SettingsClient({
   };
   const removeAccount = async () => {
     if (delText.trim() !== "DELETE" || deleting) return;
-    if (!navigator.onLine) return setDelError("You’re offline. Reconnect and try again.");
+    if (!navigator.onLine) {
+      reportClientError("delete_account_offline", { userId });
+      return setDelError("You’re offline. Reconnect and try again.");
+    }
     setDeleting(true);
     setDelError(null);
     const { error } = await deleteAccount(createClient(), userId);
     if (error) {
+      reportClientError("delete_account_failed", { userId, ...errorFields(error) });
       setDeleting(false);
       return setDelError("Couldn’t delete your account. Check your connection and try again.");
     }

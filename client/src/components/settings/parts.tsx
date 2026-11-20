@@ -4,6 +4,7 @@
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { clsx } from "clsx";
+import { errorFields, reportClientError } from "@/lib/log.mjs";
 
 export const INPUT =
   "h-[46px] min-w-0 rounded-xl border border-line-2 bg-bg px-3.5 text-base text-ink outline-none transition-[border-color,box-shadow] duration-200 focus:border-lime focus:shadow-[0_0_0_3px_var(--lime-soft)] focus-visible:outline-none";
@@ -12,7 +13,7 @@ export const BTN_LINE =
   "flex h-[38px] cursor-pointer items-center rounded-full border border-line-2 bg-transparent px-4 text-[13px] font-semibold text-ink transition-colors duration-200 hover:border-ink-2 disabled:cursor-default disabled:opacity-60";
 export const BTN_LINK =
   "cursor-pointer border-0 bg-transparent p-0 text-[13px] font-semibold text-lime-text hover:text-ink";
-export const SAVE_ERROR = "Couldn’t save. Check your connection and try again.";
+export const SAVE_ERROR = "Couldn’t reach SaveFirst. Check your connection and try again.";
 
 /** Hands the browser a file to save. CSV gets a BOM so Excel reads ₹ and accents right. */
 export function download(name: string, text: string, type: "text/csv" | "application/json") {
@@ -107,9 +108,16 @@ export function useSave() {
   useEffect(() => () => clearTimeout(timer.current), []);
   const run = async (write: () => PromiseLike<{ error: unknown }>) => {
     clearTimeout(timer.current);
-    if (!navigator.onLine) return setStatus("error");
+    if (!navigator.onLine) {
+      reportClientError("save_offline", { source: "useSave" });
+      setStatus("error");
+      return false;
+    }
     setStatus("saving");
     const { error } = await write();
+    if (error) {
+      reportClientError("save_failed", { source: "useSave", ...errorFields(error) });
+    }
     setStatus(error ? "error" : "saved");
     if (!error) timer.current = setTimeout(() => setStatus(null), 2400);
     return !error;

@@ -20,6 +20,7 @@ import {
 } from "@/lib/settings.mjs";
 import type { PayDayEntry } from "@/lib/periods.mjs";
 import type { Settings } from "../dashboard/types";
+import { errorFields, reportClientError } from "@/lib/log.mjs";
 import { BTN_LINK, Card, INPUT, Row, SAVE_ERROR, SELECT, SectionHead } from "./parts";
 
 type Field = "salary" | "payday" | "save_pct";
@@ -129,7 +130,10 @@ export default function PlanSection({
     if (edited.includes("salary") && sal <= 0) return setError("Enter your monthly salary.");
     if (edited.includes("save_pct") && (pct < MIN_PCT || pct > MAX_PCT))
       return setError(`Save first must be between ${MIN_PCT}% and ${MAX_PCT}%.`);
-    if (!navigator.onLine) return setError(SAVE_ERROR);
+    if (!navigator.onLine) {
+      reportClientError("plan_apply_offline");
+      return setError(SAVE_ERROR);
+    }
     setBusy(true);
     const { error: err } = await applyPlan(
       createClient(),
@@ -143,7 +147,10 @@ export default function PlanSection({
       today,
     );
     setBusy(false);
-    if (err) return setError(SAVE_ERROR);
+    if (err) {
+      reportClientError("plan_apply_failed", { ...errorFields(err) });
+      return setError(SAVE_ERROR);
+    }
     setJustSaved({ fields: edited, from: applies === "next" ? nextFrom : null });
     await onApplied(applies === "next" ? `Plan updated · from ${shortDate(nextFrom)}` : "Plan updated for this cycle");
   };
