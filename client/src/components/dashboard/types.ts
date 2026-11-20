@@ -1,5 +1,6 @@
 // Row shapes the dashboard reads (amounts in paise, dates 'YYYY-MM-DD').
 export type { RecurringItem } from "@/lib/recurringTypes";
+import type { PlanChange } from "@/lib/periods.mjs";
 
 export interface Category {
   id: string;
@@ -52,8 +53,13 @@ export interface IncomeSource {
 export interface Settings {
   /** Pay day from onboarding: 1-28, or 31 for the last day of the month. */
   month_start_day: number;
-  /** Later pay-day changes, each effective from a cycle start ('YYYY-MM-DD'). */
-  pay_day_changes?: Array<{ pay_day: number; effective_from: string }> | null;
+  /** Plan history: every change to salary, payday and save-first % (lib/plan.mjs, periods.mjs). */
+  plan_changes?: PlanChange[] | null;
+  display_name?: string | null;
+  avatar_url?: string | null;
+  number_format?: "indian" | "international" | "european";
+  /** 0 = Sunday, 1 = Monday. */
+  week_start?: 0 | 1;
   /** Theme saved to the account; null = not chosen yet. */
   theme?: "dark" | "light" | "system" | null;
   take_home_pay?: number | null;

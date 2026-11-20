@@ -13,7 +13,7 @@ import { recurringStatus } from "@/lib/recurringStatus.mjs";
 import { budgetWarnings } from "@/lib/notices.mjs";
 import { inr } from "@/lib/money.mjs";
 import { transactionsToCsv } from "@/lib/csvExport.mjs";
-import { saveSettings } from "@/lib/settings.mjs";
+import { savePreferences } from "@/lib/settings.mjs";
 import { syncSavedTheme } from "@/lib/theme";
 import ThemeToggle from "./ThemeToggle";
 import Dialog from "./ui/Dialog";
@@ -311,7 +311,7 @@ export default function DashboardClient(props: DashboardClientProps) {
             {navButton("reports", "Reports")}
           </nav>
           <div className="ml-auto flex items-center gap-2 justify-self-end">
-            <ThemeToggle onChange={(theme) => void saveSettings(db(), { theme }, schedule, today)} />
+            <ThemeToggle onChange={(theme) => void savePreferences(db(), { theme })} />
             <button
               type="button"
               onClick={() => openIncome()}

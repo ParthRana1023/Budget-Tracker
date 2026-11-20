@@ -1,5 +1,6 @@
 import { createClient } from "@/utils/supabase/server";
 import { STARTER_CATEGORIES } from "@/lib/starterCategories.mjs";
+import { errorFields, log } from "@/lib/log.mjs";
 import { redirect } from "next/navigation";
 import DashboardClient from "@/components/DashboardClient";
 
@@ -17,7 +18,7 @@ export default async function DashboardPage() {
   // Fetch user settings
   const { data: settings, error: settingsError } = await supabase
     .from("user_settings")
-    .select("*, pay_day_changes(pay_day, effective_from)")
+    .select("*, plan_changes(field, from_value, to_value, applies, effective_from, superseded_at, created_at)")
     .eq("user_id", user.id)
     .maybeSingle();
   if (settingsError) throw new Error(`Could not load your settings: ${settingsError.message}`);
@@ -41,7 +42,11 @@ export default async function DashboardPage() {
   if (!categories || categories.length === 0) {
     const { error: rpcError } = await supabase.rpc("ensure_starter_categories");
     if (rpcError) {
-      console.error("ensure_starter_categories failed, inserting starters directly:", rpcError.message);
+      log.warn("starter_categories_rpc_failed", {
+        ...errorFields(rpcError),
+        rpc: "ensure_starter_categories",
+        userId: user.id,
+      });
       const { error: insertError } = await supabase
         .from("categories")
         .insert(STARTER_CATEGORIES.map((c) => ({ user_id: user.id, name: c.name, type: c.type, monthly_limit: 0 })));

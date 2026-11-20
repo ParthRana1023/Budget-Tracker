@@ -177,10 +177,42 @@ test("cycles tile the calendar across pay-day changes: no gaps, no overlaps, 15+
   }
 });
 
-test("paySchedule: onboarding pay day plus changes", () => {
+test("paySchedule: the Start pay day plus changes still in force, from the plan history", () => {
   assert.deepEqual(paySchedule(null), [{ payDay: 1 }]);
-  assert.deepEqual(
-    paySchedule({ month_start_day: 25, pay_day_changes: [{ pay_day: 31, effective_from: "2026-12-25" }] }),
-    [{ payDay: 25 }, { payDay: 31, from: "2026-12-25" }],
-  );
+  assert.deepEqual(paySchedule({ month_start_day: 25 }), [{ payDay: 25 }], "no history: the settings column");
+  const rows = [
+    { field: "payday", to_value: 25, applies: "start", effective_from: "2026-10-01" },
+    { field: "salary", to_value: 1, applies: "next", effective_from: "2026-12-25" },
+    {
+      field: "payday",
+      to_value: 15,
+      applies: "next",
+      effective_from: "2026-12-25",
+      superseded_at: "2026-11-21T10:00:00Z",
+    },
+    { field: "payday", to_value: 31, applies: "next", effective_from: "2026-12-25", created_at: "2026-11-21T10:00:00" },
+  ];
+  assert.deepEqual(paySchedule({ month_start_day: 31, plan_changes: rows }), [
+    { payDay: 25 },
+    { payDay: 31, from: "2026-12-25", applies: "next", madeOn: "2026-11-21" },
+  ]);
+});
+
+test("'now': this cycle keeps its start and ends before the first new pay date after the change", () => {
+  const later = [{ payDay: 25 }, { payDay: 1, from: "2026-11-25", applies: "now", madeOn: "2026-11-28" }];
+  assert.equal(span(later, 2026, 11, 24), "2026-10-25..2026-11-24", "earlier cycles keep their dates");
+  assert.equal(span(later, 2026, 11, 27), "2026-11-25..2026-11-30", "this cycle now ends 30 Nov (6 days)");
+  assert.equal(span(later, 2026, 12, 1), "2026-12-01..2026-12-31");
+  const earlier = [{ payDay: 1 }, { payDay: 25, from: "2026-11-01", applies: "now", madeOn: "2026-11-28" }];
+  assert.equal(span(earlier, 2026, 11, 28), "2026-11-01..2026-12-24", "25 Nov already passed: runs to 24 Dec");
+  assert.equal(span(earlier, 2026, 12, 25), "2026-12-25..2027-01-24");
+  for (const sched of [later, earlier]) {
+    let p = cycleFor(at(2026, 9, 1), sched);
+    for (let i = 0; i < 8; i++) {
+      const [y, m, d] = p.endStr.split("-").map(Number);
+      const next = cycleFor(at(y, m, d + 1), sched);
+      assert.equal(next.startStr, toLocalDateString(at(y, m, d + 1)), `no gap after ${p.endStr}`);
+      p = next;
+    }
+  }
 });

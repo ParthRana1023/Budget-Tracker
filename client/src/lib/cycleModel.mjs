@@ -4,6 +4,7 @@
 
 import { recurringStatus } from "./recurringStatus.mjs";
 import { effectiveDate } from "./cycle.mjs";
+import { planFor } from "./plan.mjs";
 
 /**
  * @typedef {{ id: string, name: string, type: "fixed" | "flexible", monthly_limit: number, due_day?: number | null, is_active?: boolean }} Category
@@ -13,7 +14,7 @@ import { effectiveDate } from "./cycle.mjs";
 
 /**
  * @param {{
- *   settings: { take_home_pay?: number | null, savings_pct?: number | null } | null,
+ *   settings: { take_home_pay?: number | null, savings_pct?: number | null, plan_changes?: import("./periods.mjs").PlanChange[] | null } | null,
  *   categories: Category[], transactions: Tx[],
  *   recurringItems: Array<{ id: string, type: string, amount: number, category_id: string | null, day_of_month: number | null, active: boolean, skip_month?: string | null }>,
  *   period: { startStr: string, endStr: string, totalDays: number, daysElapsed: number, daysRemaining: number },
@@ -77,8 +78,10 @@ export function buildCycleModel({ settings, categories, transactions, recurringI
     }
   }
 
-  const takeHome = Number(settings?.take_home_pay ?? 0),
-    pct = Number(settings?.savings_pct ?? 0);
+  // The plan in force at this cycle's start (a change can apply from this cycle or the next).
+  const plan = planFor(settings, period.startStr);
+  const takeHome = Number(plan.take_home_pay ?? 0),
+    pct = Number(plan.savings_pct ?? 0);
   const savingsTarget = Math.round((takeHome * pct) / 100);
   const savingsSetAside = Math.max(savingsTarget, regularSaved);
   // No income recorded this cycle yet: nothing is safe to spend (never a negative figure).

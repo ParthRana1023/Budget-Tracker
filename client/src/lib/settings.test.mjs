@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { deleteAccount, exportAllCsv, nextCycleStart, payDayStatus, saveSettings } from "./settings.mjs";
+import { applyPlan, deleteAccount, exportAllCsv, nextCycleStart, payDayStatus, savePreferences } from "./settings.mjs";
 
 /** Records rpc calls; serves `rows` in pages for from("transactions"). */
 function fakeSupabase({ rows = [], rpcError = null } = {}) {
@@ -34,19 +34,21 @@ test("pay day in force today and a pending change", () => {
   assert.deepEqual(payDayStatus([{ payDay: 1 }], "2026-11-28"), { current: 1, pending: null });
 });
 
-test("saveSettings sends only what changed; a pay day carries its start date", async () => {
+test("applyPlan starts at this cycle or the next one; savePreferences sends only its keys", async () => {
   const sb = fakeSupabase();
-  await saveSettings(sb, { savingsPct: 25 }, [{ payDay: 25 }], "2026-11-28");
-  await saveSettings(sb, { payDay: 31, theme: "system" }, [{ payDay: 25 }], "2026-11-28");
+  await applyPlan(sb, { savePct: 25 }, "now", [{ payDay: 25 }], "2026-11-28");
+  await applyPlan(sb, { payday: 31, salary: 8500000 }, "next", [{ payDay: 25 }], "2026-11-28");
+  await savePreferences(sb, { theme: "system" });
   assert.deepEqual(sb.calls, [
     [
-      "update_settings",
-      { p_take_home_pay: null, p_savings_pct: 25, p_theme: null, p_pay_day: null, p_pay_day_from: null },
+      "update_plan",
+      { p_salary: null, p_payday: null, p_save_pct: 25, p_applies: "now", p_effective_from: "2026-11-25" },
     ],
     [
-      "update_settings",
-      { p_take_home_pay: null, p_savings_pct: null, p_theme: "system", p_pay_day: 31, p_pay_day_from: "2026-12-25" },
+      "update_plan",
+      { p_salary: 8500000, p_payday: 31, p_save_pct: null, p_applies: "next", p_effective_from: "2026-12-25" },
     ],
+    ["update_preferences", { p_changes: { theme: "system" } }],
   ]);
 });
 

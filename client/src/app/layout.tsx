@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import localFont from "next/font/local";
 import PwaRegister from "@/components/PwaRegister";
+import ErrorReporter from "@/components/ErrorReporter";
 import { ToastProvider } from "@/components/ui/Toast";
 import { THEME_INIT_SCRIPT } from "@/lib/theme";
 import "./globals.css";
@@ -50,6 +51,7 @@ export default function RootLayout({
       </head>
       <body className="min-h-screen antialiased flex flex-col">
         <PwaRegister />
+        <ErrorReporter />
         <ToastProvider>{children}</ToastProvider>
       </body>
     </html>

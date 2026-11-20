@@ -8,6 +8,7 @@ import { createClient } from "@/utils/supabase/client";
 import { inr } from "@/lib/money.mjs";
 import { addDaysStr, dayLabel, shortDate } from "@/lib/cycle.mjs";
 import { cycleFor, paySchedule } from "@/lib/periods.mjs";
+import { planFor } from "@/lib/plan.mjs";
 import {
   cycleHistory,
   flexByDay,
@@ -134,7 +135,9 @@ export default function ReportsView({
     N = cur.period.totalDays;
   const budget = flex.reduce((s, c) => s + Number(c.monthly_limit), 0);
   const fixedTotal = fixed.reduce((s, c) => s + Number(c.monthly_limit), 0);
-  const target = Number(settings?.savings_pct ?? 0);
+  // The plan in force for the current period (salary and save-first % can change per cycle).
+  const curPlan = planFor(settings, cur.period.startStr);
+  const target = Number(curPlan.savings_pct ?? 0);
   const prevName = prev?.labelLong ?? "Last month";
 
   const catName = (t: Tx) => byId.get(t.category_id ?? "")?.name;
@@ -240,8 +243,8 @@ export default function ReportsView({
       ySaved = sum((c) => c.saved + c.extraSaved),
       yFixed = sum((c) => c.fixed),
       yFlex = sum((c) => c.flex);
-    const fixShare = settings?.take_home_pay
-      ? (fixedTotal / Number(settings.take_home_pay)) * 100
+    const fixShare = curPlan.take_home_pay
+      ? (fixedTotal / Number(curPlan.take_home_pay)) * 100
       : yIncome
         ? (yFixed / yIncome) * 100
         : 0;
@@ -986,7 +989,7 @@ export default function ReportsView({
     const next = cycleFor(new Date(`${addDaysStr(cur.period.endStr, 1)}T12:00:00`), reportSchedule(schedule, grouping));
     const nextName = new Date(`${next.startStr}T12:00:00`).toLocaleDateString("en-GB", { month: "long" });
     const f = forecastNext({
-      settings,
+      settings: planFor(settings, next.startStr),
       fixed,
       recurringItems,
       flex,

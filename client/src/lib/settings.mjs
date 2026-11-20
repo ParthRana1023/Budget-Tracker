@@ -36,21 +36,37 @@ export function payDayStatus(schedule, today) {
 }
 
 /**
- * Save Settings. Leave a field out (undefined) to keep it unchanged. A new pay day takes
- * effect at the next cycle start.
+ * Start date of the cycle containing `today`: where a "This cycle" plan change applies from.
+ * @param {PayDayEntry[]} schedule @param {string} today
+ */
+export const thisCycleStart = (schedule, today) => cycleFor(toDate(today), schedule).startStr;
+
+/**
+ * Save preferences and profile fields (they save on their own). Only the keys passed change;
+ * null clears name, photo or theme.
  * @param {any} supabase
- * @param {{ takeHomePay?: number, savingsPct?: number, theme?: "dark" | "light" | "system", payDay?: number }} changes
+ * @param {{ theme?: "dark" | "light" | "system" | null, display_name?: string | null, avatar_url?: string | null,
+ *   number_format?: "indian" | "international" | "european", week_start?: 0 | 1 }} changes
+ * @returns {Promise<{ error: any }>}
+ */
+export const savePreferences = (supabase, changes) => supabase.rpc("update_preferences", { p_changes: changes });
+
+/**
+ * "Apply from when?": save salary, payday and save-first % together, from this cycle or the
+ * next one. Leave a field out to keep it. The database records each change in the plan history.
+ * @param {any} supabase
+ * @param {{ salary?: number, payday?: number, savePct?: number }} changes salary in paise; payday 1-28 or 31
+ * @param {"now" | "next"} applies
  * @param {PayDayEntry[]} schedule @param {string} today
  * @returns {Promise<{ error: any }>}
  */
-export function saveSettings(supabase, changes, schedule, today) {
-  const payDay = changes.payDay ?? null;
-  return supabase.rpc("update_settings", {
-    p_take_home_pay: changes.takeHomePay ?? null,
-    p_savings_pct: changes.savingsPct ?? null,
-    p_theme: changes.theme ?? null,
-    p_pay_day: payDay,
-    p_pay_day_from: payDay === null ? null : nextCycleStart(schedule, today),
+export function applyPlan(supabase, changes, applies, schedule, today) {
+  return supabase.rpc("update_plan", {
+    p_salary: changes.salary ?? null,
+    p_payday: changes.payday ?? null,
+    p_save_pct: changes.savePct ?? null,
+    p_applies: applies,
+    p_effective_from: applies === "now" ? thisCycleStart(schedule, today) : nextCycleStart(schedule, today),
   });
 }
 

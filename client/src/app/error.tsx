@@ -2,11 +2,15 @@
 
 import { useEffect, useState } from "react";
 import StatusPage from "@/components/StatusPage";
+import { errorFields, reportClientError } from "@/lib/log.mjs";
 
 export default function ServerError({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {
   // The digest matches the server log entry; without one, a short id still helps a report.
   const [reference] = useState(() => error.digest ?? `SF-${Date.now().toString(36).slice(-6).toUpperCase()}`);
-  useEffect(() => console.error(error), [error]);
+  useEffect(
+    () => reportClientError("page_crash", { ...errorFields(error), digest: reference, route: location.pathname }),
+    [error, reference],
+  );
 
   return (
     <StatusPage

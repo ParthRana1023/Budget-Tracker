@@ -67,21 +67,36 @@ function payDatesAround(/** @type {string} */ s, /** @type {number} */ payDay) {
 const MIN_TRANSITION_DAYS = 15;
 
 /**
- * @typedef {{ payDay: number, from?: string | null }} PayDayEntry
+ * @typedef {{ payDay: number, from?: string | null, applies?: "now" | "next", madeOn?: string }} PayDayEntry
  *   The pay day in force from `from` ('YYYY-MM-DD', a cycle start). The entry without `from`
- *   is the original pay day.
+ *   is the original pay day. `applies` 'now' = changed for the cycle it was made in, on
+ *   `madeOn`; 'next' (default) = from the next cycle.
  */
 
 /**
- * The pay-day schedule of a user: the pay day from onboarding plus every later change
- * (user_settings.pay_day_changes, each effective from a cycle start).
- * @param {{ month_start_day?: number | null, pay_day_changes?: Array<{ pay_day: number, effective_from: string }> | null } | null | undefined} settings
+ * @typedef {{ field: "salary" | "payday" | "save_pct", from_value?: number | null, to_value: number,
+ *   applies: "start" | "now" | "next", effective_from: string, superseded_at?: string | null, created_at?: string }} PlanChange
+ */
+
+/**
+ * The pay-day schedule of a user from the plan history (user_settings.plan_changes): the
+ * onboarding pay day plus every change still in force. Falls back to month_start_day.
+ * @param {{ month_start_day?: number | null, plan_changes?: PlanChange[] | null } | null | undefined} settings
  * @returns {PayDayEntry[]}
  */
 export function paySchedule(settings) {
+  const rows = (settings?.plan_changes ?? []).filter((r) => r.field === "payday" && !r.superseded_at);
+  const start = rows.find((r) => r.applies === "start");
   return [
-    { payDay: settings?.month_start_day || 1 },
-    ...(settings?.pay_day_changes ?? []).map((c) => ({ payDay: c.pay_day, from: c.effective_from })),
+    { payDay: Number(start?.to_value ?? settings?.month_start_day) || 1 },
+    ...rows
+      .filter((r) => r.applies !== "start")
+      .map((r) => ({
+        payDay: Number(r.to_value),
+        from: r.effective_from,
+        applies: /** @type {"now" | "next"} */ (r.applies),
+        ...(r.created_at ? { madeOn: toLocalDateString(new Date(r.created_at)) } : {}),
+      })),
   ];
 }
 
@@ -89,10 +104,13 @@ export function paySchedule(settings) {
  * The pay-day cycle containing `referenceDate` under a pay-day schedule.
  *
  * A cycle runs from one pay date to the day before the next. Pay day 31 is the last day
- * of each month. When the pay day changes (effective from F, the next pay date under the
- * old pay day), the cycle starting at F runs to the first new pay date at least
- * MIN_TRANSITION_DAYS after F, so no cycle is shorter than that (e.g. 25th -> last day,
- * F = 25 Dec: 25 Dec - 30 Jan, not 25 - 30 Dec).
+ * of each month. When the pay day changes from F (a cycle start):
+ *   - 'next' (F = the next pay date under the old pay day): the cycle starting at F runs to
+ *     the first new pay date at least MIN_TRANSITION_DAYS after F, so no cycle is shorter
+ *     than that (25th -> last day, F = 25 Dec: 25 Dec - 30 Jan, not 25 - 30 Dec).
+ *   - 'now' (F = the start of the cycle it was made in): that cycle keeps its start and ends
+ *     the day before the first new pay date after the day the change was made; no entry
+ *     changes cycle (25th -> 1st on 28 Nov: 25 Nov - 30 Nov).
  *
  * startStr / endStr are inclusive local YYYY-MM-DD bounds, safe to compare against `date`
  * columns with plain string comparison.
@@ -116,12 +134,17 @@ export function cycleFor(referenceDate, schedule) {
     }
   }
   const payDay = normPayDay(seg.payDay);
-  const minStart = seg.from ? plusDays(seg.from, MIN_TRANSITION_DAYS) : null;
+  // New pay dates after `boundary` start cycles; up to it, the cycle that began at the change runs on.
+  const boundary = !seg.from
+    ? null
+    : seg.applies === "now" && seg.madeOn
+      ? seg.madeOn
+      : plusDays(seg.from, MIN_TRANSITION_DAYS - 1);
 
   const around = payDatesAround(ref, payDay);
-  const startStr = seg.from && /** @type {string} */ (minStart) > around.prev ? seg.from : around.prev;
+  const startStr = boundary && around.prev <= boundary ? /** @type {string} */ (seg.from) : around.prev;
   let next = around.next;
-  if (minStart && next < minStart) next = payDatesAround(next, payDay).next;
+  while (boundary && next <= boundary) next = payDatesAround(next, payDay).next;
   if (nextChange && nextChange < next) next = nextChange;
   const endStr = plusDays(next, -1);
 
