@@ -34,10 +34,10 @@ test.describe("Onboarding", () => {
   test("answers carry through to the summary and the safe-to-spend preview", async ({ page }) => {
     await signUpFreshUser(page);
 
-    // Step 1: income. The pay day clamps to 1-28 while typing.
+    // Step 1: income. Pay day: 1st-28th, or the last day of the month.
     await page.fill("#ob-sal", "100000");
-    await page.fill("#ob-day", "31");
-    await expect(page.locator("#ob-day")).toHaveValue("28");
+    await page.getByLabel("Salary lands on").selectOption({ label: "Last day of the month" });
+    await expect(page.locator("#ob-day")).toHaveValue("31");
     await expect(onboardingNext(page)).toHaveText("Continue");
     await onboardingNext(page).click();
 

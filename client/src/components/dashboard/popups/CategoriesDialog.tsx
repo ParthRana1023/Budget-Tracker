@@ -6,12 +6,12 @@
 import { useState } from "react";
 import { Lock, Trash2 } from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
-import { inr } from "@/lib/money.mjs";
+import { inr, showTyped } from "@/lib/money.mjs";
 import { categoryDiff, draftProblems } from "@/lib/categoryDiff.mjs";
 import Dialog from "../../ui/Dialog";
 import type { Category } from "../types";
 import type { PopupContext } from "./context";
-import { FIELD, Preview, SAVE_FAILED, cleanDay, paise, toField } from "./parts";
+import { FIELD, Preview, SAVE_FAILED, cleanAmount, cleanDay, paise, toField } from "./parts";
 
 type Cat = {
   id: string;
@@ -196,9 +196,9 @@ export default function CategoriesDialog({ ctx, onClose }: { ctx: PopupContext; 
                   inputMode="numeric"
                   placeholder={c.type === "flexible" ? "No limit" : "Amount"}
                   aria-label={`${c.name} monthly ${c.type === "flexible" ? "limit" : "amount"}`}
-                  value={limits[c.id] ?? ""}
+                  value={showTyped(limits[c.id] ?? "")}
                   onChange={(e) => {
-                    const v = e.target.value.replace(/[^\d.]/g, "").slice(0, 9);
+                    const v = cleanAmount(e.target.value);
                     setLimits((l) => ({ ...l, [c.id]: v }));
                     update(c.id, { monthly_limit: paise(v) });
                   }}
@@ -260,8 +260,8 @@ export default function CategoriesDialog({ ctx, onClose }: { ctx: PopupContext; 
             inputMode="numeric"
             placeholder={tab === "flexible" ? "Blank = no limit" : "Monthly amount"}
             aria-label="Monthly limit"
-            value={add.limit}
-            onChange={(e) => setAdd({ ...add, limit: e.target.value.replace(/[^\d.]/g, "").slice(0, 9) })}
+            value={showTyped(add.limit)}
+            onChange={(e) => setAdd({ ...add, limit: cleanAmount(e.target.value) })}
             className={`${FIELD} h-11 w-auto flex-[1_1_120px]`}
           />
           {tab === "fixed" && (

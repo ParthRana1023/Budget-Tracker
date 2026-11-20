@@ -3,6 +3,7 @@
 // Edit recurring item (design handoff, Popups).
 
 import { createClient } from "@/utils/supabase/client";
+import { showTyped } from "@/lib/money.mjs";
 import Dialog from "../../ui/Dialog";
 import type { RecurringItem } from "../types";
 import type { PopupContext } from "./context";
@@ -73,7 +74,7 @@ export default function RecurringDialog({
             id="ru-amt"
             type="text"
             inputMode="decimal"
-            value={form.amount}
+            value={showTyped(form.amount)}
             onChange={(e) => set({ amount: cleanAmount(e.target.value) })}
             className={`${FIELD} tabular`}
           />

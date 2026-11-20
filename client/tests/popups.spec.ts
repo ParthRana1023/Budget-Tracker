@@ -88,7 +88,7 @@ test.describe("Popups", () => {
     await expect(dialog(page)).toHaveCount(0);
 
     await page.getByRole("button", { name: "Mark received & allocate" }).click();
-    await expect(dialog(page).getByLabel("Amount to savings")).toHaveValue("30000");
+    await expect(dialog(page).getByLabel("Amount to savings")).toHaveValue("30,000");
     await dialog(page).getByLabel("Amount to spend this cycle").fill("1000");
     await expect(dialog(page)).toContainText("₹11,000 still to allocate.");
     await dialog(page).getByRole("button", { name: "Confirm & allocate" }).click();

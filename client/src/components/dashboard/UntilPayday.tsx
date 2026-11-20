@@ -9,6 +9,7 @@ import { monotonePath, projectUntilPayday } from "@/lib/untilPayday.mjs";
 import type { buildCycleModel } from "@/lib/cycleModel.mjs";
 import type { RecurringItem, Tx } from "./types";
 import Reveal from "../ui/Reveal";
+import Slider from "../ui/Slider";
 
 type Model = ReturnType<typeof buildCycleModel>;
 type Period = { startStr: string; totalDays: number; daysElapsed: number };
@@ -160,16 +161,16 @@ export default function UntilPayday({
               </button>
             )}
           </div>
-          <input
+          <Slider
             id="run-burn"
-            type="range"
             min={0}
             max={p.sliderMax}
             step={5000}
             value={Math.round(p.burn)}
-            onChange={(e) => setDailySpend(+e.target.value)}
-            aria-valuetext={`${inr(p.burn)} a day`}
-            className="w-full cursor-pointer accent-lime"
+            onChange={setDailySpend}
+            valueText={`${inr(p.burn)} a day`}
+            mark={p.pace}
+            danger={short}
           />
           <span className="text-xs text-muted">Your pace so far: {inr(p.pace)} a day</span>
           <div

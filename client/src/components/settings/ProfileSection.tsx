@@ -7,9 +7,15 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/utils/supabase/client";
 import { formatMoney } from "@/lib/money.mjs";
-import { AVATAR_TYPES, avatarProblem, removeAvatar, savePreferences, uploadAvatar } from "@/lib/settings.mjs";
+import {
+  AVATAR_TYPES,
+  avatarProblem,
+  payDayLabel,
+  removeAvatar,
+  savePreferences,
+  uploadAvatar,
+} from "@/lib/settings.mjs";
 import type { Settings } from "../dashboard/types";
-import { dayLabel } from "./PlanSection";
 import { Avatar, BTN_LINK, Card, INPUT, Row, SAVE_ERROR, SaveState, useSave } from "./parts";
 
 export type AccountUser = { id: string; email: string; verified: boolean; createdAt: string };
@@ -148,7 +154,7 @@ export default function ProfileSection({
         </div>
         <div className="flex flex-col">
           <span className="text-xs text-muted">Payday</span>
-          <span className="text-xl font-semibold">{dayLabel(settings.month_start_day ?? 1).replace(/^l/, "L")}</span>
+          <span className="text-xl font-semibold">{payDayLabel(settings.month_start_day ?? 1).replace(/^l/, "L")}</span>
         </div>
         <div className="flex flex-col">
           <span className="text-xs text-muted">Saved first</span>

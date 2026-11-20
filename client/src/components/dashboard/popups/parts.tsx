@@ -4,7 +4,7 @@
 
 import { useState, type ReactNode } from "react";
 import { Repeat, Trash2, TriangleAlert } from "lucide-react";
-import { inr } from "@/lib/money.mjs";
+import { cleanTyped, inr, showTyped } from "@/lib/money.mjs";
 
 export const FIELD =
   "h-12 w-full min-w-0 rounded-xl border border-line-2 bg-tile-2 px-3.5 text-[15px] text-ink outline-none transition-[border-color,box-shadow] duration-200 focus:border-lime focus:shadow-[0_0_0_3px_var(--lime-soft)] focus-visible:outline-none";
@@ -13,19 +13,8 @@ export const OFFLINE = "You’re offline, so this wasn’t saved. Reconnect and 
 
 /** Rupees typed into a field -> paise (0 when blank or invalid). */
 export const paise = (v: string) => Math.round((parseFloat(v.replace(/[^\d.]/g, "")) || 0) * 100);
-/** Keep digits and one decimal point with at most 2 decimals. */
-export const cleanAmount = (v: string) => {
-  let x = v.replace(/[^\d.]/g, "");
-  const i = x.indexOf(".");
-  if (i >= 0)
-    x =
-      x.slice(0, i + 1) +
-      x
-        .slice(i + 1)
-        .replace(/\./g, "")
-        .slice(0, 2);
-  return x.slice(0, 9);
-};
+/** What was typed (in the user's number format) -> "1234.5". Show it back with showTyped. */
+export const cleanAmount = (v: string) => cleanTyped(v);
 /** Day-of-month field: digits only, up to 2. */
 export const cleanDay = (v: string) => v.replace(/\D/g, "").slice(0, 2);
 /** Paise -> the plain rupee string a field shows ("1200", "99.5"). */
@@ -105,7 +94,7 @@ export function AmountField({
           autoComplete="off"
           autoFocus
           placeholder="0"
-          value={value}
+          value={showTyped(value)}
           onChange={(e) => onChange(cleanAmount(e.target.value))}
           className="tabular w-full min-w-0 flex-1 border-0 bg-transparent p-0 font-serif text-[clamp(48px,13vw,64px)] leading-[1.05] tracking-[-0.02em] text-ink outline-none focus-visible:outline-none"
         />

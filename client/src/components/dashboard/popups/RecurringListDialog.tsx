@@ -7,7 +7,7 @@
 import { useState } from "react";
 import { Trash2 } from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
-import { inr } from "@/lib/money.mjs";
+import { inr, showTyped } from "@/lib/money.mjs";
 import { recurringDiff, recurringProblems } from "@/lib/recurringDiff.mjs";
 import Dialog from "../../ui/Dialog";
 import type { RecurringItem } from "../types";
@@ -139,7 +139,7 @@ export default function RecurringListDialog({ ctx, onClose }: { ctx: PopupContex
                 type="text"
                 inputMode="decimal"
                 aria-label={`${r.name} amount`}
-                value={amounts[r.id] ?? ""}
+                value={showTyped(amounts[r.id] ?? "")}
                 onChange={(e) => {
                   const v = cleanAmount(e.target.value);
                   setAmounts((a) => ({ ...a, [r.id]: v }));
@@ -210,7 +210,7 @@ export default function RecurringListDialog({ ctx, onClose }: { ctx: PopupContex
             inputMode="decimal"
             placeholder="Amount"
             aria-label="New recurring item amount"
-            value={add.amount}
+            value={showTyped(add.amount)}
             onChange={(e) => setAdd({ ...add, amount: cleanAmount(e.target.value) })}
             className={`${FIELD} h-11 w-auto flex-[1_1_110px]`}
           />

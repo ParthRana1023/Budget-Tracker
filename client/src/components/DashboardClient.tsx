@@ -7,11 +7,12 @@ import { useEffect, useMemo, useState } from "react";
 import { Plus } from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
 import { cycleFor, paySchedule, toLocalDateString } from "@/lib/periods.mjs";
-import { cycleKey, cycleKeyFor, cycleLabel, dayLabel } from "@/lib/cycle.mjs";
+import { cycleKey, cycleKeyFor, cycleLabel, dayLabel, shortDate } from "@/lib/cycle.mjs";
+import { payDayLabel, payDayStatus } from "@/lib/settings.mjs";
 import { buildCycleModel } from "@/lib/cycleModel.mjs";
 import { recurringStatus } from "@/lib/recurringStatus.mjs";
 import { budgetWarnings } from "@/lib/notices.mjs";
-import { inr } from "@/lib/money.mjs";
+import { inr, setNumberFormat } from "@/lib/money.mjs";
 import { transactionsToCsv } from "@/lib/csvExport.mjs";
 import { syncSavedTheme } from "@/lib/theme";
 import AppHeader, { type Tab } from "./AppHeader";
@@ -63,6 +64,8 @@ export default function DashboardClient(props: DashboardClientProps) {
   const toast = useToast();
   const [view, setView] = useState<Tab>(props.initialView ?? "dashboard");
   const [settings] = useState<Settings | null>(props.initialSettings);
+  // Every amount below is shown and typed in the user's number format.
+  setNumberFormat(settings?.number_format);
   const [categories, setCategories] = useState(props.initialCategories);
   const [transactions, setTransactions] = useState(props.initialTransactions);
   const [incomeSources, setIncomeSources] = useState(props.initialIncomeSources);
@@ -104,6 +107,7 @@ export default function DashboardClient(props: DashboardClientProps) {
   const today = toLocalDateString();
   const schedule = useMemo(() => paySchedule(settings), [settings]);
   const period = useMemo(() => cycleFor(new Date(), schedule), [schedule]);
+  const pendingPayDay = payDayStatus(schedule, today).pending;
   const activeCategories = useMemo(() => categories.filter((c) => c.is_active !== false), [categories]);
   const model = useMemo(
     () => buildCycleModel({ settings, categories, transactions, recurringItems, period, today }),
@@ -348,7 +352,11 @@ export default function DashboardClient(props: DashboardClientProps) {
           <>
             <div className="eyebrow flex flex-wrap justify-between gap-x-6 gap-y-1.5 px-1 pb-1">
               <span>{dateLong}</span>
-              <span>{cycleLabel(period)}</span>
+              <span>
+                {cycleLabel(period)}
+                {pendingPayDay &&
+                  ` · Payday moves to the ${payDayLabel(pendingPayDay.payDay)} from ${shortDate(pendingPayDay.from)}`}
+              </span>
             </div>
 
             <Notices

@@ -56,6 +56,7 @@ const SUB = "text-[13px] text-muted";
 const ROW_BTN =
   "flex cursor-pointer flex-wrap items-center gap-x-4 gap-y-1.5 border-0 border-b border-line bg-transparent py-2.5 text-left";
 const ROMAN = ["i", "ii", "iii", "iv"];
+const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
 function Head({ title, sub, children }: { title: ReactNode; sub?: string; children?: ReactNode }) {
   return (
@@ -518,7 +519,10 @@ export default function ReportsView({
       arr.map((v, k) => `${((k / n) * 600).toFixed(1)},${Y(v).toFixed(1)}`).join(" ");
     const proj = DAY ? (cur.flex / DAY) * N : 0;
     const cal = calPrev && prev ? prev : cur;
-    const lead = (new Date(`${cal.period.startStr}T12:00:00`).getDay() + 6) % 7;
+    // Week start (Settings › Preferences): 1 Monday, 0 Sunday. Weekday indexes below are Mon=0..Sun=6.
+    const weekStart = settings?.week_start ?? 1;
+    const order = weekStart === 1 ? [0, 1, 2, 3, 4, 5, 6] : [6, 0, 1, 2, 3, 4, 5];
+    const lead = (new Date(`${cal.period.startStr}T12:00:00`).getDay() - weekStart + 7) % 7;
     const maxD = Math.max(1, ...cal.daily);
     const wk = weekdayAverages([prev, cur].filter(Boolean) as Cycle[], today),
       wkMax = Math.max(1, ...wk);
@@ -644,9 +648,9 @@ export default function ReportsView({
               </div>
             </Head>
             <div className="grid grid-cols-7 gap-1">
-              {["M", "T", "W", "T", "F", "S", "S"].map((h, i) => (
+              {order.map((i) => (
                 <span key={i} className="text-center text-xs text-muted">
-                  {h}
+                  {"MTWTFSS"[i]}
                 </span>
               ))}
               {Array.from({ length: lead }, (_, i) => (
@@ -679,9 +683,9 @@ export default function ReportsView({
           </section>
           <section className={`${CARD} flex-[2_1_300px]`}>
             <Head title="By weekday" sub={`Average flexible spend, ${prev?.label ?? cur.label}–${cur.label}`} />
-            {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((label, i) => (
-              <div key={label} className="flex items-center gap-3">
-                <span className="w-9 text-[13px] text-muted">{label}</span>
+            {order.map((i) => (
+              <div key={i} className="flex items-center gap-3">
+                <span className="w-9 text-[13px] text-muted">{WEEKDAYS[i]}</span>
                 <div className="h-2.5 flex-1 overflow-hidden rounded-full bg-track">
                   <div
                     className="h-full rounded-full"

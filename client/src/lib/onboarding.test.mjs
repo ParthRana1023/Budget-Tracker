@@ -58,6 +58,12 @@ test("names never collide, so the save can't be rejected", () => {
   );
 });
 
+test("payday: 1-28, or 31 for the last day of the month", () => {
+  assert.equal(onboardingPayload({ ...base, payDay: "31" }).p_pay_day, 31);
+  assert.equal(onboardingPayload({ ...base, payDay: "25" }).p_pay_day, 25);
+  assert.equal(onboardingPayload({ ...base, payDay: "" }).p_pay_day, 1);
+});
+
 test("day inputs clamp to 1-28", () => {
   assert.equal(clampDay("31"), "28");
   assert.equal(clampDay("0"), "1");

@@ -5,25 +5,15 @@
 import { useState, type ReactNode } from "react";
 import { Pencil, Trash2 } from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
-import { inr } from "@/lib/money.mjs";
+import { inr, showTyped } from "@/lib/money.mjs";
 import { monthLabel } from "@/lib/cycle.mjs";
 import { analyzeGoal, goalTrack } from "@/lib/goalAnalytics.mjs";
 import Dialog from "../ui/Dialog";
 import Reveal from "../ui/Reveal";
 import { useToast } from "../ui/Toast";
 import { CARD_H2, LINK_BUTTON, type Contribution, type Goal } from "./types";
+import { FIELD, SAVE_FAILED, cleanAmount, paise } from "./popups/parts";
 
-const FIELD =
-  "h-12 w-full min-w-0 rounded-xl border border-line-2 bg-tile-2 px-3.5 text-[15px] text-ink outline-none transition-[border-color,box-shadow] duration-200 focus:border-lime focus:shadow-[0_0_0_3px_var(--lime-soft)] focus-visible:outline-none";
-const SAVE_FAILED = "Couldn’t save. Check your connection and try again. Nothing was changed.";
-
-/** Rupees typed into a field -> paise (0 when blank or invalid). */
-const paise = (v: string) => Math.round((parseFloat(v.replace(/[^\d.]/g, "")) || 0) * 100);
-const cleanAmount = (v: string) =>
-  v
-    .replace(/[^\d.]/g, "")
-    .replace(/(\..*)\./g, "$1")
-    .slice(0, 9);
 const thisMonth = (today: string) => today.slice(0, 7);
 /** Months from this month to 'YYYY-MM' (the handoff's monthsTo). */
 const monthsTo = (by: string, today: string) => {
@@ -378,7 +368,7 @@ export default function Goals({
                     autoComplete="off"
                     autoFocus
                     placeholder="0"
-                    value={form.amount}
+                    value={showTyped(form.amount)}
                     onChange={(e) => set({ amount: cleanAmount(e.target.value) })}
                     className="tabular w-full min-w-0 flex-1 border-0 bg-transparent p-0 font-serif text-[clamp(48px,13vw,64px)] leading-[1.05] tracking-[-0.02em] text-ink outline-none focus-visible:outline-none"
                   />
@@ -431,7 +421,7 @@ export default function Goals({
                     type="text"
                     inputMode="decimal"
                     placeholder="₹1,00,000"
-                    value={form.target}
+                    value={showTyped(form.target)}
                     onChange={(e) => set({ target: cleanAmount(e.target.value) })}
                     className={`${FIELD} tabular`}
                   />
@@ -454,7 +444,7 @@ export default function Goals({
                     type="text"
                     inputMode="decimal"
                     placeholder="₹0"
-                    value={form.saved}
+                    value={showTyped(form.saved)}
                     onChange={(e) => set({ saved: cleanAmount(e.target.value) })}
                     className={`${FIELD} max-w-[240px]`}
                   />

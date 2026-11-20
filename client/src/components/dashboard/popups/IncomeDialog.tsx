@@ -3,7 +3,7 @@
 // Record income (design handoff, Popups): received now, or expected later (on hold).
 
 import { createClient } from "@/utils/supabase/client";
-import { addDaysStr, cycleKeyFor } from "@/lib/cycle.mjs";
+import { addDaysStr, cycleDayOf, cycleKeyFor, nextCycleOffer, shortDate } from "@/lib/cycle.mjs";
 import { inr } from "@/lib/money.mjs";
 import { recurringStatus } from "@/lib/recurringStatus.mjs";
 import Dialog from "../../ui/Dialog";
@@ -17,6 +17,7 @@ import {
   SAVE_FAILED,
   Suggestions,
   Switch,
+  SwitchRow,
   paise,
   safeAfterPreview,
   toField,
@@ -51,9 +52,14 @@ export default function IncomeDialog({
     repeat: false,
     day: "",
     itemId: null as string | null,
+    early: false,
   });
   const amount = paise(form.amount);
   const received = form.status === "received";
+  // Income 1-5 days before payday can count toward the next cycle (counts_from).
+  const offer: string | null = received ? nextCycleOffer(form.date, ctx.schedule) : null;
+  const early = form.early && !!offer;
+  const daysBefore = offer ? cycleDayOf(offer, { startStr: form.date }) - 1 : 0;
   const holdTotal = ctx.held.reduce((s, i) => s + Number(i.amount), 0);
 
   const statusCtx = { cycleTransactions: model.cycleTransactions, period, today };
@@ -94,7 +100,14 @@ export default function IncomeDialog({
     );
 
   let preview: PreviewProps;
-  if (amount > 0 && received) {
+  if (amount > 0 && early) {
+    preview = {
+      label: `Counts from ${shortDate(offer!)}`,
+      value: `+${inr(amount)}`,
+      line: "added to next cycle’s income",
+      sub: `safe to spend stays ${inr(model.safe)}`,
+    };
+  } else if (amount > 0 && received) {
     preview = safeAfterPreview(
       ctx.previewSafe([{ type: "income", amount, date: form.date }]),
       model.safe,
@@ -148,6 +161,7 @@ export default function IncomeDialog({
     if (form.repeat && day !== null && !(day >= 1 && day <= 28))
       return setError("Pick a day from 1 to 28, or leave it blank.");
     const viaRecurring = !!form.itemId || form.repeat;
+    const countsFrom = early ? offer : null;
     save(
       () =>
         viaRecurring
@@ -161,20 +175,24 @@ export default function IncomeDialog({
               p_make_recurring: !form.itemId,
               p_day: form.itemId ? null : day,
               p_income_type: form.type,
-              p_cycle_key: cycleKeyFor(form.date, ctx.schedule),
+              p_cycle_key: cycleKeyFor(countsFrom ?? form.date, ctx.schedule),
+              p_counts_from: countsFrom,
             })
           : supabase.rpc("record_received_income", {
               p_name: name,
               p_amount: amount,
               p_date: form.date,
               p_type: form.type,
+              p_counts_from: countsFrom,
             }),
       async (txId) => {
         onClose();
         // The income row and its transaction are linked; deleting the transaction removes both.
         const undo = typeof txId === "string" ? () => supabase.from("transactions").delete().eq("id", txId) : undefined;
         await ctx.saved(
-          `Added ${inr(amount)} to this cycle’s income${form.repeat && !form.itemId ? " · repeats monthly" : ""}`,
+          countsFrom
+            ? `Added ${inr(amount)} · counts toward the cycle starting ${shortDate(countsFrom)}`
+            : `Added ${inr(amount)} to this cycle’s income${form.repeat && !form.itemId ? " · repeats monthly" : ""}`,
           undo,
         );
       },
@@ -313,6 +331,14 @@ export default function IncomeDialog({
             <DueDayField id="in-day" value={form.day} onChange={(v) => set({ day: v })} />
           </div>
         </div>
+      )}
+      {offer && (
+        <SwitchRow
+          title={`Count toward the cycle starting ${shortDate(offer)}`}
+          sub={`This arrived ${daysBefore} day${daysBefore === 1 ? "" : "s"} before payday. Turn this on if it’s meant for next month: it stays out of this cycle’s safe to spend and is counted from ${shortDate(offer)}.`}
+          on={form.early}
+          onToggle={() => set({ early: !form.early })}
+        />
       )}
       <Preview {...preview} />
     </Dialog>

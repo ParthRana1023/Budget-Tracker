@@ -16,6 +16,8 @@ import {
   keptBills,
   onboardingPayload,
 } from "@/lib/onboarding.mjs";
+import { PAYDAY_OPTIONS } from "@/lib/settings.mjs";
+import { inr as money } from "@/lib/money.mjs";
 
 const STEPS: Array<[eyebrow: string, title: string, em: string, lede: string]> = [
   [
@@ -50,7 +52,8 @@ const STEPS: Array<[eyebrow: string, title: string, em: string, lede: string]> =
   ],
 ];
 
-const inr = (n: number) => `${n < 0 ? "−" : ""}₹${Math.round(Math.abs(n)).toLocaleString("en-IN")}`;
+/** Rupees (not paise) here: onboarding works in whole rupees. */
+const inr = (rupees: number) => money(rupees * 100);
 const FIELD =
   "rounded-[10px] border border-line-2 bg-tile-2 text-[15px] text-ink outline-none focus:border-lime focus-visible:outline-none";
 
@@ -93,7 +96,6 @@ export default function Onboarding() {
   const next = async (e: FormEvent) => {
     e.preventDefault();
     if (busy) return;
-    if (step === 0 && !payDay) setPayDay("1");
     if (step === 2) {
       const kept = keptBills(bills);
       setBills(kept.length ? kept : [{ name: "", amt: "", due: "" }]);
@@ -194,18 +196,20 @@ export default function Onboarding() {
               </div>
               <div className="flex flex-col gap-2">
                 <label htmlFor="ob-day" className="eyebrow">
-                  Salary lands on day
+                  Salary lands on
                 </label>
-                <input
+                <select
                   id="ob-day"
-                  type="text"
-                  inputMode="numeric"
-                  maxLength={2}
                   value={payDay}
-                  onChange={(e) => setPayDay(clampDay(e.target.value))}
-                  placeholder="1–28"
-                  className="h-12 w-[110px] rounded-xl border border-line-2 bg-tile-2 px-3.5 text-center text-[15px] text-ink outline-none focus:border-lime focus:shadow-[0_0_0_3px_var(--lime-soft)] focus-visible:outline-none"
-                />
+                  onChange={(e) => setPayDay(e.target.value)}
+                  className="h-12 w-full max-w-[280px] cursor-pointer rounded-xl border border-line-2 bg-tile-2 px-3 text-[15px] text-ink outline-none focus:border-lime focus:shadow-[0_0_0_3px_var(--lime-soft)] focus-visible:outline-none"
+                >
+                  {PAYDAY_OPTIONS.map((o) => (
+                    <option key={o.value} value={o.value}>
+                      {o.label}
+                    </option>
+                  ))}
+                </select>
                 <span className="text-[13px] text-muted">Your cycle starts this day each month.</span>
               </div>
             </>

@@ -5,7 +5,7 @@
 import { useEffect, useState } from "react";
 import { ChevronDown } from "lucide-react";
 import { inr } from "@/lib/money.mjs";
-import { dayLabel } from "@/lib/cycle.mjs";
+import { dayLabel, shortDate } from "@/lib/cycle.mjs";
 import Reveal from "../ui/Reveal";
 import { CARD_H2, LINK_BUTTON, PILL_LIME, PILL_LINE, type Category, type Tx } from "./types";
 
@@ -50,7 +50,12 @@ export default function Ledger({
     const cat = t.category_id ? byId.get(t.category_id) : undefined;
     if (t.type === "expense")
       return { cat: t.category?.name ?? cat?.name ?? "Uncategorised", amt: `− ${inr(t.amount)}`, color: "var(--ink)" };
-    if (t.type === "income") return { cat: "Income", amt: `+ ${inr(t.amount)}`, color: "var(--lime-text)" };
+    if (t.type === "income")
+      return {
+        cat: t.counts_from ? `Income · counts from ${shortDate(t.counts_from)}` : "Income",
+        amt: `+ ${inr(t.amount)}`,
+        color: "var(--lime-text)",
+      };
     if (t.type === "savings_transfer") return { cat: "Savings", amt: `→ ${inr(t.amount)}`, color: "var(--lime-text)" };
     return { cat: "Reserved", amt: `→ ${inr(t.amount)}`, color: "var(--muted)" };
   };

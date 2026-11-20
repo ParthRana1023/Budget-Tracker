@@ -8,7 +8,16 @@ import { Minus, Plus } from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
 import { formatMoney, NUMBER_LOCALES } from "@/lib/money.mjs";
 import { shortDate } from "@/lib/cycle.mjs";
-import { applyPlan, nextCycleStart, payDayPreview, pendingPlan, planHistory } from "@/lib/settings.mjs";
+import {
+  applyPlan,
+  nextCycleStart,
+  ordinal,
+  PAYDAY_OPTIONS,
+  payDayLabel,
+  payDayPreview,
+  pendingPlan,
+  planHistory,
+} from "@/lib/settings.mjs";
 import type { PayDayEntry } from "@/lib/periods.mjs";
 import type { Settings } from "../dashboard/types";
 import { BTN_LINK, Card, INPUT, Row, SAVE_ERROR, SELECT, SectionHead } from "./parts";
@@ -16,14 +25,10 @@ import { BTN_LINK, Card, INPUT, Row, SAVE_ERROR, SELECT, SectionHead } from "./p
 type Field = "salary" | "payday" | "save_pct";
 type Format = NonNullable<Settings["number_format"]>;
 
-const ord = (d: number) =>
-  d + (d % 10 === 1 && d !== 11 ? "st" : d % 10 === 2 && d !== 12 ? "nd" : d % 10 === 3 && d !== 13 ? "rd" : "th");
-export const dayLabel = (d: number) => (d === 31 ? "last day" : ord(d));
 const cycleRuns = (d: number) =>
-  d === 1 ? "1st – last day" : d === 31 ? "last day – day before" : `${ord(d)} – ${ord(d - 1)}`;
+  d === 1 ? "1st – last day" : d === 31 ? "last day – day before" : `${ordinal(d)} – ${ordinal(d - 1)}`;
 const longDate = (s: string) =>
   new Date(`${s}T12:00:00`).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
-const PAYDAYS = [...Array.from({ length: 28 }, (_, i) => i + 1), 31];
 const LABEL = { salary: "Salary", payday: "Payday", save_pct: "Save first" } as const;
 const MIN_PCT = 5,
   MAX_PCT = 60;
@@ -146,7 +151,7 @@ export default function PlanSection({
   const history = planHistory(settings);
   const shown = allHistory ? history : history.slice(0, 4);
   const value = (field: Field, v: number | null) =>
-    v === null ? "—" : field === "salary" ? money(v) : field === "payday" ? dayLabel(v) : `${v}%`;
+    v === null ? "—" : field === "salary" ? money(v) : field === "payday" ? payDayLabel(v) : `${v}%`;
   const statusCell = (k: Field) => {
     const [text, color] = status(k);
     return (
@@ -182,9 +187,9 @@ export default function PlanSection({
             onChange={(e) => set("payday", e.target.value)}
             className={`${SELECT} flex-[1_1_220px]`}
           >
-            {PAYDAYS.map((d) => (
-              <option key={d} value={d}>
-                {d === 31 ? "Last day of the month" : `${ord(d)} of each month`}
+            {PAYDAY_OPTIONS.map((o) => (
+              <option key={o.value} value={o.value}>
+                {o.label}
               </option>
             ))}
           </select>

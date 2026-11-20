@@ -3,7 +3,7 @@
 // Log expense (design handoff, Popups).
 
 import { createClient } from "@/utils/supabase/client";
-import { inr } from "@/lib/money.mjs";
+import { inr, showTyped } from "@/lib/money.mjs";
 import { recurringStatus } from "@/lib/recurringStatus.mjs";
 import Dialog from "../../ui/Dialog";
 import type { Category } from "../types";
@@ -277,7 +277,7 @@ export default function ExpenseDialog({
               onClick={() => set({ amount: String(Math.round((paise(form.amount) / 100 + q) * 100) / 100) })}
               className="tabular h-[34px] cursor-pointer rounded-full border border-line bg-transparent px-3 text-[13px] font-semibold text-ink-2 transition-[border-color,color,transform] hover:border-ink-2 hover:text-ink active:scale-[.94]"
             >
-              +{q.toLocaleString("en-IN")}
+              +{showTyped(String(q))}
             </button>
           ))}
           {form.amount && (

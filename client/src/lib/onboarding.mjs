@@ -64,7 +64,8 @@ export function onboardingPayload(s) {
   const salary = +s.salary || 0;
   return {
     p_take_home_pay: salary > 0 ? salary * 100 : null,
-    p_pay_day: +clampDay(s.payDay) || 1,
+    // 31 = the last day of the month; otherwise 1-28.
+    p_pay_day: s.payDay === "31" ? 31 : +clampDay(s.payDay) || 1,
     p_savings_pct: s.pct,
     p_bills: bills,
     p_categories: categories,

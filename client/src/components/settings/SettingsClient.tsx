@@ -9,7 +9,7 @@ import { Download, Search } from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
 import { cycleFor, paySchedule, toLocalDateString } from "@/lib/periods.mjs";
 import { buildCycleModel } from "@/lib/cycleModel.mjs";
-import { formatMoney } from "@/lib/money.mjs";
+import { formatMoney, setNumberFormat } from "@/lib/money.mjs";
 import { deleteAccount, exportAllCsv, SETTINGS_SELECT, undoPlan } from "@/lib/settings.mjs";
 import AppHeader from "../AppHeader";
 import { useToast } from "../ui/Toast";
@@ -90,6 +90,8 @@ export default function SettingsClient({
     sections.find(([id]) => id === initialSection)?.[0] ?? sections[0][0],
   );
   const [settings, setSettings] = useState(data.settings);
+  // Every amount below (and in the popups) is shown and typed in the user's number format.
+  setNumberFormat(settings.number_format);
   const [categories, setCategories] = useState(data.categories);
   const [recurringItems, setRecurringItems] = useState(data.recurringItems);
   const [q, setQ] = useState("");

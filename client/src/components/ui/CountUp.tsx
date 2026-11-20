@@ -1,8 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-
-const inr = (rupees: number) => `${rupees <= -0.5 ? "−" : ""}₹${Math.round(Math.abs(rupees)).toLocaleString("en-IN")}`;
+import { inr } from "@/lib/money.mjs";
 
 /**
  * A rupee amount that counts up from 0 on first show, then glides from its old value
@@ -31,5 +30,5 @@ export default function CountUp({ rupees, duration = 1500 }: { rupees: number; d
     return () => cancelAnimationFrame(raf);
   }, [rupees, duration]);
 
-  return <>{inr(shown)}</>;
+  return <>{inr(shown * 100)}</>;
 }

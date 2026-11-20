@@ -9,6 +9,17 @@ import { transactionsToCsv } from "./csvExport.mjs";
 /** @typedef {import("./periods.mjs").PlanChange} PlanChange */
 /** @typedef {"salary" | "payday" | "save_pct"} PlanField */
 
+/** 1 -> "1st", 22 -> "22nd". @param {number} d */
+export const ordinal = (d) =>
+  d + (d % 10 === 1 && d !== 11 ? "st" : d % 10 === 2 && d !== 12 ? "nd" : d % 10 === 3 && d !== 13 ? "rd" : "th");
+/** Pay day for a sentence: "25th", or "last day" for 31. @param {number} d */
+export const payDayLabel = (d) => (d === 31 ? "last day" : ordinal(d));
+/** Payday select (Settings, Onboarding): 1st…28th of each month, then the last day (31). */
+export const PAYDAY_OPTIONS = [
+  ...Array.from({ length: 28 }, (_, i) => ({ value: i + 1, label: `${ordinal(i + 1)} of each month` })),
+  { value: 31, label: "Last day of the month" },
+];
+
 /** user_settings with its plan history (Dashboard, Settings). */
 export const SETTINGS_SELECT =
   "*, plan_changes(field, from_value, to_value, applies, effective_from, superseded_at, created_at)";
