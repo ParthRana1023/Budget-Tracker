@@ -2223,3 +2223,6 @@ begin
 end;
 $$;
 grant execute on function public.import_transactions(jsonb) to authenticated;
+
+commit;
+
