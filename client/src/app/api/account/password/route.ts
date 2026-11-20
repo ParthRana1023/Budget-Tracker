@@ -15,13 +15,17 @@ export async function POST(request: Request) {
   if (next.length < MIN_LENGTH || next.length > 200)
     return NextResponse.json({ error: { message: "New password needs at least 8 characters." } }, { status: 400 });
   if (next === current)
-    return NextResponse.json({ error: { message: "Choose a password you haven’t used here before." } }, { status: 400 });
+    return NextResponse.json(
+      { error: { message: "Choose a password you haven’t used here before." } },
+      { status: 400 },
+    );
 
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user?.email) return NextResponse.json({ error: { message: "Sign in again to change your password." } }, { status: 401 });
+  if (!user?.email)
+    return NextResponse.json({ error: { message: "Sign in again to change your password." } }, { status: 401 });
 
   const check = createSupabaseClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,

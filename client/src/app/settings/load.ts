@@ -28,10 +28,9 @@ export async function loadSettingsPage(): Promise<SettingsPageData> {
   ]);
   const failed = [settings, categories, recurring, transactions].find((r) => r.error);
   if (failed) throw new Error(`Could not load your settings: ${failed.error!.message}`);
-  // No plan yet: set one up first. Same rule as the Dashboard (app/dashboard/page.tsx): a
-  // database without the onboarded_at column counts as onboarded.
+  // No plan yet: set one up first. Same rule as the Dashboard (app/dashboard/page.tsx).
   const s = settings.data;
-  if (!s || ("onboarded_at" in s && !s.onboarded_at)) redirect("/onboarding");
+  if (!s || !s.onboarded_at) redirect("/onboarding");
 
   return {
     user: {

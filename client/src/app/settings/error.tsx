@@ -4,13 +4,7 @@ import { useEffect, useState } from "react";
 import StatusPage from "@/components/StatusPage";
 import { errorFields, reportClientError } from "@/lib/log.mjs";
 
-export default function SettingsError({
-  error,
-  reset,
-}: {
-  error: Error & { digest?: string };
-  reset: () => void;
-}) {
+export default function SettingsError({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {
   const [reference] = useState(() => error.digest ?? `ST-${Date.now().toString(36).slice(-6).toUpperCase()}`);
   useEffect(
     () => reportClientError("page_crash", { ...errorFields(error), digest: reference, route: "/settings" }),

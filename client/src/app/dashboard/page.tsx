@@ -30,8 +30,7 @@ export default async function DashboardPage({
   if (settingsError) throw new Error(`Could not load your settings: ${settingsError.message}`);
 
   // New accounts set up their salary, savings, bills and categories first.
-  // shortcut: a database without the onboarded_at column (redesign migration not applied) skips onboarding; drop the column check once it is applied everywhere.
-  if (settings && "onboarded_at" in settings && !settings.onboarded_at) redirect("/onboarding");
+  if (settings && !settings.onboarded_at) redirect("/onboarding");
 
   // Fetch categories
   let { data: categories, error: categoriesError } = await supabase
