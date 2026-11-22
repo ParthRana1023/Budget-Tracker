@@ -102,10 +102,8 @@ export function PasswordSection({ hasPassword }: { hasPassword: boolean }) {
     setBusy(false);
     if (!res?.ok) {
       const body = await res?.json().catch(() => null);
-      reportClientError("password_change_request_failed", { status: res?.status });
-      return setError(
-        body?.error?.message ?? body?.error ?? "Couldn’t change your password. Check your connection and try again.",
-      );
+      if (!res || res.status >= 500) reportClientError("password_change_request_failed", { status: res?.status });
+      return setError(body?.error?.message ?? "Couldn’t change your password. Check your connection and try again.");
     }
     setForm({ current: "", next: "", confirm: "" });
     setDone(true);

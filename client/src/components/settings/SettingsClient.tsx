@@ -210,10 +210,7 @@ export default function SettingsClient({
   };
   const removeAccount = async () => {
     if (delText.trim() !== "DELETE" || deleting) return;
-    if (!navigator.onLine) {
-      reportClientError("delete_account_offline", { userId });
-      return setDelError("You’re offline. Reconnect and try again.");
-    }
+    if (!navigator.onLine) return setDelError("You’re offline. Reconnect and try again.");
     setDeleting(true);
     setDelError(null);
     const { error } = await deleteAccount(createClient(), userId);

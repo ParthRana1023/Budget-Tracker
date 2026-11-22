@@ -45,7 +45,7 @@ SaveFirst flips traditional budgeting on its head. Instead of tracking expenses 
 | ------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
 | **Frontend**        | [Next.js](https://nextjs.org/) 16 (App Router), [React](https://react.dev/) 19, [Tailwind CSS](https://tailwindcss.com/) 4, Lucide Icons |
 | **Backend & DB**    | [Supabase](https://supabase.com/) (PostgreSQL 15+), Row-Level Security (RLS), PL/pgSQL stored procedures                                 |
-| **Auth & Security** | Supabase SSR Auth (PKCE flow, HttpOnly secure cookies), Argon2/bcrypt                                                                    |
+| **Auth & Security** | Supabase Auth via `@supabase/ssr` (PKCE, cookie sessions)                                                                                |
 | **Background Jobs** | Supabase Edge Functions (Deno), `pg_cron`, `pg_net`, Resend API                                                                          |
 | **Tooling & Tests** | TypeScript, Playwright (E2E), Node.js native test runner, Prettier                                                                       |
 
@@ -53,7 +53,7 @@ SaveFirst flips traditional budgeting on its head. Instead of tracking expenses 
 
 ## Architecture
 
-```mermaid
+```text
                     ┌──────────────────────────────────────────────┐
                     │               Client (Next.js)               │
                     │  App Router · SSR Pages · Client Components  │
@@ -102,18 +102,22 @@ All financial figures are stored internally as **paise** (`bigint`) in INR to gu
    npm install
    ```
 
-3. Set up environment variables:
+3. Start a local Supabase (needs Docker). `client/.env.development` already points `npm run dev` at it:
 
    ```bash
-   cp .env.example .env.local
+   npx supabase start --workdir server
    ```
 
-   Configure the variables as described in the [Environment Variables](#environment-variables) section below.
-
-4. Start local development:
+4. Optional: to use a hosted Supabase project instead, or to add secrets, create `client/.env.local`
+   from the template. It overrides the committed defaults and is never committed:
 
    ```bash
-   # Run frontend client (http://localhost:3000)
+   cp client/.env.example client/.env.local
+   ```
+
+5. Start the app (`http://localhost:3000`):
+
+   ```bash
    npm --workspace=client run dev
    ```
 
@@ -121,7 +125,20 @@ All financial figures are stored internally as **paise** (`bigint`) in INR to gu
 
 ## Environment Variables
 
-### Client (`client/.env.local`)
+Each folder has a committed template (`.env.example`) and committed, secret-free defaults for
+local development (`.env.development`) and production builds (`.env.production`). Your own values
+and every secret go in the uncommitted files shown below, or in the host's environment settings,
+which override everything.
+
+| Folder                                   | Your values (not committed)      | Production                                          |
+| ---------------------------------------- | -------------------------------- | --------------------------------------------------- |
+| `client/` (Next.js)                      | `client/.env.local`              | Vercel › Project › Settings › Environment Variables |
+| `server/` (Express API, optional)        | `server/.env`                    | The host's environment                              |
+| `server/supabase/functions/` (email job) | `server/supabase/functions/.env` | `npx supabase secrets set --env-file …`             |
+
+No env file is needed at the repo root.
+
+### Client (`client/.env.example`)
 
 | Variable                               | Required    | Description                                                        |
 | -------------------------------------- | ----------- | ------------------------------------------------------------------ |
@@ -130,6 +147,22 @@ All financial figures are stored internally as **paise** (`bigint`) in INR to gu
 | `SUPABASE_SECRET_KEY`                  | Server-only | Supabase service role key (used for writing sign-in audit history) |
 | `NEXT_PUBLIC_GOOGLE_AUTH`              | Optional    | Set to `1` to enable Google OAuth sign-in and account linking      |
 | `NEXT_PUBLIC_EMAIL_NOTIFICATIONS`      | Optional    | Set to `1` to display email notification controls in Settings      |
+
+### Server (`server/.env.example`)
+
+| Variable     | Description                               |
+| ------------ | ----------------------------------------- |
+| `PORT`       | Port for the Express API (default `5000`) |
+| `CLIENT_URL` | The web app's origin, allowed by CORS     |
+
+### Email job (`server/supabase/functions/.env.example`)
+
+| Variable         | Description                                         |
+| ---------------- | --------------------------------------------------- |
+| `RESEND_API_KEY` | Resend API key                                      |
+| `EMAIL_FROM`     | Sender address on a domain verified in Resend       |
+| `CRON_SECRET`    | Shared secret; must match the one in the cron SQL   |
+| `APP_URL`        | The web app's address, used for links in the emails |
 
 ---
 
@@ -142,23 +175,23 @@ The database schema, RLS policies, views, triggers, and RPC functions are manage
 To initialize or completely reset your database schema:
 
 1. Open your Supabase Project SQL Editor.
-2. Run the script located at [server/supabase/savefirst_full_setup.sql](file:///server/supabase/savefirst_full_setup.sql).
+2. Run the script located at [server/supabase/savefirst_full_setup.sql](server/supabase/savefirst_full_setup.sql).
 3. The script is idempotent and transactional: it cleanly drops existing application tables and builds the complete schema from scratch.
 
 ### Setup Checklist
 
-| What                                       | Where                               | Why                                                                                                                                    |
-| ------------------------------------------ | ----------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
-| **Run `savefirst_full_setup.sql`**         | Supabase SQL editor                 | Creates full schema, tables, views, RLS policies, and RPC functions.                                                                   |
-| **`NEXT_PUBLIC_SUPABASE_URL`**             | Vercel / Client env                 | Connects application to the Supabase backend.                                                                                          |
-| **`NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`** | Vercel / Client env                 | Public client access token.                                                                                                            |
-| **`SUPABASE_SECRET_KEY`**                  | Vercel (Server-only env)            | Records sign-in audit logs via secure server route.                                                                                    |
-| **Raise sign-in rate limits**              | Supabase › Auth › Rate Limits       | Server routes proxy authentication; ensure adequate rate limits per IP.                                                                |
-| **`NEXT_PUBLIC_GOOGLE_AUTH=1`**            | Vercel / Client env                 | Enables Google Sign-In and identity linking UI.                                                                                        |
-| **Redirect URLs**                          | Supabase › Auth › URL Configuration | Add `<APP_URL>/auth/callback` and `<APP_URL>/auth/confirm`.                                                                            |
-| **Deploy `send-notifications`**            | Supabase Edge Functions             | Deploy background email worker with `RESEND_API_KEY`, `EMAIL_FROM`, `CRON_SECRET`, `APP_URL`.                                          |
-| **Schedule Notifications Cron**            | Supabase SQL editor                 | Run [server/supabase/cron/send-notifications.sql](file:///server/supabase/cron/send-notifications.sql) with your project URL and keys. |
-| **`NEXT_PUBLIC_EMAIL_NOTIFICATIONS=1`**    | Vercel / Client env                 | Reveals email notification toggles in Settings once the worker is active.                                                              |
+| What                                       | Where                               | Why                                                                                                                            |
+| ------------------------------------------ | ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| **Run `savefirst_full_setup.sql`**         | Supabase SQL editor                 | Creates full schema, tables, views, RLS policies, and RPC functions.                                                           |
+| **`NEXT_PUBLIC_SUPABASE_URL`**             | Vercel / Client env                 | Connects application to the Supabase backend.                                                                                  |
+| **`NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`** | Vercel / Client env                 | Public client access token.                                                                                                    |
+| **`SUPABASE_SECRET_KEY`**                  | Vercel (Server-only env)            | Records sign-in audit logs via secure server route.                                                                            |
+| **Raise sign-in rate limits**              | Supabase › Auth › Rate Limits       | Password and code sign-ins go through the app's server, so every user shares its IP's limit.                                   |
+| **`NEXT_PUBLIC_GOOGLE_AUTH=1`**            | Vercel / Client env                 | Enables Google Sign-In and identity linking UI.                                                                                |
+| **Redirect URLs**                          | Supabase › Auth › URL Configuration | Add `<APP_URL>/auth/callback` and `<APP_URL>/auth/confirm`.                                                                    |
+| **Deploy `send-notifications`**            | Supabase Edge Functions             | Deploy background email worker with `RESEND_API_KEY`, `EMAIL_FROM`, `CRON_SECRET`, `APP_URL`.                                  |
+| **Schedule Notifications Cron**            | Supabase SQL editor                 | Run [server/supabase/cron/send-notifications.sql](server/supabase/cron/send-notifications.sql) with your project URL and keys. |
+| **`NEXT_PUBLIC_EMAIL_NOTIFICATIONS=1`**    | Vercel / Client env                 | Reveals email notification toggles in Settings once the worker is active.                                                      |
 
 ---
 
@@ -178,13 +211,21 @@ npm run format:check
 
 # Run TypeScript type check
 npm --workspace=client run lint
+
+# Database tests (pgTAP, needs the local Supabase)
+npm run test:db
+
+# End-to-end tests (Playwright). They refuse to run against a hosted Supabase:
+# point NEXT_PUBLIC_SUPABASE_URL / _PUBLISHABLE_KEY at the local stack, and set
+# SUPABASE_SECRET_KEY to its SECRET_KEY so sign-in history is covered.
+npm run test:e2e
 ```
 
 ---
 
 ## Project Structure
 
-```code
+```text
 Budget-Tracker/
 ├── client/                     # Next.js frontend application
 │   ├── public/                 # Static assets, PWA manifest, service worker

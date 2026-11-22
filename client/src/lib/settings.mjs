@@ -2,7 +2,7 @@
 // Amounts are paise; dates are local 'YYYY-MM-DD'.
 
 import { addDaysStr } from "./cycle.mjs";
-import { cycleFor, toLocalDateString } from "./periods.mjs";
+import { cycleFor, parseLocalDate, toLocalDateString } from "./periods.mjs";
 import { transactionsToCsv } from "./csvExport.mjs";
 
 /** @typedef {import("./periods.mjs").PayDayEntry} PayDayEntry */
@@ -24,16 +24,11 @@ export const PAYDAY_OPTIONS = [
 export const SETTINGS_SELECT =
   "*, plan_changes(field, from_value, to_value, applies, effective_from, superseded_at, created_at)";
 
-const toDate = (/** @type {string} */ s) => {
-  const [y, m, d] = s.split("-").map(Number);
-  return new Date(y, m - 1, d);
-};
-
 /**
  * Start date of the cycle after the one containing `today`: when a new pay day takes effect.
  * @param {PayDayEntry[]} schedule @param {string} today
  */
-export const nextCycleStart = (schedule, today) => addDaysStr(cycleFor(toDate(today), schedule).endStr, 1);
+export const nextCycleStart = (schedule, today) => addDaysStr(cycleFor(parseLocalDate(today), schedule).endStr, 1);
 
 /**
  * The pay day in force today, and a change waiting for the next cycle, if any.
@@ -56,7 +51,7 @@ export function payDayStatus(schedule, today) {
  * Start date of the cycle containing `today`: where a "This cycle" plan change applies from.
  * @param {PayDayEntry[]} schedule @param {string} today
  */
-export const thisCycleStart = (schedule, today) => cycleFor(toDate(today), schedule).startStr;
+export const thisCycleStart = (schedule, today) => cycleFor(parseLocalDate(today), schedule).startStr;
 
 /**
  * Save preferences and profile fields (they save on their own). Only the keys passed change;
@@ -100,8 +95,8 @@ export const undoPlan = (supabase) => supabase.rpc("undo_plan_change");
 export function payDayPreview(schedule, today, payDay) {
   const nowFrom = thisCycleStart(schedule, today),
     nextFrom = nextCycleStart(schedule, today);
-  const now = cycleFor(toDate(today), [...schedule, { payDay, from: nowFrom, applies: "now", madeOn: today }]);
-  const next = cycleFor(toDate(nextFrom), [...schedule, { payDay, from: nextFrom, applies: "next" }]);
+  const now = cycleFor(parseLocalDate(today), [...schedule, { payDay, from: nowFrom, applies: "now", madeOn: today }]);
+  const next = cycleFor(parseLocalDate(nextFrom), [...schedule, { payDay, from: nextFrom, applies: "next" }]);
   return {
     now: { startStr: now.startStr, endStr: now.endStr },
     next: { startStr: next.startStr, endStr: next.endStr },

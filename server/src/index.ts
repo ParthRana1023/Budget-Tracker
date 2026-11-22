@@ -1,10 +1,8 @@
+import "./config/env.js"; // first: loads .env files before the routes read process.env
 import express from "express";
 import cors from "cors";
-import dotenv from "dotenv";
 import healthRouter from "./routes/health.js";
 import budgetRouter from "./routes/budget.js";
-
-dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 5000;

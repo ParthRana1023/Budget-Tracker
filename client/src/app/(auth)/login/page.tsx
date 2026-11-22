@@ -4,7 +4,6 @@ import { Suspense, useState, type FormEvent } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/utils/supabase/client";
 import { authErrorFor, errorFromQuery, isValidEmail, signInVia } from "@/lib/auth.mjs";
-import { errorFields, reportClientError } from "@/lib/log.mjs";
 import {
   AuthAlert,
   AuthHeading,
@@ -38,7 +37,6 @@ function LoginForm() {
     router.refresh();
   };
   const fail = (e: AuthError) => {
-    reportClientError("login_auth_failed", { message: e.message });
     setBusy(null);
     setError(e);
   };

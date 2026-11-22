@@ -130,10 +130,7 @@ export default function PlanSection({
     if (edited.includes("salary") && sal <= 0) return setError("Enter your monthly salary.");
     if (edited.includes("save_pct") && (pct < MIN_PCT || pct > MAX_PCT))
       return setError(`Save first must be between ${MIN_PCT}% and ${MAX_PCT}%.`);
-    if (!navigator.onLine) {
-      reportClientError("plan_apply_offline");
-      return setError(SAVE_ERROR);
-    }
+    if (!navigator.onLine) return setError(SAVE_ERROR);
     setBusy(true);
     const { error: err } = await applyPlan(
       createClient(),

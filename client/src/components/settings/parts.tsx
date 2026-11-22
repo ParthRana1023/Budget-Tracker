@@ -13,7 +13,7 @@ export const BTN_LINE =
   "flex h-[38px] cursor-pointer items-center rounded-full border border-line-2 bg-transparent px-4 text-[13px] font-semibold text-ink transition-colors duration-200 hover:border-ink-2 disabled:cursor-default disabled:opacity-60";
 export const BTN_LINK =
   "cursor-pointer border-0 bg-transparent p-0 text-[13px] font-semibold text-lime-text hover:text-ink";
-export const SAVE_ERROR = "Couldn’t reach SaveFirst. Check your connection and try again.";
+export const SAVE_ERROR = "Couldn’t save. Check your connection and try again.";
 
 /** Hands the browser a file to save. CSV gets a BOM so Excel reads ₹ and accents right. */
 export function download(name: string, text: string, type: "text/csv" | "application/json") {
@@ -109,7 +109,6 @@ export function useSave() {
   const run = async (write: () => PromiseLike<{ error: unknown }>) => {
     clearTimeout(timer.current);
     if (!navigator.onLine) {
-      reportClientError("save_offline", { source: "useSave" });
       setStatus("error");
       return false;
     }

@@ -2,12 +2,7 @@
 
 ## Supported Versions
 
-SaveFirst receives active security updates on the latest major/minor releases.
-
-| Version | Supported          |
-| ------- | ------------------ |
-| 0.17.x  | :white_check_mark: |
-| < 0.17  | :x:                |
+Security fixes go into the latest version on the `master` branch. Older versions are not patched.
 
 ## Reporting a Vulnerability
 
@@ -15,8 +10,8 @@ We take the security of personal financial data seriously. If you discover a vul
 
 ### How to Report
 
-1. **Email or Private Advisory**:
-   - Send details to `security@savefirst.app` or open a private security advisory on GitHub.
+1. **Private advisory**:
+   - Open a [private security advisory](https://github.com/ParthRana1023/Budget-Tracker/security/advisories/new) on GitHub. Please don't open a public issue.
    - Please include:
      - Description of the vulnerability.
      - Steps to reproduce or a proof of concept.

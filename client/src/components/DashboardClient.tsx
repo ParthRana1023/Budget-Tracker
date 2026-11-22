@@ -159,10 +159,7 @@ export default function DashboardClient(props: DashboardClientProps) {
     failMessage: string,
     undo?: (data: unknown) => PromiseLike<{ error: unknown }>,
   ) => {
-    if (!navigator.onLine) {
-      reportClientError("dashboard_action_offline", { userId, message });
-      return toast("You’re offline, so this wasn’t saved.", { error: true });
-    }
+    if (!navigator.onLine) return toast("You’re offline, so this wasn’t saved.", { error: true });
     const { error, data } = await write();
     if (error) {
       reportClientError("dashboard_action_failed", { userId, ...errorFields(error), message });

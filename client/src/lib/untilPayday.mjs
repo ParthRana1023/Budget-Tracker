@@ -3,15 +3,13 @@
 // All amounts are integer paise.
 
 import { addDaysStr, cycleDayOf, dueDateInCycle } from "./cycle.mjs";
+import { parseLocalDate } from "./periods.mjs";
 import { recurringStatus } from "./recurringStatus.mjs";
 
 const HISTORY_DAYS = 90;
 const isRecurringEntry = (/** @type {{ external_id?: string | null }} */ t) =>
   !!t.external_id?.startsWith("recurring:");
-const weekdayOf = (/** @type {string} */ dateStr) => {
-  const [y, m, d] = dateStr.split("-").map(Number);
-  return new Date(y, m - 1, d).getDay();
-};
+const weekdayOf = (/** @type {string} */ dateStr) => parseLocalDate(dateStr).getDay();
 
 /**
  * @param {{

@@ -43,12 +43,12 @@ const normPayDay = (/** @type {number} */ d) => {
   return n >= 31 ? 31 : Math.min(Math.max(1, n), 28);
 };
 /** 'YYYY-MM-DD' -> local Date at midnight. */
-const toDate = (/** @type {string} */ s) => {
+export const parseLocalDate = (/** @type {string} */ s) => {
   const [y, m, d] = s.split("-").map(Number);
   return new Date(y, m - 1, d);
 };
 const plusDays = (/** @type {string} */ s, /** @type {number} */ n) => {
-  const d = toDate(s);
+  const d = parseLocalDate(s);
   return toLocalDateString(new Date(d.getFullYear(), d.getMonth(), d.getDate() + n));
 };
 /** The pay date in month m0 (0-based, may overflow) of year y. */
@@ -56,7 +56,7 @@ const payDateIn = (/** @type {number} */ y, /** @type {number} */ m0, /** @type 
   toLocalDateString(new Date(y, m0, payDay === 31 ? new Date(y, m0 + 1, 0).getDate() : payDay));
 /** Latest pay date on or before s, and earliest pay date after s. */
 function payDatesAround(/** @type {string} */ s, /** @type {number} */ payDay) {
-  const d = toDate(s);
+  const d = parseLocalDate(s);
   const here = payDateIn(d.getFullYear(), d.getMonth(), payDay);
   return here <= s
     ? { prev: here, next: payDateIn(d.getFullYear(), d.getMonth() + 1, payDay) }
@@ -148,8 +148,8 @@ export function cycleFor(referenceDate, schedule) {
   if (nextChange && nextChange < next) next = nextChange;
   const endStr = plusDays(next, -1);
 
-  const startDate = toDate(startStr);
-  const endDate = toDate(endStr);
+  const startDate = parseLocalDate(startStr);
+  const endDate = parseLocalDate(endStr);
   endDate.setHours(23, 59, 59, 999);
 
   const totalDays = calendarDaysBetween(startDate, endDate) + 1;

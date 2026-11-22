@@ -2,16 +2,10 @@
 // Read-only: simulation never touches stored contributions.
 
 import { calculateNeededPerMonth } from "./goalMetrics.mjs";
-import { toLocalDateString, toLocalMonthKey } from "./periods.mjs";
+import { parseLocalDate, toLocalDateString, toLocalMonthKey } from "./periods.mjs";
 
 const DAYS_PER_MONTH = 365.25 / 12;
 const PACE_WINDOW_DAYS = 90;
-
-/** @param {string} dateStr YYYY-MM-DD */
-const parseLocal = (dateStr) => {
-  const [y, m, d] = dateStr.split("-").map(Number);
-  return new Date(y, m - 1, d);
-};
 
 /**
  * When a goal completes at a given monthly contribution.
@@ -62,7 +56,7 @@ export function analyzeGoal({
   let monthlyPace = 0;
   if (firstDate) {
     const utcDay = (/** @type {Date} */ d) => Date.UTC(d.getFullYear(), d.getMonth(), d.getDate());
-    const daysSinceFirst = Math.round((utcDay(referenceDate) - utcDay(parseLocal(firstDate))) / 86400000) + 1;
+    const daysSinceFirst = Math.round((utcDay(referenceDate) - utcDay(parseLocalDate(firstDate))) / 86400000) + 1;
     const windowDays = Math.max(30, Math.min(PACE_WINDOW_DAYS, daysSinceFirst));
     const windowStart = toLocalDateString(
       new Date(referenceDate.getFullYear(), referenceDate.getMonth(), referenceDate.getDate() - windowDays + 1),
