@@ -1,4 +1,5 @@
-// Runs every src/**/*.test.mjs under several timezones.
+// Runs every src/**/*.test.mjs, plus the email job's tests in server/supabase/functions,
+// under several timezones.
 //
 // Date logic that only passes in UTC is a bug waiting for a user in India or
 // California, and CI machines default to UTC, so a single run proves nothing.
@@ -9,7 +10,9 @@ import { readdirSync, statSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
-const root = join(dirname(fileURLToPath(import.meta.url)), "..", "src");
+const here = dirname(fileURLToPath(import.meta.url));
+const root = join(here, "..", "src");
+const functionsRoot = join(here, "..", "..", "server", "supabase", "functions");
 const ZONES = ["UTC", "Asia/Kolkata", "America/Los_Angeles", "Pacific/Auckland"];
 
 const findTests = (dir) =>
@@ -19,7 +22,7 @@ const findTests = (dir) =>
     return name.endsWith(".test.mjs") ? [full] : [];
   });
 
-const files = findTests(root);
+const files = [...findTests(root), ...findTests(functionsRoot)];
 if (files.length === 0) {
   console.error("No *.test.mjs files found under src/");
   process.exit(1);

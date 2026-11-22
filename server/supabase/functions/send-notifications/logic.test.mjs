@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { addDays, billsDueOn, isQuiet, localParts } from "../supabase/functions/send-notifications/logic.mjs";
+import { addDays, billsDueOn, isQuiet, localParts } from "./logic.mjs";
 
 test("local date, hour and weekday in the user's time zone", () => {
   // 20:30 UTC Sunday 22 Nov = 02:00 Monday 23 Nov in India.

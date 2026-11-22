@@ -1,5 +1,5 @@
 // What the hourly email job sends, worked out from a user's settings and rows. No imports, so
-// both the Edge Function (Deno) and node:test (server/test) can load it. Amounts are paise.
+// both the Edge Function (Deno) and node:test (logic.test.mjs) can load it. Amounts are paise.
 
 /**
  * The user's local date ('YYYY-MM-DD'), hour (0-23) and weekday (0 Sunday) at `now`.

@@ -1,6 +1,6 @@
 {
   "name": "personal-budget-tracker",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Savings-first personal budget tracker with live Safe-to-Spend calculations, variable pay isolation, and fast 3-tap expense logging.",
   "private": true,
   "author": "Parth Rana",
@@ -20,18 +20,12 @@
     "npm": ">=10.0.0"
   },
   "workspaces": [
-    "client",
-    "server"
+    "client"
   ],
   "scripts": {
-    "dev": "concurrently -n \"CLIENT,SERVER\" -c \"emerald,blue\" \"npm run dev:client\" \"npm run dev:server\"",
-    "dev:client": "npm run dev --workspace=client",
-    "dev:server": "npm run dev --workspace=server",
-    "build": "npm run build:server && npm run build:client",
-    "build:client": "npm run build --workspace=client",
-    "build:server": "npm run build --workspace=server",
-    "start:client": "npm run start --workspace=client",
-    "start:server": "npm run start --workspace=server",
+    "dev": "npm run dev --workspace=client",
+    "build": "npm run build --workspace=client",
+    "start": "npm run start --workspace=client",
     "test": "npm run test:unit && npm run test:e2e",
     "test:unit": "npm run test:unit --workspace=client",
     "test:e2e": "npm run test:e2e --workspace=client",
@@ -41,7 +35,6 @@
     "format:check": "prettier --check ."
   },
   "devDependencies": {
-    "concurrently": "^9.1.2",
     "prettier": "^3.10.1",
     "supabase": "^3.0.0"
   }

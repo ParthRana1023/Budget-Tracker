@@ -13,7 +13,7 @@ dist/
 
 # Environment variables & secrets
 # Committed on purpose (no secrets): .env.example, .env.development, .env.production in
-# client/ and server/, and server/supabase/functions/.env.example.
+# client/, and server/supabase/functions/.env.example.
 .env
 .env.local
 .env*.local

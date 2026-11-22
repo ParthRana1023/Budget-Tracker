@@ -133,7 +133,6 @@ which override everything.
 | Folder                                   | Your values (not committed)      | Production                                          |
 | ---------------------------------------- | -------------------------------- | --------------------------------------------------- |
 | `client/` (Next.js)                      | `client/.env.local`              | Vercel › Project › Settings › Environment Variables |
-| `server/` (Express API, optional)        | `server/.env`                    | The host's environment                              |
 | `server/supabase/functions/` (email job) | `server/supabase/functions/.env` | `npx supabase secrets set --env-file …`             |
 
 No env file is needed at the repo root.
@@ -147,13 +146,6 @@ No env file is needed at the repo root.
 | `SUPABASE_SECRET_KEY`                  | Server-only | Supabase service role key (used for writing sign-in audit history) |
 | `NEXT_PUBLIC_GOOGLE_AUTH`              | Optional    | Set to `1` to enable Google OAuth sign-in and account linking      |
 | `NEXT_PUBLIC_EMAIL_NOTIFICATIONS`      | Optional    | Set to `1` to display email notification controls in Settings      |
-
-### Server (`server/.env.example`)
-
-| Variable     | Description                               |
-| ------------ | ----------------------------------------- |
-| `PORT`       | Port for the Express API (default `5000`) |
-| `CLIENT_URL` | The web app's origin, allowed by CORS     |
 
 ### Email job (`server/supabase/functions/.env.example`)
 
@@ -182,13 +174,14 @@ To initialize or completely reset your database schema:
 
 | What                                       | Where                               | Why                                                                                                                            |
 | ------------------------------------------ | ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| **Vercel project**                         | Vercel › Settings › Build           | Framework Preset `Next.js`, Root Directory `client`, Output Directory empty. One project serves the app and its API routes.    |
 | **Run `savefirst_full_setup.sql`**         | Supabase SQL editor                 | Creates full schema, tables, views, RLS policies, and RPC functions.                                                           |
 | **`NEXT_PUBLIC_SUPABASE_URL`**             | Vercel / Client env                 | Connects application to the Supabase backend.                                                                                  |
 | **`NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`** | Vercel / Client env                 | Public client access token.                                                                                                    |
 | **`SUPABASE_SECRET_KEY`**                  | Vercel (Server-only env)            | Records sign-in audit logs via secure server route.                                                                            |
 | **Raise sign-in rate limits**              | Supabase › Auth › Rate Limits       | Password and code sign-ins go through the app's server, so every user shares its IP's limit.                                   |
 | **`NEXT_PUBLIC_GOOGLE_AUTH=1`**            | Vercel / Client env                 | Enables Google Sign-In and identity linking UI.                                                                                |
-| **Redirect URLs**                          | Supabase › Auth › URL Configuration | Add `<APP_URL>/auth/callback` and `<APP_URL>/auth/confirm`.                                                                    |
+| **Redirect URLs**                          | Supabase › Auth › URL Configuration | Add `<APP_URL>/**` and `http://localhost:3000/**`. The wildcard is needed because the callback carries `?next=`.               |
 | **Deploy `send-notifications`**            | Supabase Edge Functions             | Deploy background email worker with `RESEND_API_KEY`, `EMAIL_FROM`, `CRON_SECRET`, `APP_URL`.                                  |
 | **Schedule Notifications Cron**            | Supabase SQL editor                 | Run [server/supabase/cron/send-notifications.sql](server/supabase/cron/send-notifications.sql) with your project URL and keys. |
 | **`NEXT_PUBLIC_EMAIL_NOTIFICATIONS=1`**    | Vercel / Client env                 | Reveals email notification toggles in Settings once the worker is active.                                                      |
@@ -197,14 +190,10 @@ To initialize or completely reset your database schema:
 
 ## Testing
 
-The project maintains comprehensive test coverage across both workspaces:
-
 ```bash
-# Run unit tests across all timezones (UTC, Asia/Kolkata, America/Los_Angeles, Pacific/Auckland)
-npm --workspace=client run test:unit
-
-# Run server unit tests
-npm --workspace=server test
+# Unit tests across all timezones (UTC, Asia/Kolkata, America/Los_Angeles, Pacific/Auckland).
+# Covers client/src and the email job's logic in server/supabase/functions.
+npm run test:unit
 
 # Check code formatting with Prettier
 npm run format:check
@@ -232,7 +221,7 @@ Budget-Tracker/
 │   ├── src/
 │   │   ├── app/                # App Router (pages, error boundaries, API routes)
 │   │   │   ├── (auth)/         # Login, signup, password reset routes
-│   │   │   ├── api/            # Server endpoints (/api/auth, /api/account, /api/log)
+│   │   │   ├── api/            # Server endpoints (/api/auth, /api/account, /api/log, /api/budget, /api/health)
 │   │   │   ├── auth/           # OAuth and token exchange callbacks
 │   │   │   ├── dashboard/      # Safe to spend, Until Payday, Ledger, Budgets
 │   │   │   ├── onboarding/     # 5-step interactive setup flow
@@ -241,14 +230,13 @@ Budget-Tracker/
 │   │   ├── lib/                # Pure business logic (cycle, periods, money, reports, log)
 │   │   └── utils/supabase/     # Client, server, middleware, and admin Supabase instances
 │   └── tests/                  # Playwright E2E test suites
-├── server/                     # Backend services & database configurations
-│   ├── src/                    # Standalone calculation service & Express API
-│   ├── supabase/
-│   │   ├── cron/               # Scheduled pg_cron notification scripts
-│   │   ├── functions/          # Deno Edge Functions (send-notifications)
-│   │   ├── migrations/         # Versioned SQL migration files
-│   │   └── savefirst_full_setup.sql # Consolidated idempotent database setup
-│   └── test/                   # Backend calculation & notification unit tests
+├── server/                     # Database and background jobs (no Node server; the API lives in client/)
+│   └── supabase/
+│       ├── cron/               # Scheduled pg_cron notification scripts
+│       ├── functions/          # Deno Edge Functions (send-notifications, with its unit tests)
+│       ├── migrations/         # Versioned SQL migration files
+│       ├── tests/database/     # pgTAP database tests
+│       └── savefirst_full_setup.sql # Consolidated idempotent database setup
 ├── plans/                      # Architecture plans and implementation specs
 └── package.json                # Root workspace configuration
 ```
