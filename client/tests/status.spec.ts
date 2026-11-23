@@ -14,7 +14,7 @@ test.describe("Status pages", () => {
   test("offline page offers a retry", async ({ page }) => {
     await page.goto("/offline");
     await expect(page.getByRole("heading", { name: /You’re offline\./ })).toBeVisible();
-    await expect(page.getByRole("button", { name: "Retry connection" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Try again" })).toBeVisible();
   });
 
   test("a sign-in cookie that no longer works shows the session-expired page", async ({ page, context, baseURL }) => {

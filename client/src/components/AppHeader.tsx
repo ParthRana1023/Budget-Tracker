@@ -6,7 +6,8 @@
 
 import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import Link from "next/link";
-import { LogOut, MailWarning, Settings as SettingsIcon, User } from "lucide-react";
+import { Download, LogOut, MailWarning, Settings as SettingsIcon, User } from "lucide-react";
+import { reopenInstall, useInstall } from "@/lib/install";
 import { createClient } from "@/utils/supabase/client";
 import { savePreferences } from "@/lib/settings.mjs";
 import { clearDeviceOnSignOut } from "@/lib/push.mjs";
@@ -130,6 +131,7 @@ function AccountMenu({
   onSignOut: () => void;
 }) {
   const [open, setOpen] = useState(false);
+  const install = useInstall();
   const button = useRef<HTMLButtonElement>(null);
   const menu = useRef<HTMLDivElement>(null);
   const items = () => Array.from(menu.current?.querySelectorAll<HTMLElement>('[role="menuitem"]') ?? []);
@@ -212,6 +214,23 @@ function AccountMenu({
               <SettingsIcon size={15} className="flex-none" />
               Settings
             </Link>
+            {install.kind && (
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => {
+                  close(false);
+                  reopenInstall();
+                  // The card lives on Home.
+                  if (window.location.pathname + window.location.search !== "/dashboard")
+                    window.location.href = "/dashboard";
+                }}
+                className={ITEM}
+              >
+                <Download size={15} className="flex-none" />
+                Install app
+              </button>
+            )}
             <span aria-hidden className="mx-1.5 my-1 h-px bg-line" />
             <button
               type="button"

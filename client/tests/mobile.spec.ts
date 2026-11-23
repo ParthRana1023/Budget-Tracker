@@ -70,6 +70,8 @@ test.describe("Phones", () => {
   test("dragging the handle down closes the sheet, asking first when half-filled", async ({ page }) => {
     await setUpAccount(page);
     const drag = async () => {
+      // Measure once the sheet has finished sliding in.
+      await expect(page.getByRole("dialog")).toHaveCSS("transform", "none");
       const box = (await page.getByRole("dialog").boundingBox())!;
       const x = box.x + box.width / 2,
         y = box.y + 12; // the 26px handle zone at the top

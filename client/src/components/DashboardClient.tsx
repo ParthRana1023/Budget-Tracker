@@ -20,6 +20,9 @@ import { errorFields, reportClientError } from "@/lib/log.mjs";
 import AppHeader, { type Tab } from "./AppHeader";
 import BottomNav, { type NavTab } from "./BottomNav";
 import More, { type MoreView } from "./dashboard/More";
+import InstallCard from "./dashboard/InstallCard";
+import { OfflineBanner, OfflineShell } from "./dashboard/Offline";
+import { useOnline } from "./ui/useOnline";
 import { useToast } from "./ui/Toast";
 import SafeToSpend from "./dashboard/SafeToSpend";
 import UntilPayday from "./dashboard/UntilPayday";
@@ -80,6 +83,15 @@ const SECTION: Partial<Record<View, string>> = {
   goals: "budgets",
 };
 const PHONE_MQ = "(max-width: 719.98px)";
+const OFFLINE_EYEBROW: Record<View, string> = {
+  dashboard: "Safe to spend this cycle",
+  reports: "Reports",
+  ledger: "Ledger",
+  more: "More",
+  bills: "Bills & recurring",
+  budgets: "Budgets",
+  goals: "Goals",
+};
 
 interface DashboardClientProps {
   initialUser: { id: string; email?: string; verified: boolean };
@@ -116,8 +128,10 @@ export default function DashboardClient(props: DashboardClientProps) {
   const [contributions, setContributions] = useState(props.initialContributions);
   const [recurringItems, setRecurringItems] = useState(props.initialRecurringItems);
   const [notesOff, setNotesOff] = useState<string[]>([]);
-  const [offline, setOffline] = useState(false);
+  const offline = !useOnline();
   const [retrying, setRetrying] = useState(false);
+  /** When these numbers last came from the server (shown while offline). */
+  const [syncedAt, setSyncedAt] = useState<Date | null>(null);
   const [loadFailed, setLoadFailed] = useState(false);
 
   // Popups.
@@ -139,15 +153,14 @@ export default function DashboardClient(props: DashboardClientProps) {
       setExpense({});
       window.history.replaceState(null, "", "/dashboard"); // a reload shouldn't reopen it
     }
-    const onNet = () => setOffline(!navigator.onLine);
-    onNet();
-    window.addEventListener("online", onNet);
-    window.addEventListener("offline", onNet);
-    return () => {
-      window.removeEventListener("online", onNet);
-      window.removeEventListener("offline", onNet);
-    };
+    setSyncedAt(new Date());
   }, []);
+  // Back online: fetch fresh numbers before showing any.
+  const [wasOffline, setWasOffline] = useState(false);
+  useEffect(() => {
+    if (offline) return setWasOffline(true);
+    if (wasOffline) void refreshData();
+  }, [offline]);
 
   // Back / Forward between in-place pages; a phone page on a wide screen becomes its section.
   const [jump, setJump] = useState<string | null>(null);
@@ -242,6 +255,7 @@ export default function DashboardClient(props: DashboardClientProps) {
       return false;
     }
     setLoadFailed(false);
+    setSyncedAt(new Date());
     setCategories(cat.data as Category[]);
     setTransactions(tx.data as Tx[]);
     setIncomeSources(inc.data as IncomeSource[]);
@@ -361,12 +375,13 @@ export default function DashboardClient(props: DashboardClientProps) {
     setRetrying(true);
     const ok = navigator.onLine && (await refreshData());
     setRetrying(false);
-    setOffline(!ok);
-    toast(
-      ok ? "Back online" : "Still offline. We’ll reconnect when the network is back.",
-      ok ? undefined : { error: true },
-    );
+    toast(ok ? "Back online" : "Still offline. We’ll reconnect when the network is back.", {
+      tone: ok ? "done" : "offline",
+    });
   };
+  /** Add, Log expense and Record income stay tappable offline so they can explain themselves. */
+  const needsNet = (open: () => void) => () =>
+    offline ? toast("Adding needs a connection. Try again when you’re back online.", { tone: "offline" }) : open();
   const exportCsv = () => {
     const blob = new Blob([`﻿${transactionsToCsv(transactions as never[])}`], { type: "text/csv;charset=utf-8" });
     const url = URL.createObjectURL(blob);
@@ -434,16 +449,18 @@ export default function DashboardClient(props: DashboardClientProps) {
             <>
               <button
                 type="button"
-                onClick={() => openIncome()}
-                className="h-[38px] cursor-pointer rounded-full border border-line bg-transparent px-[15px] text-[13px] font-semibold transition-[border-color,transform] hover:border-ink-2 active:scale-[.96] max-[720px]:hidden"
+                onClick={needsNet(() => openIncome())}
+                aria-disabled={offline || undefined}
+                className="h-[38px] cursor-pointer aria-disabled:opacity-45 rounded-full border border-line bg-transparent px-[15px] text-[13px] font-semibold transition-[border-color,transform] hover:border-ink-2 active:scale-[.96] max-[720px]:hidden"
               >
                 Record income
               </button>
               <button
                 type="button"
                 id="open-fast-expense-btn"
-                onClick={() => openExpense()}
-                className="flex h-[38px] cursor-pointer items-center gap-2 rounded-full border-0 bg-lime px-4 text-sm font-bold text-lime-ink transition-[transform,box-shadow] hover:-translate-y-px hover:shadow-[0_8px_24px_-10px_var(--lime)] active:scale-[.96] max-[720px]:hidden"
+                onClick={needsNet(() => openExpense())}
+                aria-disabled={offline || undefined}
+                className="flex h-[38px] cursor-pointer aria-disabled:opacity-45 items-center gap-2 rounded-full border-0 bg-lime px-4 text-sm font-bold text-lime-ink transition-[transform,box-shadow] hover:-translate-y-px hover:shadow-[0_8px_24px_-10px_var(--lime)] active:scale-[.96] max-[720px]:hidden"
               >
                 <Plus size={16} />
                 Log expense
@@ -452,7 +469,10 @@ export default function DashboardClient(props: DashboardClientProps) {
           )}
         </AppHeader>
 
-        {view === "reports" ? (
+        {offline && <OfflineBanner retrying={retrying} onRetry={retryOnline} />}
+        {offline && view !== "more" ? (
+          <OfflineShell eyebrow={OFFLINE_EYEBROW[view]} syncedAt={syncedAt} tiles={view === "dashboard"} />
+        ) : view === "reports" ? (
           <ReportsView
             transactions={transactions}
             categories={categories}
@@ -462,7 +482,13 @@ export default function DashboardClient(props: DashboardClientProps) {
             onChanged={refreshData}
           />
         ) : view === "more" ? (
-          <More plan={morePlan} verified={props.initialUser.verified} onGo={go} />
+          <More
+            plan={morePlan}
+            verified={props.initialUser.verified}
+            offline={offline}
+            onGo={go}
+            onHome={() => go("dashboard")}
+          />
         ) : loadFailed ? (
           <section
             role="alert"
@@ -508,10 +534,9 @@ export default function DashboardClient(props: DashboardClientProps) {
                   </span>
                 </div>
 
+                <InstallCard />
+
                 <Notices
-                  offline={offline}
-                  retrying={retrying}
-                  onRetry={retryOnline}
                   due={due}
                   warnings={warnings}
                   daysLeft={period.daysRemaining}
@@ -663,7 +688,8 @@ export default function DashboardClient(props: DashboardClientProps) {
         <BottomNav
           current={NAV_TAB[view]}
           onGo={(t) => go(t === "home" ? "dashboard" : t)}
-          onAdd={() => openExpense()}
+          onAdd={needsNet(() => openExpense())}
+          addDisabled={offline}
         />
       </div>
 

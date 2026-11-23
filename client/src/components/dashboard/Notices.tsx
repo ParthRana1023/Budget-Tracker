@@ -1,9 +1,9 @@
 "use client";
 
-// Notices card (design handoff): Offline, recurring items Due, and budget warnings.
+// Notices card (design handoff): recurring items Due and budget warnings. Offline has its own
+// banner (design handoff v3, PWA).
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
 import { inr } from "@/lib/money.mjs";
 import { shortDate } from "@/lib/cycle.mjs";
 import { PILL_LIME, PILL_LINE, type RecurringItem } from "./types";
@@ -16,9 +16,6 @@ export type DueRow = { item: RecurringItem; dueDate: string };
 export type Warning = { key: string; name: string; level: "80" | "over"; pct: number; spent: number; limit: number };
 
 export default function Notices({
-  offline,
-  retrying,
-  onRetry,
   due,
   warnings,
   daysLeft,
@@ -27,9 +24,6 @@ export default function Notices({
   onSkip,
   onDismiss,
 }: {
-  offline: boolean;
-  retrying: boolean;
-  onRetry: () => void;
   due: DueRow[];
   warnings: Warning[];
   daysLeft: number;
@@ -51,10 +45,9 @@ export default function Notices({
     } catch {}
   };
 
-  const count = (offline ? 1 : 0) + due.length + warnings.length;
+  const count = due.length + warnings.length;
   if (!count) return null;
   const summary = [
-    offline && "Offline",
     due.length && `${due.length} due`,
     warnings.map((w) => (w.level === "over" ? "over limit" : "note")).join(", "),
   ]
@@ -81,22 +74,6 @@ export default function Notices({
       </div>
       {open && (
         <>
-          {offline && (
-            <div role="status" className={ROW}>
-              <span className={`${TAG} text-warn`}>Offline</span>
-              <span className="min-w-0 flex-[1_1_240px] font-serif text-xl text-pretty">
-                Showing what was saved last. Logging and edits need a connection.
-              </span>
-              <span className="flex items-center gap-3">
-                <Link href="/offline" className="text-[13px] font-semibold text-lime-text hover:text-ink">
-                  Details
-                </Link>
-                <button type="button" onClick={onRetry} disabled={retrying} className={PILL_LINE}>
-                  {retrying ? "Checking…" : "Retry"}
-                </button>
-              </span>
-            </div>
-          )}
           {due.map(({ item, dueDate }) => (
             <div key={item.id} role="status" className={ROW}>
               <span className={`${TAG} text-warn`}>Due</span>

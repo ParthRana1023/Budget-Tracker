@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { setUpAccount } from "./helpers";
+import { isPhone, setUpAccount, show } from "./helpers";
 
 // Phase 2: installable app, service worker, offline page, push opt-in. Runs on desktop and
 // mobile (Pixel 5) projects.
@@ -87,5 +87,61 @@ test.describe("PWA", () => {
     await sheet.getByRole("button", { name: "Close" }).click();
     await expect(sheet).toBeHidden();
     await expect(toggle).toHaveAttribute("aria-checked", "false");
+  });
+
+  test("offline: amounts hide, Add explains itself, numbers return online", async ({ page, context }) => {
+    await setUpAccount(page);
+    await expect(page.getByTestId("safe-to-spend")).toBeVisible();
+    await context.setOffline(true);
+    await expect(page.getByText("You’re offline", { exact: true })).toBeVisible();
+    await expect(page.getByRole("region", { name: "Numbers hidden while offline" })).toBeVisible();
+    await expect(page.getByTestId("safe-to-spend")).toHaveCount(0);
+    await expect(page.getByText(/₹\d/)).toHaveCount(0); // no amount anywhere
+
+    // aria-disabled, but still tappable so it can say why.
+    const add = isPhone(page)
+      ? page.getByRole("button", { name: "Add an entry, needs a connection" })
+      : page.getByRole("button", { name: "Log expense" });
+    await expect(add).toHaveAttribute("aria-disabled", "true");
+    await add.click({ force: true });
+    await expect(page.getByText("Adding needs a connection. Try again when you’re back online.")).toBeVisible();
+    await expect(page.getByRole("dialog")).toHaveCount(0);
+
+    await context.setOffline(false);
+    await expect(page.getByTestId("safe-to-spend")).toBeVisible();
+    await expect(page.getByText("You’re offline", { exact: true })).toHaveCount(0);
+  });
+
+  test("install card: second visit, Not now hides it, the menu brings it back, Install", async ({ page }) => {
+    await setUpAccount(page);
+    // From the second visit, once the browser offers to install (stubbed: Chromium only fires
+    // beforeinstallprompt for a real, engaged, installable site).
+    await page.evaluate(() => {
+      localStorage.setItem("sf-visits", "2");
+      const e = Object.assign(new Event("beforeinstallprompt", { cancelable: true }), {
+        prompt: async () => {},
+        userChoice: Promise.resolve({ outcome: "accepted" }),
+      });
+      window.dispatchEvent(e);
+    });
+    const card = page.getByRole("region", { name: "Install SaveFirst" });
+    await expect(card).toBeVisible();
+
+    await card.getByRole("button", { name: "Not now" }).click();
+    await expect(card).toHaveCount(0);
+    await expect(page.getByText(/^Hidden for 30 days\./)).toBeVisible();
+
+    if (isPhone(page)) {
+      await page.getByRole("navigation", { name: "Main" }).getByRole("button", { name: "More", exact: true }).click();
+      await page.getByRole("button", { name: /^Install app/ }).click();
+    } else {
+      await page.getByRole("button", { name: /^Account menu/ }).click();
+      await page.getByRole("menuitem", { name: "Install app" }).click();
+    }
+    await expect(card).toBeVisible();
+    await card.getByRole("button", { name: "Install app" }).click();
+    await expect(page.getByText("SaveFirst is installed. Open it from your home screen.")).toBeVisible();
+    await expect(card).toHaveCount(0);
+    await show(page, "Home");
   });
 });

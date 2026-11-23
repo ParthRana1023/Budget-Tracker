@@ -28,10 +28,13 @@ export default function BottomNav({
   current,
   onGo,
   onAdd,
+  addDisabled = false,
 }: {
   current: NavTab | null;
   onGo?: (tab: NavTab) => void;
   onAdd?: () => void;
+  /** Offline: Add stays tappable (aria-disabled) so onAdd can explain why it can't add. */
+  addDisabled?: boolean;
 }) {
   const tab = ([key, label, Icon]: (typeof TABS)[number]) => {
     const on = current === key;
@@ -74,7 +77,13 @@ export default function BottomNav({
         {TABS.slice(0, 2).map(tab)}
         <div className="flex flex-col items-center">
           {onAdd ? (
-            <button type="button" onClick={onAdd} aria-label="Add an entry" className={addClass}>
+            <button
+              type="button"
+              onClick={onAdd}
+              aria-label={addDisabled ? "Add an entry, needs a connection" : "Add an entry"}
+              aria-disabled={addDisabled || undefined}
+              className={`${addClass} aria-disabled:bg-tile-2 aria-disabled:text-muted aria-disabled:shadow-none`}
+            >
               <Plus size={24} aria-hidden />
             </button>
           ) : (

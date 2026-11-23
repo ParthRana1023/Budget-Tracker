@@ -8,6 +8,7 @@ import Link from "next/link";
 import {
   CalendarClock,
   ChevronRight,
+  Download,
   Gauge,
   LogOut,
   Settings as SettingsIcon,
@@ -17,6 +18,7 @@ import {
 } from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
 import { savePreferences } from "@/lib/settings.mjs";
+import { reopenInstall, useInstall } from "@/lib/install";
 import { useThemeToggle } from "../ThemeToggle";
 import { SignOutDialog } from "../AppHeader";
 
@@ -30,13 +32,18 @@ const chevron = <ChevronRight size={18} aria-hidden className="flex-none text-mu
 export default function More({
   plan,
   verified,
+  offline,
   onGo,
+  onHome,
 }: {
   /** Summary line under each Plan row. */
   plan: Record<MoreView, string>;
   verified: boolean;
+  offline: boolean;
   onGo: (view: MoreView) => void;
+  onHome: () => void;
 }) {
+  const install = useInstall();
   const { theme, toggleTheme } = useThemeToggle((t) => void savePreferences(createClient(), { theme: t }));
   const [signOut, setSignOut] = useState(false);
   const planRow = (view: MoreView, name: string, icon: ReactNode) => (
@@ -51,7 +58,7 @@ export default function More({
       </span>
       <span className="flex min-w-0 flex-1 flex-col">
         <span className="text-[15px] font-semibold">{name}</span>
-        <span className="tabular text-[13px] text-muted">{plan[view]}</span>
+        <span className="tabular text-[13px] text-muted">{offline ? "Needs a connection" : plan[view]}</span>
       </span>
       {chevron}
     </button>
@@ -68,6 +75,20 @@ export default function More({
       </section>
       <span className="eyebrow px-1 pt-2.5">You</span>
       <section className={CARD}>
+        {install.kind && (
+          <button
+            type="button"
+            onClick={() => {
+              reopenInstall();
+              onHome(); // the card lives on Home
+            }}
+            className={ROW_Y}
+          >
+            <Download size={18} aria-hidden className="flex-none text-ink-2" />
+            <span className="flex-1">Install app</span>
+            <span className="text-[13px] text-muted">Home screen</span>
+          </button>
+        )}
         <Link href="/settings" className={ROW_Y}>
           <SettingsIcon size={18} aria-hidden className="flex-none text-ink-2" />
           <span className="flex-1">Settings</span>

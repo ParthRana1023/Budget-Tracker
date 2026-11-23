@@ -2,7 +2,7 @@
 
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { clsx } from "clsx";
-import { Check, CircleAlert, X } from "lucide-react";
+import { Check, CircleAlert, Info, WifiOff, X } from "lucide-react";
 
 type ToastOptions = {
   /** Shows an Undo button. A rejected promise turns the toast into "Couldn't undo". */
@@ -12,11 +12,19 @@ type ToastOptions = {
   action?: { label: string; onClick: () => void };
   /** Stays until dismissed or replaced instead of hiding after 6s. */
   sticky?: boolean;
+  /** Status toast (design handoff v3, PWA): icon chip in this tone, an ×, hides after 5s. */
+  tone?: "done" | "offline" | "info";
 };
 type ToastState = ToastOptions & { msg: string; id: number };
 type ShowToast = (msg: string, options?: ToastOptions) => void;
 
 const HIDE_MS = 6000;
+const STATUS_HIDE_MS = 5000;
+const TONES = {
+  done: { bg: "var(--lime)", fg: "var(--lime-ink)", Icon: Check },
+  offline: { bg: "var(--warn)", fg: "var(--bg)", Icon: WifiOff },
+  info: { bg: "var(--line-2)", fg: "var(--ink)", Icon: Info },
+};
 const ToastContext = createContext<ShowToast>(() => {});
 
 /** Bottom toast that auto-hides after 6s, with optional Undo (handoff "Toast"). */
@@ -41,7 +49,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
       clearTimeout(hideTimer.current);
       setShown(false);
       setToast({ msg, ...options, id: ++nextId.current });
-      if (!options?.sticky) hideTimer.current = setTimeout(hide, HIDE_MS);
+      if (!options?.sticky) hideTimer.current = setTimeout(hide, options?.tone ? STATUS_HIDE_MS : HIDE_MS);
     },
     [hide],
   );
@@ -78,15 +86,19 @@ export function ToastProvider({ children }: { children: ReactNode }) {
             shown ? "-translate-x-1/2 translate-y-0 opacity-100" : "-translate-x-1/2 translate-y-4 opacity-0",
           )}
         >
-          <span
-            aria-hidden
-            className={clsx(
-              "flex h-[26px] w-[26px] flex-none items-center justify-center rounded-full text-lime-ink",
-              toast.error ? "bg-danger" : "bg-lime",
-            )}
-          >
-            {toast.error ? <CircleAlert size={13} /> : <Check size={13} />}
-          </span>
+          {toast.tone ? (
+            <ToneChip tone={toast.tone} />
+          ) : (
+            <span
+              aria-hidden
+              className={clsx(
+                "flex h-[26px] w-[26px] flex-none items-center justify-center rounded-full text-lime-ink",
+                toast.error ? "bg-danger" : "bg-lime",
+              )}
+            >
+              {toast.error ? <CircleAlert size={13} /> : <Check size={13} />}
+            </span>
+          )}
           <span className="min-w-0 flex-1 text-sm font-medium text-pretty">{toast.msg}</span>
           {toast.undo && (
             <button
@@ -109,12 +121,12 @@ export function ToastProvider({ children }: { children: ReactNode }) {
               {toast.action.label}
             </button>
           )}
-          {toast.sticky && (
+          {(toast.sticky || toast.tone) && (
             <button
               type="button"
               onClick={hide}
               aria-label="Dismiss"
-              className="flex h-[34px] w-[34px] flex-none cursor-pointer items-center justify-center rounded-full border-0 bg-transparent text-muted hover:text-ink"
+              className="flex h-10 w-10 flex-none cursor-pointer items-center justify-center rounded-full border-0 bg-transparent text-muted hover:text-ink"
             >
               <X size={15} />
             </button>
@@ -122,5 +134,18 @@ export function ToastProvider({ children }: { children: ReactNode }) {
         </div>
       )}
     </ToastContext.Provider>
+  );
+}
+
+function ToneChip({ tone }: { tone: keyof typeof TONES }) {
+  const { bg, fg, Icon } = TONES[tone];
+  return (
+    <span
+      aria-hidden
+      className="flex h-[26px] w-[26px] flex-none items-center justify-center rounded-full"
+      style={{ background: bg, color: fg }}
+    >
+      <Icon size={13} />
+    </span>
   );
 }

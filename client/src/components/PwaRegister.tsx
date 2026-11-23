@@ -2,50 +2,42 @@
 
 import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
-import { WifiOff } from "lucide-react";
-import { useToast } from "./ui/Toast";
+import { Sparkles, WifiOff, X } from "lucide-react";
+import { startInstallWatch } from "@/lib/install";
+import { useOnline } from "./ui/useOnline";
 
-// Registers the service worker (public/sw.js), offers "New version ready" when a deploy lands,
-// suggests installing the app on the Dashboard, and shows a bar while offline.
+// Registers the service worker (public/sw.js) and offers "New version ready" when a deploy
+// lands (design handoff v3, PWA); starts watching for the browser's install prompt; shows a
+// bar while offline on pages that don't have their own offline banner.
 const BUILD = process.env.NEXT_PUBLIC_BUILD_ID ?? "dev";
-const HINT_KEY = "savefirst-install-hint";
-// shortcut: the toast doesn't report a dismissal, so the hint simply waits this long before it shows again.
-const HINT_EVERY_MS = 30 * 24 * 60 * 60 * 1000;
+/** These pages show their own offline banner and hide every amount. */
+const OWN_OFFLINE = ["/dashboard", "/ledger", "/more", "/bills", "/budgets", "/goals"];
 
-type InstallPromptEvent = Event & { prompt: () => Promise<void>; userChoice: Promise<{ outcome: string }> };
+/** True while a Dialog or sheet is open, so the update toast never interrupts an entry. */
+function useModalOpen() {
+  const [open, setOpen] = useState(false);
+  useEffect(() => {
+    const check = () => setOpen(!!document.querySelector('[role="dialog"][aria-modal="true"]'));
+    check();
+    const mo = new MutationObserver(check);
+    mo.observe(document.body, { childList: true });
+    return () => mo.disconnect();
+  }, []);
+  return open;
+}
 
-const hintDue = () => {
-  try {
-    return Date.now() - Number(localStorage.getItem(HINT_KEY) ?? 0) > HINT_EVERY_MS;
-  } catch {
-    return false;
-  }
-};
-const hintShown = () => {
-  try {
-    localStorage.setItem(HINT_KEY, String(Date.now()));
-  } catch {}
-};
+let reloadOnSwap = false;
 
 export default function PwaRegister() {
-  const toast = useToast();
   const pathname = usePathname();
-  const [offline, setOffline] = useState(false);
+  const online = useOnline();
+  const modalOpen = useModalOpen();
+  const [waiting, setWaiting] = useState<ServiceWorker | null>(null);
+  const [updating, setUpdating] = useState(false);
 
   useEffect(() => {
+    startInstallWatch();
     if (!("serviceWorker" in navigator)) return;
-    let reloadOnSwap = false;
-    const offer = (worker: ServiceWorker) =>
-      toast("A new version of SaveFirst is ready.", {
-        sticky: true,
-        action: {
-          label: "Refresh",
-          onClick: () => {
-            reloadOnSwap = true;
-            worker.postMessage({ type: "SKIP_WAITING" });
-          },
-        },
-      });
     // Only after "Refresh": the first install also changes controller (clients.claim).
     const onSwap = () => reloadOnSwap && window.location.reload();
     navigator.serviceWorker.addEventListener("controllerchange", onSwap);
@@ -53,67 +45,65 @@ export default function PwaRegister() {
     navigator.serviceWorker
       .register(`/sw.js?v=${encodeURIComponent(BUILD)}`)
       .then((reg) => {
-        if (reg.waiting && navigator.serviceWorker.controller) offer(reg.waiting);
+        if (reg.waiting && navigator.serviceWorker.controller) setWaiting(reg.waiting);
         reg.addEventListener("updatefound", () => {
           const worker = reg.installing;
           worker?.addEventListener("statechange", () => {
-            if (worker.state === "installed" && navigator.serviceWorker.controller) offer(worker);
+            if (worker.state === "installed" && navigator.serviceWorker.controller) setWaiting(worker);
           });
         });
       })
       .catch((err) => console.debug("ServiceWorker registration failed:", err));
     return () => navigator.serviceWorker.removeEventListener("controllerchange", onSwap);
-  }, [toast]);
-
-  useEffect(() => {
-    const onDashboard = () => window.location.pathname.startsWith("/dashboard");
-    const standalone =
-      window.matchMedia("(display-mode: standalone)").matches ||
-      (navigator as { standalone?: boolean }).standalone === true;
-    if (standalone) return;
-
-    // Android / desktop Chrome and Edge: keep the browser's install prompt for our own button.
-    const onPrompt = (e: Event) => {
-      e.preventDefault();
-      if (!onDashboard() || !hintDue()) return;
-      hintShown();
-      const prompt = e as InstallPromptEvent;
-      toast("Install SaveFirst for one-tap access from your home screen.", {
-        sticky: true,
-        action: { label: "Install", onClick: () => void prompt.prompt().catch(() => {}) },
-      });
-    };
-    window.addEventListener("beforeinstallprompt", onPrompt);
-
-    // iPhone/iPad Safari has no install prompt; explain the Share menu instead.
-    const ios = /iPhone|iPad|iPod/.test(navigator.userAgent);
-    if (ios && onDashboard() && hintDue()) {
-      hintShown();
-      toast("Install SaveFirst: tap Share, then Add to Home Screen.", { sticky: true });
-    }
-    return () => window.removeEventListener("beforeinstallprompt", onPrompt);
-  }, [toast]);
-
-  useEffect(() => {
-    const update = () => setOffline(!navigator.onLine);
-    update();
-    window.addEventListener("online", update);
-    window.addEventListener("offline", update);
-    return () => {
-      window.removeEventListener("online", update);
-      window.removeEventListener("offline", update);
-    };
   }, []);
 
-  // The Dashboard has its own offline notice with Retry (Notices).
-  if (!offline || pathname?.startsWith("/dashboard")) return null;
+  const refresh = () => {
+    if (!waiting) return;
+    setUpdating(true);
+    reloadOnSwap = true;
+    waiting.postMessage({ type: "SKIP_WAITING" });
+  };
+
   return (
-    <div
-      role="status"
-      className="fixed inset-x-0 top-0 z-80 flex items-center justify-center gap-2 bg-warn px-4 pt-[calc(6px+env(safe-area-inset-top))] pb-1.5 text-[13px] font-semibold text-bg"
-    >
-      <WifiOff size={14} aria-hidden />
-      You’re offline. Figures may be out of date, and changes need a connection to save.
-    </div>
+    <>
+      {waiting && !modalOpen && (
+        <div
+          role="status"
+          aria-live="polite"
+          className="fixed bottom-[calc(84px+env(safe-area-inset-bottom))] left-1/2 z-72 flex w-[min(calc(100vw-24px),460px)] -translate-x-1/2 items-center gap-3 rounded-2xl bg-ink py-2 pr-1.5 pl-4 text-bg shadow-[0_20px_50px_-20px_rgba(0,0,0,.6)] min-[720px]:bottom-[calc(20px+env(safe-area-inset-bottom))]"
+        >
+          <Sparkles size={18} aria-hidden className="flex-none" />
+          <span className="flex min-w-0 flex-1 flex-col">
+            <span className="text-sm font-bold">New version ready</span>
+            <span className="text-xs opacity-75">Refresh to update. Takes a second.</span>
+          </span>
+          <button
+            type="button"
+            onClick={refresh}
+            disabled={updating}
+            className="h-10 flex-none cursor-pointer rounded-full border-0 bg-lime px-4 text-sm font-bold text-lime-ink active:scale-[.97]"
+          >
+            {updating ? "Updating…" : "Refresh"}
+          </button>
+          <button
+            type="button"
+            onClick={() => setWaiting(null)}
+            aria-label="Update later"
+            className="flex h-10 w-10 flex-none cursor-pointer items-center justify-center rounded-full border-0 bg-transparent text-inherit opacity-70"
+          >
+            <X size={16} />
+          </button>
+        </div>
+      )}
+      {!online && !OWN_OFFLINE.some((p) => pathname?.startsWith(p)) && (
+        <div
+          role="status"
+          className="fixed inset-x-0 top-0 z-80 flex items-center justify-center gap-2 bg-warn px-4 pt-[calc(6px+env(safe-area-inset-top))] pb-1.5 text-[13px] font-semibold text-bg"
+        >
+          <WifiOff size={14} aria-hidden />
+          You’re offline. Changes need a connection to save.
+        </div>
+      )}
+    </>
   );
 }

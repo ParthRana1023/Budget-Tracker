@@ -73,6 +73,7 @@ self.addEventListener("push", (event) => {
     self.registration.showNotification(data.title || "SaveFirst", {
       body: data.body || "",
       icon: "/android-chrome-192x192.png",
+      badge: "/badge-96.png", // the mark in white, for the Android status bar
       tag: data.tag,
       data: { url: data.url || "/dashboard" },
     }),

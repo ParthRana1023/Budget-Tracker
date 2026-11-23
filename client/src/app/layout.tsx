@@ -1,4 +1,15 @@
 import type { Metadata, Viewport } from "next";
+
+/** iPhone screens with launch images in public/splash: CSS width, height, pixel ratio. */
+const SPLASH: Array<[number, number, number]> = [
+  [430, 932, 3],
+  [393, 852, 3],
+  [428, 926, 3],
+  [390, 844, 3],
+  [375, 812, 3],
+  [414, 896, 2],
+  [375, 667, 2],
+];
 import localFont from "next/font/local";
 import { Analytics } from "@vercel/analytics/next";
 import { SpeedInsights } from "@vercel/speed-insights/next";
@@ -38,7 +49,18 @@ export const metadata: Metadata = {
     ],
     apple: { url: "/apple-touch-icon.png", sizes: "180x180" },
   },
-  appleWebApp: { capable: true, title: "SaveFirst", statusBarStyle: "black-translucent" },
+  appleWebApp: {
+    capable: true,
+    title: "SaveFirst",
+    statusBarStyle: "black-translucent",
+    // iOS launch images (design handoff v3, PWA 2l), one per screen size, dark and light.
+    startupImage: SPLASH.flatMap(([w, h, dpr]) =>
+      (["dark", "light"] as const).map((scheme) => ({
+        url: `/splash/${scheme}-${w * dpr}x${h * dpr}.png`,
+        media: `(device-width: ${w}px) and (device-height: ${h}px) and (-webkit-device-pixel-ratio: ${dpr}) and (orientation: portrait) and (prefers-color-scheme: ${scheme})`,
+      })),
+    ),
+  },
 };
 
 // viewport-fit=cover lets the installed app draw under the notch; layouts pad with
@@ -47,7 +69,10 @@ export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover",
-  themeColor: "#0b0b0c",
+  themeColor: [
+    { media: "(prefers-color-scheme: dark)", color: "#0b0b0c" },
+    { media: "(prefers-color-scheme: light)", color: "#ecece6" },
+  ],
 };
 
 export default function RootLayout({
