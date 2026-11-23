@@ -1,4 +1,6 @@
-const CSV_COLUMNS = ["Date", "Type", "Category", "Amount (INR)", "Note"];
+import { methodLabel } from "./paymentMethods.mjs";
+
+const CSV_COLUMNS = ["Date", "Type", "Category", "Amount (INR)", "Note", "Payment method"];
 
 function escapeCsv(value) {
   const text = String(value ?? "");
@@ -13,6 +15,7 @@ export function transactionsToCsv(transactions) {
       transaction.category?.name,
       (Number(transaction.amount) / 100).toFixed(2),
       transaction.note,
+      methodLabel(transaction.payment_method),
     ]
       .map(escapeCsv)
       .join(","),

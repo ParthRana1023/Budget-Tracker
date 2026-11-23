@@ -9,6 +9,8 @@ export interface RecurringItem {
   day_of_month: number | null;
   /** 'YYYY-MM' the user chose "Skip this month" for; null = not skipped. */
   skip_month?: string | null;
+  /** Default method for entries posted from this item (expenses only). */
+  payment_method?: import("./paymentMethods.mjs").PaymentMethod | null;
   active: boolean;
   income_type: "salary" | "variable" | "other";
 }

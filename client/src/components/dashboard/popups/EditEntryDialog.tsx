@@ -1,6 +1,6 @@
 "use client";
 
-// Edit entry (design handoff, Popups): amount, category, date, note (+ payee), or delete.
+// Edit entry (design handoff, Popups): amount, category, date, note (+ payee, paid with), or delete.
 
 import { useState } from "react";
 import { Trash2 } from "lucide-react";
@@ -14,6 +14,7 @@ import {
   AmountField,
   FIELD,
   Labeled,
+  MethodSelect,
   Preview,
   SAVE_FAILED,
   paise,
@@ -41,6 +42,7 @@ export default function EditEntryDialog({
     date: entry.date,
     note: entry.note ?? "",
     payee: entry.payee ?? "",
+    method: entry.payment_method ?? null,
   });
   const [confirming, setConfirming] = useState(false);
   const amount = paise(form.amount);
@@ -52,14 +54,21 @@ export default function EditEntryDialog({
     entry.id,
   );
 
-  const restore = () =>
-    createClient().rpc("update_financial_transaction", {
+  const restore = async () => {
+    const db = createClient();
+    const r = await db.rpc("update_financial_transaction", {
       p_transaction_id: entry.id,
       p_amount: Number(entry.amount),
       p_date: entry.date,
       p_category_id: entry.category_id,
       p_note: entry.note,
     });
+    if (r.error || !isExpense) return r;
+    return db
+      .from("transactions")
+      .update({ payee: entry.payee ?? null, payment_method: entry.payment_method ?? null })
+      .eq("id", entry.id);
+  };
 
   const submit = () => {
     if (amount <= 0) return setError("Enter an amount above ₹0.");
@@ -75,8 +84,9 @@ export default function EditEntryDialog({
           p_note: form.note.trim() || entry.note,
         });
         const payee = form.payee.trim() || null;
-        if (r.error || !isExpense || payee === (entry.payee ?? null)) return r;
-        return supabase.from("transactions").update({ payee }).eq("id", entry.id);
+        const unchanged = payee === (entry.payee ?? null) && form.method === (entry.payment_method ?? null);
+        if (r.error || !isExpense || unchanged) return r;
+        return supabase.from("transactions").update({ payee, payment_method: form.method }).eq("id", entry.id);
       },
       async () => {
         onClose();
@@ -100,6 +110,7 @@ export default function EditEntryDialog({
           note: entry.note,
           category_id: entry.category_id,
           payee: entry.payee ?? null,
+          payment_method: entry.payment_method ?? null,
           from_reserve: !!entry.from_reserve,
           external_id: entry.external_id,
         };
@@ -170,6 +181,7 @@ export default function EditEntryDialog({
             />
           </Labeled>
         )}
+        {isExpense && <MethodSelect id="ed-method" value={form.method} onChange={(method) => set({ method })} />}
       </div>
       {confirming ? (
         <div

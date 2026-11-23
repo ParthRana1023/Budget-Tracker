@@ -9,11 +9,13 @@ import Dialog from "../../ui/Dialog";
 import type { Category } from "../types";
 import type { PopupContext } from "./context";
 import { cycleKeyFor } from "@/lib/cycle.mjs";
+import type { PaymentMethod } from "@/lib/paymentMethods.mjs";
 import {
   AmountField,
   DueDayField,
   FIELD,
   Labeled,
+  MethodSelect,
   Preview,
   SAVE_FAILED,
   SwitchRow,
@@ -44,6 +46,7 @@ export default function ExpenseDialog({
     date: today,
     note: prefill.note ?? "",
     payee: "",
+    method: null as PaymentMethod | null,
     fromReserve: !!prefill.fromReserve,
     repeat: false,
     day: "",
@@ -74,6 +77,7 @@ export default function ExpenseDialog({
       amount: toField(Number(r.amount)),
       categoryId: r.category_id ?? "",
       note: r.name,
+      method: r.payment_method ?? null,
       repeat: false,
     });
   };
@@ -158,6 +162,7 @@ export default function ExpenseDialog({
               category_id: form.categoryId,
               note,
               payee,
+              payment_method: form.method,
               from_reserve: form.fromReserve,
             })
             .select("id")
@@ -175,11 +180,12 @@ export default function ExpenseDialog({
           p_day: form.itemId ? null : day,
           p_cycle_key: cycleKeyFor(form.date, ctx.schedule),
         });
-        // The recurring path doesn't take these two; set them on the new entry.
-        if (!r.error && (payee || form.fromReserve)) {
+        // The recurring path doesn't take these; set them on the new entry. With an item, the
+        // method shown here (its default, changed or cleared) replaces the one the database copied.
+        if (!r.error && (payee || form.fromReserve || form.method || form.itemId)) {
           const u = await supabase
             .from("transactions")
-            .update({ payee, from_reserve: form.fromReserve })
+            .update({ payee, from_reserve: form.fromReserve, payment_method: form.method })
             .eq("id", r.data);
           if (u.error) return { error: u.error, data: r.data };
         }
@@ -336,6 +342,7 @@ export default function ExpenseDialog({
             className={FIELD}
           />
         </Labeled>
+        <MethodSelect id="ex-method" value={form.method} onChange={(method) => set({ method })} />
       </div>
 
       {model.reserveLeft > 0 && (

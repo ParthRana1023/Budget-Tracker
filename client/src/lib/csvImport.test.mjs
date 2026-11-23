@@ -56,3 +56,36 @@ test("a file without the needed columns, or empty, is refused", () => {
   assert.match(checkImport("Name,Value\nx,1", { categories }).error, /Date and Amount/);
   assert.match(checkImport("Date,Amount\n", { categories }).error, /no entries/);
 });
+
+test("payment method: round-trips through export, optional, unknown values skipped", () => {
+  const csv = transactionsToCsv([
+    {
+      date: "2026-11-02",
+      type: "expense",
+      category: { name: "Groceries" },
+      amount: 50000,
+      note: "a",
+      payment_method: "credit_card",
+    },
+    { date: "2026-11-03", type: "expense", category: { name: "Groceries" }, amount: 60000, note: "b" },
+  ]);
+  assert.deepEqual(checkImport(csv, { categories }).rows, [
+    {
+      date: "2026-11-02",
+      type: "expense",
+      category: "Groceries",
+      amount: 50000,
+      note: "a",
+      payment_method: "credit_card",
+    },
+    { date: "2026-11-03", type: "expense", category: "Groceries", amount: 60000, note: "b" },
+  ]);
+  const r = checkImport(
+    "Date,Type,Category,Amount,Payment method\n2026-11-04,expense,Groceries,10,Cheque\n2026-11-05,income,,10,UPI",
+    {
+      categories,
+    },
+  );
+  assert.deepEqual(r.skipped, [{ line: 2, reason: "Unknown payment method “Cheque”" }]);
+  assert.equal(r.rows[0].payment_method, undefined, "income never carries a method");
+});

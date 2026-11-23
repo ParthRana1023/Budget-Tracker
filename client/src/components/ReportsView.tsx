@@ -19,6 +19,7 @@ import {
   weekdayAverages,
   type Grouping,
 } from "@/lib/reports.mjs";
+import { spendByMethod } from "@/lib/paymentMethods.mjs";
 import Drawer from "./ui/Drawer";
 import { useToast } from "./ui/Toast";
 import { CARD_H2, type Category, type RecurringItem, type Settings, type Tx } from "./dashboard/types";
@@ -530,6 +531,9 @@ export default function ReportsView({
       weekend = (wk[5] + wk[6]) / 2;
     const payees = topPayees(cur, prev),
       payMax = Math.max(1, ...payees.map((p) => Math.max(p.amount, p.previous ?? 0)));
+    const methods = spendByMethod(cur.entries),
+      methodMax = Math.max(1, ...methods.map((m) => m.amount)),
+      methodTotal = methods.reduce((s, m) => s + m.amount, 0);
     const dayRows = (cy: Cycle, k: number) =>
       rowsOf(flexEntries(cy, (t) => t.date === addDaysStr(cy.period.startStr, k - 1)));
 
@@ -757,6 +761,44 @@ export default function ReportsView({
           })}
           {!payees.length && (
             <p className="m-0 font-serif text-xl text-ink-2 italic">No flexible spending logged this cycle yet.</p>
+          )}
+        </section>
+
+        <section className={CARD}>
+          <Head title="Paid with" sub={`Every expense in ${cur.labelLong}, by how it was paid`} />
+          {methods.map((m) => (
+            <button
+              key={m.label}
+              type="button"
+              onClick={() => open(m.label, `${m.count} ${m.count === 1 ? "expense" : "expenses"}`, rowsOf(m.entries))}
+              aria-label={`${m.label}: ${inr(m.amount)}`}
+              className={ROW_BTN}
+            >
+              <span className="flex min-w-[140px] flex-col">
+                <span className="font-semibold" style={{ color: m.key ? undefined : "var(--muted)" }}>
+                  {m.label}
+                </span>
+                <span className="text-xs text-muted">
+                  {m.count} {m.count === 1 ? "expense" : "expenses"}
+                </span>
+              </span>
+              <span className="relative h-2.5 min-w-[120px] flex-1 rounded-full bg-track">
+                <span
+                  className="absolute inset-y-0 left-0 rounded-full"
+                  style={{
+                    width: `${(m.amount / methodMax) * 100}%`,
+                    background: m.key ? "var(--lime)" : "var(--line-2)",
+                  }}
+                />
+              </span>
+              <span className="tabular w-20 text-right font-semibold">{inr(m.amount)}</span>
+              <span className="w-[150px] text-right text-xs text-muted">
+                {methodTotal ? `${Math.round((m.amount / methodTotal) * 100)}% of spending` : ""}
+              </span>
+            </button>
+          ))}
+          {!methods.length && (
+            <p className="m-0 font-serif text-xl text-ink-2 italic">No expenses logged this cycle yet.</p>
           )}
         </section>
       </>

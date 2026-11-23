@@ -6,6 +6,7 @@ import { useState, type ReactNode } from "react";
 import { Repeat, Trash2, TriangleAlert } from "lucide-react";
 import { cleanTyped, inr, showTyped } from "@/lib/money.mjs";
 import { errorFields, reportClientError } from "@/lib/log.mjs";
+import { PAYMENT_METHODS, type PaymentMethod } from "@/lib/paymentMethods.mjs";
 
 export const FIELD =
   "h-12 w-full min-w-0 rounded-xl border border-line-2 bg-tile-2 px-3.5 text-[15px] text-ink outline-none transition-[border-color,box-shadow] duration-200 focus:border-lime focus:shadow-[0_0_0_3px_var(--lime-soft)] focus-visible:outline-none";
@@ -109,6 +110,37 @@ export function AmountField({
 }
 
 /** On/off switch row ("Repeat every month", "Pay from annual bills reserve"). */
+/** "Paid with" picker for expenses (tracking only). Empty = not recorded. */
+export function MethodSelect({
+  id,
+  value,
+  onChange,
+  label = "Paid with",
+}: {
+  id: string;
+  value: PaymentMethod | null | undefined;
+  onChange: (v: PaymentMethod | null) => void;
+  label?: string;
+}) {
+  return (
+    <Labeled id={id} label={label} optional>
+      <select
+        id={id}
+        value={value ?? ""}
+        onChange={(e) => onChange((e.target.value || null) as PaymentMethod | null)}
+        className={FIELD}
+      >
+        <option value="">Not recorded</option>
+        {PAYMENT_METHODS.map(([k, l]) => (
+          <option key={k} value={k}>
+            {l}
+          </option>
+        ))}
+      </select>
+    </Labeled>
+  );
+}
+
 export function SwitchRow({
   title,
   sub,

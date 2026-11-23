@@ -7,7 +7,17 @@ import { showTyped } from "@/lib/money.mjs";
 import Dialog from "../../ui/Dialog";
 import type { RecurringItem } from "../types";
 import type { PopupContext } from "./context";
-import { FIELD, Labeled, SAVE_FAILED, cleanAmount, cleanDay, paise, toField, usePopupForm } from "./parts";
+import {
+  FIELD,
+  Labeled,
+  MethodSelect,
+  SAVE_FAILED,
+  cleanAmount,
+  cleanDay,
+  paise,
+  toField,
+  usePopupForm,
+} from "./parts";
 
 export default function RecurringDialog({
   ctx,
@@ -22,7 +32,9 @@ export default function RecurringDialog({
     name: item.name,
     amount: toField(Number(item.amount)),
     day: item.day_of_month ? String(item.day_of_month) : "",
+    method: item.payment_method ?? null,
   });
+  const isExpense = item.type === "expense";
 
   const submit = () => {
     const name = form.name.trim(),
@@ -33,13 +45,22 @@ export default function RecurringDialog({
     if (day !== null && !(day >= 1 && day <= 28)) return setError("Pick a day from 1 to 28, or leave it blank.");
     const db = createClient();
     save(
-      () => db.from("recurring_items").update({ name, amount, day_of_month: day }).eq("id", item.id),
+      () =>
+        db
+          .from("recurring_items")
+          .update({ name, amount, day_of_month: day, ...(isExpense && { payment_method: form.method }) })
+          .eq("id", item.id),
       async () => {
         onClose();
         await ctx.saved(`${name} updated`, () =>
           db
             .from("recurring_items")
-            .update({ name: item.name, amount: item.amount, day_of_month: item.day_of_month })
+            .update({
+              name: item.name,
+              amount: item.amount,
+              day_of_month: item.day_of_month,
+              payment_method: item.payment_method ?? null,
+            })
             .eq("id", item.id),
         );
       },
@@ -91,6 +112,14 @@ export default function RecurringDialog({
             className={FIELD}
           />
         </Labeled>
+        {isExpense && (
+          <MethodSelect
+            id="ru-method"
+            label="Usually paid with"
+            value={form.method}
+            onChange={(method) => set({ method })}
+          />
+        )}
       </div>
       <span className="text-[13px] text-pretty text-muted">
         Changes apply from the next time it’s recorded. Past entries stay as they are.

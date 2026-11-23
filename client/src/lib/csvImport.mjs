@@ -1,5 +1,5 @@
 // CSV import (Settings › Data): reads the same format lib/csvExport.mjs writes
-// (Date, Type, Category, Amount (INR), Note) and checks every row before anything is saved.
+// (Date, Type, Category, Amount (INR), Note, Payment method; the last is optional) and checks every row before anything is saved.
 // The database repeats the checks and skips exact duplicates (import_transactions).
 
 /**
@@ -32,7 +32,9 @@ export function parseCsv(text) {
   return rows.filter((r) => r.some((c) => c.trim()));
 }
 
-/** @typedef {{ date: string, type: "expense" | "income", category: string, amount: number, note: string }} ImportRow */
+import { parseMethod } from "./paymentMethods.mjs";
+
+/** @typedef {{ date: string, type: "expense" | "income", category: string, amount: number, note: string, payment_method?: import("./paymentMethods.mjs").PaymentMethod }} ImportRow */
 
 /**
  * Checks a CSV for import. Rows that can't go in are listed with the reason (line numbers
@@ -52,6 +54,7 @@ export function checkImport(text, { categories, existing = [] }) {
     category: col(/^category$/i),
     amount: col(/^amount/i),
     note: col(/^note$/i),
+    method: col(/^payment method$/i),
   };
   if (at.date < 0 || at.amount < 0) {
     return { ...out, error: "This file needs Date and Amount columns, like a SaveFirst export." };
@@ -93,7 +96,17 @@ export function checkImport(text, { categories, existing = [] }) {
       if (!known) return skip(`No category called “${category}”`);
       category = known;
     }
-    const row = { date, type, category, amount, note: get(at.note).slice(0, 500) };
+    // Optional column; income never carries a method.
+    const method = type === "expense" ? parseMethod(get(at.method)) : null;
+    if (method === undefined) return skip(`Unknown payment method “${get(at.method)}”`);
+    const row = {
+      date,
+      type,
+      category,
+      amount,
+      note: get(at.note).slice(0, 500),
+      ...(method && { payment_method: method }),
+    };
     if (seen.has(key(row))) return void out.duplicates++;
     seen.add(key(row));
     out.rows.push(/** @type {ImportRow} */ (row));

@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { ChevronDown } from "lucide-react";
 import { inr } from "@/lib/money.mjs";
 import { dayLabel, shortDate } from "@/lib/cycle.mjs";
+import { methodLabel, NOT_RECORDED, PAYMENT_METHODS } from "@/lib/paymentMethods.mjs";
 import Reveal from "../ui/Reveal";
 import { CARD_H2, LINK_BUTTON, PILL_LIME, PILL_LINE, type Category, type Tx } from "./types";
 
@@ -41,10 +42,15 @@ export default function Ledger({
     } catch {}
   };
 
-  const spent = entries.filter((t) => t.type === "expense").reduce((s, t) => s + Number(t.amount), 0);
-  const n = entries.length,
+  // "" = everything; "none" = expenses with no method; otherwise expenses paid that way.
+  const [method, setMethod] = useState("");
+  const shown = method
+    ? entries.filter((t) => t.type === "expense" && (t.payment_method ?? "none") === method)
+    : entries;
+  const spent = shown.filter((t) => t.type === "expense").reduce((s, t) => s + Number(t.amount), 0);
+  const n = shown.length,
     word = n === 1 ? "entry" : "entries";
-  const days = [...new Set(entries.map((t) => t.date))].sort().reverse();
+  const days = [...new Set(shown.map((t) => t.date))].sort().reverse();
 
   const row = (t: Tx) => {
     const cat = t.category_id ? byId.get(t.category_id) : undefined;
@@ -84,8 +90,27 @@ export default function Ledger({
             </span>
           </button>
         </h2>
-        <span className="text-[13px] text-muted">
-          {open ? `${n} ${word} this cycle` : `${n} ${word} · ${inr(spent)} spent this cycle`} ·{" "}
+        <span className="flex flex-wrap items-center gap-x-1 text-[13px] text-muted">
+          {open && entries.some((t) => t.type === "expense") && (
+            <select
+              aria-label="Show expenses paid with"
+              value={method}
+              onChange={(e) => setMethod(e.target.value)}
+              className="mr-2 h-[34px] cursor-pointer rounded-full border border-line-2 bg-transparent px-3 text-[13px] font-semibold text-ink"
+            >
+              <option value="">All entries</option>
+              {PAYMENT_METHODS.map(([k, l]) => (
+                <option key={k} value={k}>
+                  {l}
+                </option>
+              ))}
+              <option value="none">{NOT_RECORDED}</option>
+            </select>
+          )}
+          {open
+            ? `${n} ${word}${method ? ` · ${inr(spent)}` : ""} this cycle`
+            : `${n} ${word} · ${inr(spent)} spent this cycle`}{" "}
+          ·{" "}
           <button type="button" onClick={onExport} className={LINK_BUTTON}>
             Export CSV
           </button>
@@ -99,7 +124,7 @@ export default function Ledger({
                 {dayLabel(date, today)}
               </span>
               <div className="flex min-w-0 flex-[1_1_260px] flex-col">
-                {entries
+                {shown
                   .filter((t) => t.date === date)
                   .map((t) => {
                     const r = row(t);
@@ -116,6 +141,11 @@ export default function Ledger({
                         <span className="rounded-full bg-tile-2 px-2 py-0.5 text-[11px] font-semibold whitespace-nowrap text-ink-2">
                           {r.cat}
                         </span>
+                        {t.payment_method && (
+                          <span className="rounded-full border border-line-2 px-2 py-0.5 text-[11px] font-semibold whitespace-nowrap text-muted">
+                            {methodLabel(t.payment_method)}
+                          </span>
+                        )}
                         <span
                           className="tabular ml-auto min-w-20 text-right font-semibold whitespace-nowrap"
                           style={{ color: r.color }}
@@ -128,7 +158,13 @@ export default function Ledger({
               </div>
             </div>
           ))}
-          {n === 0 && (
+          {n === 0 && method && (
+            <p className="m-0 pt-[22px] pb-1.5 font-serif text-[22px] text-ink-2 italic">
+              No expenses {method === "none" ? "without a payment method" : `paid with ${methodLabel(method)}`} this
+              cycle.
+            </p>
+          )}
+          {n === 0 && !method && (
             <div className="flex flex-col items-start gap-3 pt-[22px] pb-1.5">
               <p className="m-0 font-serif text-[22px] text-pretty text-ink-2 italic">
                 No entries this cycle. Record your salary first, then log spending as it happens.

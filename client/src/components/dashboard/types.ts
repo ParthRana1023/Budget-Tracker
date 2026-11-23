@@ -1,6 +1,7 @@
 // Row shapes the dashboard reads (amounts in paise, dates 'YYYY-MM-DD').
 export type { RecurringItem } from "@/lib/recurringTypes";
 import type { PlanChange } from "@/lib/periods.mjs";
+import type { PaymentMethod } from "@/lib/paymentMethods.mjs";
 
 export interface Category {
   id: string;
@@ -22,6 +23,8 @@ export interface Tx {
   source?: string | null;
   from_reserve?: boolean;
   payee?: string | null;
+  /** How an expense was paid (lib/paymentMethods.mjs); null = not recorded. Tracking only. */
+  payment_method?: PaymentMethod | null;
   /** Early income counted toward the cycle starting on this date ('YYYY-MM-DD'). */
   counts_from?: string | null;
   category?: { name: string; type: string } | null;
