@@ -9,9 +9,9 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
     <div className="min-h-screen w-full overflow-x-clip">
       <SiteHeader />
       <div className="mx-auto flex min-h-[calc(100vh-65px)] max-w-[1200px] flex-wrap gap-3.5 px-6 py-6 max-[480px]:px-4">
-        <div className="flex min-w-0 flex-[1_1_460px] items-center justify-center py-8">
+        <main className="flex min-w-0 flex-[1_1_460px] items-center justify-center py-8">
           <div className="sf-rise flex w-full max-w-[400px] flex-col gap-6">{children}</div>
-        </div>
+        </main>
         <aside className="flex flex-[1_1_460px] items-center justify-center rounded-3xl border border-line bg-tile p-12 max-[860px]:hidden">
           <Reveal immediate className="flex w-full max-w-[420px] flex-col gap-[22px]">
             <span className="eyebrow">What your dashboard opens with</span>

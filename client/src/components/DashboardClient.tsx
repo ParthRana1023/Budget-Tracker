@@ -58,6 +58,8 @@ interface DashboardClientProps {
   initialRecurringItems: RecurringItem[];
   /** "reports" when opened from another page's Reports tab (/dashboard?view=reports). */
   initialView?: Tab;
+  /** Opens Log expense on arrival (/dashboard?add=expense, the installed app's shortcut). */
+  initialAdd?: boolean;
 }
 
 export default function DashboardClient(props: DashboardClientProps) {
@@ -92,6 +94,11 @@ export default function DashboardClient(props: DashboardClientProps) {
     try {
       setNotesOff(JSON.parse(localStorage.getItem(NOTES_OFF_KEY) ?? "[]"));
     } catch {}
+    // Opened after mount: the popup is a portal, which can't render on the server.
+    if (props.initialAdd) {
+      setExpense({});
+      window.history.replaceState(null, "", "/dashboard"); // a reload shouldn't reopen it
+    }
     const onNet = () => setOffline(!navigator.onLine);
     onNet();
     window.addEventListener("online", onNet);

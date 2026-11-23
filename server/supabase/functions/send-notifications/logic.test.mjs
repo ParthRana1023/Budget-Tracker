@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { addDays, billsDueOn, isQuiet, localParts } from "./logic.mjs";
+import { addDays, billPush, billsDueOn, channels, isQuiet, localParts, weeklyPush } from "./logic.mjs";
 
 test("local date, hour and weekday in the user's time zone", () => {
   // 20:30 UTC Sunday 22 Nov = 02:00 Monday 23 Nov in India.
@@ -49,4 +49,48 @@ test("bills due on a date: recurring items and fixed bills without one", () => {
   ]);
   assert.equal(billsDueOn(items, cats, "2026-12-03").length, 2, "a skipped month is left out");
   assert.equal(addDays("2026-12-30", 3), "2027-01-02");
+});
+
+test("channels: email needs a sender and the switch, push needs a device and the kind on", () => {
+  const s = {
+    email_notifications: true,
+    weekly_summary: false,
+    notify_due: true,
+    push_bills: true,
+    push_weekly: false,
+  };
+  assert.deepEqual(channels(s, { emailReady: true, pushReady: true, devices: 1 }), {
+    bills: { email: true, push: true },
+    weekly: { email: false, push: false },
+  });
+  assert.deepEqual(channels(s, { emailReady: false, pushReady: true, devices: 0 }), {
+    bills: { email: false, push: false },
+    weekly: { email: false, push: false },
+  });
+  assert.equal(channels(s, { emailReady: true, pushReady: false, devices: 2 }).bills.push, false, "no VAPID keys");
+  assert.equal(
+    channels({ ...s, notify_due: false }, { emailReady: true, pushReady: true, devices: 1 }).bills.email,
+    false,
+  );
+  assert.equal(
+    channels({}, { emailReady: true, pushReady: true, devices: 1 }).weekly.push,
+    true,
+    "push kinds default on",
+  );
+  assert.equal(
+    channels({}, { emailReady: true, pushReady: true, devices: 1 }).weekly.email,
+    false,
+    "email defaults off",
+  );
+});
+
+test("push text for bills and the weekly summary", () => {
+  assert.deepEqual(billPush("Rent", 1200000, 1), {
+    title: "Rent is due tomorrow",
+    body: "₹12,000. Record it in SaveFirst when you pay.",
+    url: "/dashboard",
+    tag: "bill:Rent",
+  });
+  assert.equal(billPush("Rent", 1200000, 3).title, "Rent is due in 3 days");
+  assert.equal(weeklyPush(450000, 1).body, "You spent ₹4,500 across 1 entry last week.");
 });

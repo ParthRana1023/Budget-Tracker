@@ -9,6 +9,7 @@ import Link from "next/link";
 import { LogOut, MailWarning, Settings as SettingsIcon, User } from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
 import { savePreferences } from "@/lib/settings.mjs";
+import { clearDeviceOnSignOut } from "@/lib/push.mjs";
 import ThemeToggle from "./ThemeToggle";
 import Dialog from "./ui/Dialog";
 import Logo from "./Logo";
@@ -62,6 +63,7 @@ export default function AppHeader({
     );
   };
   const signOut = async () => {
+    await clearDeviceOnSignOut(createClient());
     await fetch("/auth/signout", { method: "POST" });
     window.location.href = "/login";
   };

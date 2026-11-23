@@ -1,5 +1,7 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import localFont from "next/font/local";
+import { Analytics } from "@vercel/analytics/next";
+import { SpeedInsights } from "@vercel/speed-insights/next";
 import PwaRegister from "@/components/PwaRegister";
 import ErrorReporter from "@/components/ErrorReporter";
 import { ToastProvider } from "@/components/ui/Toast";
@@ -36,6 +38,16 @@ export const metadata: Metadata = {
     ],
     apple: { url: "/apple-touch-icon.png", sizes: "180x180" },
   },
+  appleWebApp: { capable: true, title: "SaveFirst", statusBarStyle: "black-translucent" },
+};
+
+// viewport-fit=cover lets the installed app draw under the notch; layouts pad with
+// env(safe-area-inset-*). Pinch-zoom stays allowed (WCAG 1.4.4).
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
+  themeColor: "#0b0b0c",
 };
 
 export default function RootLayout({
@@ -46,13 +58,21 @@ export default function RootLayout({
   return (
     <html lang="en" data-theme="dark" className={`${hanken.variable} ${instrument.variable}`} suppressHydrationWarning>
       <head>
-        <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=0" />
         <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
       </head>
       <body className="min-h-screen antialiased flex flex-col">
-        <PwaRegister />
         <ErrorReporter />
-        <ToastProvider>{children}</ToastProvider>
+        <ToastProvider>
+          <PwaRegister />
+          {children}
+        </ToastProvider>
+        {/* Their scripts live at /_vercel/*, which only exists on Vercel. */}
+        {process.env.VERCEL && (
+          <>
+            <Analytics />
+            <SpeedInsights />
+          </>
+        )}
       </body>
     </html>
   );

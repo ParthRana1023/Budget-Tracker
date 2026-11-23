@@ -10,7 +10,7 @@ export default async function DashboardPage({
 }: {
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 }) {
-  const { view } = await searchParams;
+  const { view, add } = await searchParams;
   const supabase = await createClient();
 
   const {
@@ -112,6 +112,7 @@ export default async function DashboardPage({
       initialContributions={contributions || []}
       initialRecurringItems={recurringItems || []}
       initialView={view === "reports" ? "reports" : "dashboard"}
+      initialAdd={add === "expense"}
     />
   );
 }

@@ -1,4 +1,4 @@
-// What the hourly email job sends, worked out from a user's settings and rows. No imports, so
+// What the hourly email and push job sends, worked out from a user's settings and rows. No imports, so
 // both the Edge Function (Deno) and node:test (logic.test.mjs) can load it. Amounts are paise.
 
 /**
@@ -70,3 +70,36 @@ export function billsDueOn(items, categories, due) {
 
 /** Whole rupees in Indian format, for email text. @param {number} paise */
 export const rupees = (paise) => `₹${Math.round(paise / 100).toLocaleString("en-IN")}`;
+
+/** The weekly summary goes out on Monday from this local hour. */
+export const WEEKLY_HOUR = 9;
+
+/**
+ * Which channels each kind goes out on this run. Email needs the user's switch and a configured
+ * sender; push needs the user's per-kind switch and at least one subscribed device.
+ * @param {{ email_notifications?: boolean, weekly_summary?: boolean, notify_due?: boolean, push_bills?: boolean, push_weekly?: boolean }} s
+ * @param {{ emailReady: boolean, pushReady: boolean, devices: number }} ctx
+ */
+export function channels(s, { emailReady, pushReady, devices }) {
+  const push = pushReady && devices > 0;
+  return {
+    bills: { email: emailReady && !!s.email_notifications && !!s.notify_due, push: push && s.push_bills !== false },
+    weekly: { email: emailReady && !!s.weekly_summary, push: push && s.push_weekly !== false },
+  };
+}
+
+/** Lock-screen text for a bill reminder. @param {string} name @param {number} paise @param {number} days */
+export const billPush = (name, paise, days) => ({
+  title: `${name} is due ${days === 1 ? "tomorrow" : `in ${days} days`}`,
+  body: `${rupees(paise)}. Record it in SaveFirst when you pay.`,
+  url: "/dashboard",
+  tag: `bill:${name}`,
+});
+
+/** Lock-screen text for the weekly summary. @param {number} paise @param {number} entries */
+export const weeklyPush = (paise, entries) => ({
+  title: "Your week in SaveFirst",
+  body: `You spent ${rupees(paise)} across ${entries} ${entries === 1 ? "entry" : "entries"} last week.`,
+  url: "/dashboard?view=reports",
+  tag: "weekly",
+});

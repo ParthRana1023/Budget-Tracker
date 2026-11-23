@@ -2,12 +2,16 @@
 
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { clsx } from "clsx";
-import { Check, CircleAlert } from "lucide-react";
+import { Check, CircleAlert, X } from "lucide-react";
 
 type ToastOptions = {
   /** Shows an Undo button. A rejected promise turns the toast into "Couldn't undo". */
   undo?: () => void | Promise<void>;
   error?: boolean;
+  /** Another button, e.g. "Refresh" when a new version is ready. Clicking it hides the toast. */
+  action?: { label: string; onClick: () => void };
+  /** Stays until dismissed or replaced instead of hiding after 6s. */
+  sticky?: boolean;
 };
 type ToastState = ToastOptions & { msg: string; id: number };
 type ShowToast = (msg: string, options?: ToastOptions) => void;
@@ -37,7 +41,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
       clearTimeout(hideTimer.current);
       setShown(false);
       setToast({ msg, ...options, id: ++nextId.current });
-      hideTimer.current = setTimeout(hide, HIDE_MS);
+      if (!options?.sticky) hideTimer.current = setTimeout(hide, HIDE_MS);
     },
     [hide],
   );
@@ -91,6 +95,28 @@ export function ToastProvider({ children }: { children: ReactNode }) {
               className="h-[34px] flex-none cursor-pointer rounded-full border border-line-2 bg-transparent px-3.5 text-[13px] font-semibold transition-colors hover:border-ink-2"
             >
               Undo
+            </button>
+          )}
+          {toast.action && (
+            <button
+              type="button"
+              onClick={() => {
+                toast.action?.onClick();
+                hide();
+              }}
+              className="h-[34px] flex-none cursor-pointer rounded-full border-0 bg-lime px-3.5 text-[13px] font-bold text-lime-ink active:scale-[.97]"
+            >
+              {toast.action.label}
+            </button>
+          )}
+          {toast.sticky && (
+            <button
+              type="button"
+              onClick={hide}
+              aria-label="Dismiss"
+              className="flex h-[34px] w-[34px] flex-none cursor-pointer items-center justify-center rounded-full border-0 bg-transparent text-muted hover:text-ink"
+            >
+              <X size={15} />
             </button>
           )}
         </div>

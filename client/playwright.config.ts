@@ -53,5 +53,13 @@ export default defineConfig({
     url: "http://localhost:3124",
     reuseExistingServer: false,
     timeout: 300000,
+    // The Push card only shows with a VAPID key; this public key's private half was thrown away,
+    // so nothing can be sent with it. The specs never subscribe.
+    env: {
+      ...(process.env as Record<string, string>),
+      NEXT_PUBLIC_VAPID_PUBLIC_KEY:
+        process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY ||
+        "BBEdfCCaoxZYH1QRJEvSyQakrN5B1IGh6Gl-hykxHp1hqJNHlBIecNF0w-Z5vjZIGk4rBtxTR-bBXYHJ4uaWCeY",
+    },
   },
 });

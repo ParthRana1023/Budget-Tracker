@@ -71,6 +71,9 @@ export interface Settings {
   notify_over?: boolean;
   email_notifications?: boolean;
   weekly_summary?: boolean;
+  /** Web Push kinds, sent to devices that turned push on (push_subscriptions). */
+  push_bills?: boolean;
+  push_weekly?: boolean;
   /** Email reminders this many days before a bill is due: 1, 3 or 7. */
   bill_reminder_days?: number;
   quiet_hours_on?: boolean;
