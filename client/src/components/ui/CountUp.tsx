@@ -1,10 +1,10 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { inr } from "@/lib/money.mjs";
+import { inr, toMinor } from "@/lib/money.mjs";
 
 /**
- * A rupee amount that counts up from 0 on first show, then glides from its old value
+ * A money amount (whole units of the base currency) that counts up from 0 on first show, then glides from its old value
  * to the new one when it changes (design handoff: hero count-up, ease-out cubic).
  * Shows the final value straight away under prefers-reduced-motion.
  */
@@ -30,5 +30,5 @@ export default function CountUp({ rupees, duration = 1500 }: { rupees: number; d
     return () => cancelAnimationFrame(raf);
   }, [rupees, duration]);
 
-  return <>{inr(shown * 100)}</>;
+  return <>{inr(toMinor(shown))}</>;
 }

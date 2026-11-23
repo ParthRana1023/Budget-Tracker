@@ -4,7 +4,7 @@
 // and is split across a savings goal, the annual bills reserve and this cycle's spending.
 
 import { createClient } from "@/utils/supabase/client";
-import { inr, showTyped } from "@/lib/money.mjs";
+import { currencySymbol, inr, showTyped } from "@/lib/money.mjs";
 import { dayLabel } from "@/lib/cycle.mjs";
 import Dialog from "../../ui/Dialog";
 import type { PopupContext } from "./context";
@@ -85,7 +85,7 @@ export default function WindfallDialog({
         <span className="text-[13px] text-muted">{sub}</span>
       </span>
       <span className="flex flex-none items-center gap-1.5">
-        <span className="text-muted">₹</span>
+        <span className="text-muted">{currencySymbol()}</span>
         <input
           type="text"
           inputMode="decimal"

@@ -5,7 +5,8 @@
 import { useState } from "react";
 import { Trash2 } from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
-import { inr } from "@/lib/money.mjs";
+import { currencySymbol, inr, toMajor, toMinor } from "@/lib/money.mjs";
+import { convert } from "@/lib/fx.mjs";
 import { dayLabel } from "@/lib/cycle.mjs";
 import Dialog from "../../ui/Dialog";
 import type { Tx } from "../types";
@@ -36,8 +37,10 @@ export default function EditEntryDialog({
 }) {
   const { model, today, period } = ctx;
   const isExpense = entry.type === "expense";
+  const cur = entry.original_currency ?? null;
   const { form, set, dirty, error, setError, busy, save } = usePopupForm({
-    amount: toField(Number(entry.amount)),
+    // A foreign entry is edited in what was typed; its rate stays the one it was saved with.
+    amount: cur ? String(toMajor(Number(entry.original_amount), cur)) : toField(Number(entry.amount)),
     categoryId: entry.category_id ?? "",
     date: entry.date,
     note: entry.note ?? "",
@@ -45,7 +48,8 @@ export default function EditEntryDialog({
     method: entry.payment_method ?? null,
   });
   const [confirming, setConfirming] = useState(false);
-  const amount = paise(form.amount);
+  const originalMinor = cur ? toMinor(parseFloat(form.amount) || 0, cur) : null;
+  const amount = cur ? convert(originalMinor!, cur, Number(entry.fx_rate)) : paise(form.amount);
   const label = isExpense
     ? (model.byId.get(entry.category_id ?? "")?.name ?? entry.category?.name ?? "Uncategorised")
     : KIND[entry.type as keyof typeof KIND];
@@ -66,12 +70,16 @@ export default function EditEntryDialog({
     if (r.error || !isExpense) return r;
     return db
       .from("transactions")
-      .update({ payee: entry.payee ?? null, payment_method: entry.payment_method ?? null })
+      .update({
+        payee: entry.payee ?? null,
+        payment_method: entry.payment_method ?? null,
+        ...(cur && { original_amount: entry.original_amount }),
+      })
       .eq("id", entry.id);
   };
 
   const submit = () => {
-    if (amount <= 0) return setError("Enter an amount above ₹0.");
+    if (amount <= 0) return setError(`Enter an amount above ${inr(0)}.`);
     if (form.date < period.startStr || form.date > today) return setError("Pick a date in this cycle, up to today.");
     const supabase = createClient();
     save(
@@ -84,9 +92,15 @@ export default function EditEntryDialog({
           p_note: form.note.trim() || entry.note,
         });
         const payee = form.payee.trim() || null;
-        const unchanged = payee === (entry.payee ?? null) && form.method === (entry.payment_method ?? null);
+        const unchanged =
+          payee === (entry.payee ?? null) &&
+          form.method === (entry.payment_method ?? null) &&
+          originalMinor === (cur ? Number(entry.original_amount) : null);
         if (r.error || !isExpense || unchanged) return r;
-        return supabase.from("transactions").update({ payee, payment_method: form.method }).eq("id", entry.id);
+        return supabase
+          .from("transactions")
+          .update({ payee, payment_method: form.method, ...(cur && { original_amount: originalMinor }) })
+          .eq("id", entry.id);
       },
       async () => {
         onClose();
@@ -111,6 +125,10 @@ export default function EditEntryDialog({
           category_id: entry.category_id,
           payee: entry.payee ?? null,
           payment_method: entry.payment_method ?? null,
+          original_amount: entry.original_amount ?? null,
+          original_currency: entry.original_currency ?? null,
+          fx_rate: entry.fx_rate ?? null,
+          fx_date: entry.fx_date ?? null,
           from_reserve: !!entry.from_reserve,
           external_id: entry.external_id,
         };
@@ -131,7 +149,14 @@ export default function EditEntryDialog({
       busy={busy}
       submitLabel={busy ? "Saving…" : error === SAVE_FAILED ? "Try again" : "Save changes"}
     >
-      <AmountField id="ed-amt" value={form.amount} onChange={(v) => set({ amount: v })} />
+      <AmountField id="ed-amt" value={form.amount} onChange={(v) => set({ amount: v })} currency={cur ?? undefined}>
+        {cur && (
+          <span className="tabular text-[13px] text-muted">
+            Logged in {cur} at {currencySymbol()}
+            {Number(entry.fx_rate)} for 1 {cur} · ≈ {inr(amount)}
+          </span>
+        )}
+      </AmountField>
       {isExpense && (
         <Labeled id="ed-cat" label="Category">
           <select

@@ -1,9 +1,24 @@
 // Categories popup (design handoff): edits are made on a draft and applied when the popup
 // closes, with Undo. This turns a draft into the database writes, and checks it first.
+import { inr } from "./money.mjs";
 
 /**
- * @typedef {{ id: string, name: string, type: "fixed" | "flexible", monthly_limit: number, due_day: number | null, is_active: boolean }} Cat
+ * A limit typed in another currency also has original_amount (minor units of original_currency),
+ * the cycle's fx_rate and its fx_date; monthly_limit is always the base amount.
+ * @typedef {{ id: string, name: string, type: "fixed" | "flexible", monthly_limit: number, due_day: number | null, is_active: boolean,
+ *   original_amount?: number | null, original_currency?: string | null, fx_rate?: number | null, fx_date?: string | null }} Cat
  */
+const FIELDS = /** @type {const} */ ([
+  "name",
+  "type",
+  "monthly_limit",
+  "due_day",
+  "is_active",
+  "original_amount",
+  "original_currency",
+  "fx_rate",
+  "fx_date",
+]);
 
 /**
  * Problems that stop the popup from closing, in display order (empty = fine).
@@ -20,7 +35,7 @@ export function draftProblems(draft) {
     seen.add(key);
   }
   const unpriced = live.find((c) => c.type === "fixed" && !(c.monthly_limit > 0));
-  if (unpriced) problems.push(`${unpriced.name.trim() || "A fixed bill"} needs a monthly amount above ₹0.`);
+  if (unpriced) problems.push(`${unpriced.name.trim() || "A fixed bill"} needs a monthly amount above ${inr(0)}.`);
   return problems;
 }
 
@@ -42,6 +57,10 @@ export function categoryDiff(before, after) {
       monthly_limit: c.monthly_limit,
       due_day: c.type === "fixed" ? c.due_day : null,
       is_active: c.is_active,
+      original_amount: c.original_amount ?? null,
+      original_currency: c.original_currency ?? null,
+      fx_rate: c.fx_rate ?? null,
+      fx_date: c.fx_date ?? null,
     };
     const was = old.get(c.id);
     if (!was) {
@@ -54,10 +73,14 @@ export function categoryDiff(before, after) {
       monthly_limit: was.monthly_limit,
       due_day: was.type === "fixed" ? (was.due_day ?? null) : null,
       is_active: was.is_active,
+      original_amount: was.original_amount ?? null,
+      original_currency: was.original_currency ?? null,
+      fx_rate: was.fx_rate ?? null,
+      fx_date: was.fx_date ?? null,
     };
     /** @type {Partial<Cat>} */
     const patch = {};
-    for (const k of /** @type {const} */ (["name", "type", "monthly_limit", "due_day", "is_active"])) {
+    for (const k of FIELDS) {
       if (row[k] !== wasRow[k]) patch[k] = /** @type {any} */ (row[k]);
     }
     if (Object.keys(patch).length) updates.push({ id: c.id, patch });

@@ -33,7 +33,31 @@ test("rename, new limit, move to fixed with a due day, switch off, add", () => {
     { id: "b", patch: { is_active: false } },
     { id: "c", patch: { type: "fixed", monthly_limit: 400000, due_day: 10 } },
   ]);
-  assert.deepEqual(d.inserts, [{ name: "Gym", type: "flexible", monthly_limit: 0, due_day: null, is_active: true }]);
+  assert.deepEqual(d.inserts, [
+    {
+      name: "Gym",
+      type: "flexible",
+      monthly_limit: 0,
+      due_day: null,
+      is_active: true,
+      original_amount: null,
+      original_currency: null,
+      fx_rate: null,
+      fx_date: null,
+    },
+  ]);
+});
+
+test("a limit set in another currency writes its original amount and rate; back to base clears them", () => {
+  const usd = { original_amount: 1500, original_currency: "USD", fx_rate: 92.68, fx_date: "2026-11-01" };
+  const after = [{ ...before[1], type: "fixed", monthly_limit: 139020, ...usd }, before[0], before[2]];
+  assert.deepEqual(categoryDiff(before, after).updates, [{ id: "b", patch: { monthly_limit: 139020, ...usd } }]);
+  assert.deepEqual(categoryDiff(after, before).updates, [
+    {
+      id: "b",
+      patch: { monthly_limit: 2800000, original_amount: null, original_currency: null, fx_rate: null, fx_date: null },
+    },
+  ]);
 });
 
 test("undo is the same diff the other way", () => {

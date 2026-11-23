@@ -12,6 +12,7 @@ import { cycleKeyFor } from "@/lib/cycle.mjs";
 import type { PaymentMethod } from "@/lib/paymentMethods.mjs";
 import {
   AmountField,
+  CurrencyFields,
   DueDayField,
   FIELD,
   Labeled,
@@ -20,9 +21,9 @@ import {
   SAVE_FAILED,
   SwitchRow,
   Suggestions,
-  paise,
   safeAfterPreview,
   toField,
+  useForeign,
   usePopupForm,
   type PreviewProps,
 } from "./parts";
@@ -52,7 +53,10 @@ export default function ExpenseDialog({
     day: "",
     itemId: null as string | null,
   });
-  const amount = paise(form.amount);
+  // Typed in any supported currency; saved in the base currency at this cycle's rate.
+  const fx = useForeign(period.startStr);
+  const typed = fx.toBase(form.amount);
+  const amount = typed.amount;
   const cat = form.categoryId ? model.byId.get(form.categoryId) : undefined;
   const spent = (c: Category) => model.spentByCat.get(c.id) ?? 0;
 
@@ -136,7 +140,8 @@ export default function ExpenseDialog({
   }
 
   const submit = () => {
-    if (amount <= 0) return setError("Enter an amount above ₹0.");
+    if (!fx.rateOk) return setError("Enter the exchange rate for this cycle.");
+    if (amount <= 0) return setError(`Enter an amount above ${inr(0)}.`);
     if (!form.categoryId) return setError("Pick a category.");
     const day = form.day ? +form.day : null;
     if (form.repeat && day !== null && !(day >= 1 && day <= 28))
@@ -163,6 +168,7 @@ export default function ExpenseDialog({
               note,
               payee,
               payment_method: form.method,
+              ...typed.original,
               from_reserve: form.fromReserve,
             })
             .select("id")
@@ -182,10 +188,15 @@ export default function ExpenseDialog({
         });
         // The recurring path doesn't take these; set them on the new entry. With an item, the
         // method shown here (its default, changed or cleared) replaces the one the database copied.
-        if (!r.error && (payee || form.fromReserve || form.method || form.itemId)) {
+        if (!r.error && (payee || form.fromReserve || form.method || form.itemId || fx.foreign)) {
           const u = await supabase
             .from("transactions")
-            .update({ payee, from_reserve: form.fromReserve, payment_method: form.method })
+            .update({
+              payee,
+              from_reserve: form.fromReserve,
+              payment_method: form.method,
+              ...(fx.foreign && typed.original),
+            })
             .eq("id", r.data);
           if (u.error) return { error: u.error, data: r.data };
         }
@@ -274,13 +285,16 @@ export default function ExpenseDialog({
       }
     >
       <Suggestions items={suggestions} selected={form.itemId} onPick={pick} onStop={stop} icon />
-      <AmountField id="ex-amt" value={form.amount} onChange={(v) => set({ amount: v })}>
+      <AmountField id="ex-amt" value={form.amount} onChange={(v) => set({ amount: v })} currency={fx.currency}>
+        {fx.foreign && amount > 0 && (
+          <span className="tabular text-[13px] text-muted">≈ {inr(amount)} at this cycle’s rate</span>
+        )}
         <div className="flex flex-wrap gap-1.5">
           {QUICK.map((q) => (
             <button
               key={q}
               type="button"
-              onClick={() => set({ amount: String(Math.round((paise(form.amount) / 100 + q) * 100) / 100) })}
+              onClick={() => set({ amount: String(Math.round(((parseFloat(form.amount) || 0) + q) * 100) / 100) })}
               className="tabular h-[34px] cursor-pointer rounded-full border border-line bg-transparent px-3 text-[13px] font-semibold text-ink-2 transition-[border-color,color,transform] hover:border-ink-2 hover:text-ink active:scale-[.94]"
             >
               +{showTyped(String(q))}
@@ -343,6 +357,7 @@ export default function ExpenseDialog({
           />
         </Labeled>
         <MethodSelect id="ex-method" value={form.method} onChange={(method) => set({ method })} />
+        <CurrencyFields id="ex" fx={fx} />
       </div>
 
       {model.reserveLeft > 0 && (

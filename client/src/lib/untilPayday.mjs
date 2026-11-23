@@ -5,6 +5,7 @@
 import { addDaysStr, cycleDayOf, dueDateInCycle } from "./cycle.mjs";
 import { parseLocalDate } from "./periods.mjs";
 import { recurringStatus } from "./recurringStatus.mjs";
+import { toMinor } from "./money.mjs";
 
 const HISTORY_DAYS = 90;
 const isRecurringEntry = (/** @type {{ external_id?: string | null }} */ t) =>
@@ -135,8 +136,8 @@ export function projectUntilPayday({
   return {
     pace,
     burn,
-    /** Slider range: 0 to twice the user's pace, at least ₹500, in ₹500 steps. */
-    sliderMax: Math.max(50000, Math.ceil((pace * 2) / 50000) * 50000),
+    /** Slider range: 0 to twice the user's pace, at least 500 whole units (₹500), in steps of 500. */
+    sliderMax: Math.max(toMinor(500), Math.ceil((pace * 2) / toMinor(500)) * toMinor(500)),
     openValue,
     todayValue,
     pastPoints,

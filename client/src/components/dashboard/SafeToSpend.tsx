@@ -1,6 +1,6 @@
 "use client";
 
-import { inr } from "@/lib/money.mjs";
+import { inr, toMajor } from "@/lib/money.mjs";
 import { Legend } from "../DemoSplit";
 import CountUp from "../ui/CountUp";
 import Reveal from "../ui/Reveal";
@@ -40,7 +40,7 @@ export default function SafeToSpend({ model, daysLeft }: { model: Model; daysLef
           className="tabular font-serif text-[clamp(58px,17vw,128px)] leading-[.86] tracking-[-0.025em]"
           data-testid="safe-to-spend"
         >
-          <CountUp rupees={model.safe / 100} />
+          <CountUp rupees={toMajor(model.safe)} />
         </span>
         <p className="m-0 max-w-[540px] font-serif text-[clamp(20px,2.2vw,25px)] leading-[1.25] text-pretty text-ink-2">
           That’s <em className="text-ink">{inr(model.perDay)} a day</em> for the next {daysLeft} days, after{" "}

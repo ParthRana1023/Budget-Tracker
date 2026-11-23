@@ -55,8 +55,11 @@ export default defineConfig({
     timeout: 300000,
     // The Push card only shows with a VAPID key; this public key's private half was thrown away,
     // so nothing can be sent with it. The specs never subscribe.
+    // Google sign-in stays off unless the shell turns it on (.env.production sets it to 1), so the
+    // auth spec, which reads the same variable, checks what was built.
     env: {
       ...(process.env as Record<string, string>),
+      NEXT_PUBLIC_GOOGLE_AUTH: process.env.NEXT_PUBLIC_GOOGLE_AUTH || "0",
       NEXT_PUBLIC_VAPID_PUBLIC_KEY:
         process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY ||
         "BBEdfCCaoxZYH1QRJEvSyQakrN5B1IGh6Gl-hykxHp1hqJNHlBIecNF0w-Z5vjZIGk4rBtxTR-bBXYHJ4uaWCeY",

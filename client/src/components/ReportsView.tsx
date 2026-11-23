@@ -5,7 +5,7 @@
 
 import { useMemo, useState, type KeyboardEvent, type ReactNode } from "react";
 import { createClient } from "@/utils/supabase/client";
-import { inr } from "@/lib/money.mjs";
+import { formatExact, inr } from "@/lib/money.mjs";
 import { addDaysStr, dayLabel, shortDate } from "@/lib/cycle.mjs";
 import { cycleFor, paySchedule } from "@/lib/periods.mjs";
 import { planFor } from "@/lib/plan.mjs";
@@ -148,7 +148,9 @@ export default function ReportsView({
       .sort((a, b) => (a.date < b.date ? 1 : -1))
       .map((t) => ({
         a: t.note || t.payee || catName(t) || "Entry",
-        b: `${shortDate(t.date)} · ${catName(t) ?? (t.type === "income" ? "Income" : "Savings")}`,
+        b: `${shortDate(t.date)} · ${catName(t) ?? (t.type === "income" ? "Income" : "Savings")}${
+          t.original_currency ? ` · ${formatExact(Number(t.original_amount), t.original_currency)}` : ""
+        }`,
         amt: Number(t.amount),
       }));
   const flexEntries = (cy: Cycle, filter: (t: Tx) => boolean = () => true) =>
@@ -1101,7 +1103,11 @@ export default function ReportsView({
     ];
     let cursor = f.income;
     const setLimit = async (s: (typeof sugg)[number], to: number, mark: "accept" | "undo") => {
-      const { error } = await createClient().from("categories").update({ monthly_limit: to }).eq("id", s.categoryId);
+      // A suggested limit is in the base currency, so it replaces a foreign one (or re-pricing would undo it).
+      const { error } = await createClient()
+        .from("categories")
+        .update({ monthly_limit: to, original_amount: null, original_currency: null, fx_rate: null, fx_date: null })
+        .eq("id", s.categoryId);
       if (error) return toast("Couldn’t save. Check your connection and try again.", { error: true });
       setDecided((d) => {
         const n = { ...d };

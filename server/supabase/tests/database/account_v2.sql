@@ -19,7 +19,10 @@ select public.log_sign_in('Account@Example.com', 'password', true, 'Chrome on ma
 select public.log_sign_in('account@example.com', 'password', false, 'Unknown', 'Pune');
 select public.log_sign_in('nobody@example.com', 'password', false);
 reset role;
-select is((select count(*)::int from public.sign_in_events), 2, 'attempts are logged for known emails only');
+-- Only this test's users: E2E runs leave their own sign-ins in the local database.
+select is((select count(*)::int from public.sign_in_events
+            where user_id in ('77777777-7777-7777-7777-777777777777', '66666666-6666-6666-6666-666666666666')),
+  2, 'attempts are logged for known emails only');
 
 set local role authenticated;
 select throws_ok($$select public.log_sign_in('account@example.com', 'password', true)$$, '42501', null,
@@ -78,7 +81,7 @@ select throws_ok($$select public.import_transactions('[{"date":"2026-11-03","typ
 -- ================================================================ download all my data
 select is((select jsonb_array_length(d->'entries') || ':' || (d->'profile'->>'email') || ':' || (d->>'amountsIn')
              from (select public.export_my_data() as d) x),
-  '2:account@example.com:paise', 'everything in one document, with the email and units');
+  '2:account@example.com:minor units', 'everything in one document, with the email and units');
 
 select * from finish();
 rollback;

@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { checkImport, parseCsv } from "./csvImport.mjs";
 import { transactionsToCsv } from "./csvExport.mjs";
+import { setCurrency } from "./money.mjs";
 
 const categories = [{ name: "Groceries" }, { name: "Rent / Housing" }];
 
@@ -88,4 +89,17 @@ test("payment method: round-trips through export, optional, unknown values skipp
   );
   assert.deepEqual(r.skipped, [{ line: 2, reason: "Unknown payment method “Cheque”" }]);
   assert.equal(r.rows[0].payment_method, undefined, "income never carries a method");
+});
+
+test("amounts are read in the base currency: no decimals for yen", () => {
+  setCurrency("JPY");
+  const r = checkImport(
+    'Date,Type,Category,Amount (JPY)\n2026-11-04,expense,Groceries,"¥1,200"\n2026-11-05,expense,Groceries,12.5',
+    {
+      categories,
+    },
+  );
+  setCurrency("INR");
+  assert.equal(r.rows[0].amount, 1200);
+  assert.deepEqual(r.skipped, [{ line: 3, reason: "Amount must be above ¥0" }]);
 });

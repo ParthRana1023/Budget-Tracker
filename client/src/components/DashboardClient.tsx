@@ -12,7 +12,8 @@ import { payDayLabel, payDayStatus } from "@/lib/settings.mjs";
 import { buildCycleModel } from "@/lib/cycleModel.mjs";
 import { recurringStatus } from "@/lib/recurringStatus.mjs";
 import { budgetWarnings } from "@/lib/notices.mjs";
-import { inr, setNumberFormat } from "@/lib/money.mjs";
+import { inr, setCurrency, setNumberFormat } from "@/lib/money.mjs";
+import { fetchRate, repricePatches, staleCurrencies } from "@/lib/fx.mjs";
 import { transactionsToCsv } from "@/lib/csvExport.mjs";
 import { syncSavedTheme } from "@/lib/theme";
 import { errorFields, reportClientError } from "@/lib/log.mjs";
@@ -69,6 +70,7 @@ export default function DashboardClient(props: DashboardClientProps) {
   const [settings] = useState<Settings | null>(props.initialSettings);
   // Every amount below is shown and typed in the user's number format.
   setNumberFormat(settings?.number_format);
+  setCurrency(settings?.currency);
   const [categories, setCategories] = useState(props.initialCategories);
   const [transactions, setTransactions] = useState(props.initialTransactions);
   const [incomeSources, setIncomeSources] = useState(props.initialIncomeSources);
@@ -186,6 +188,36 @@ export default function DashboardClient(props: DashboardClientProps) {
   };
 
   const db = () => createClient();
+
+  // Foreign bills, category limits and goal targets follow each cycle's rate: once a new cycle
+  // starts, fetch it (one call per currency) and re-price them. A fallback (stale) rate is never locked in.
+  useEffect(() => {
+    const cycleStart = period.startStr;
+    const stale = staleCurrencies([...recurringItems, ...categories, ...goals], cycleStart);
+    if (!stale.length) return;
+    void (async () => {
+      const rates = new Map<string, number>();
+      for (const c of stale) {
+        const r = await fetchRate(c, cycleStart).catch(() => null);
+        if (r && !r.stale) rates.set(c, r.rate);
+      }
+      const writes = [
+        ...repricePatches(recurringItems, "amount", cycleStart, rates).map((p) =>
+          db().from("recurring_items").update(p.patch).eq("id", p.id),
+        ),
+        ...repricePatches(categories, "monthly_limit", cycleStart, rates).map((p) =>
+          db().from("categories").update(p.patch).eq("id", p.id),
+        ),
+        ...repricePatches(goals, "target_amount", cycleStart, rates).map((p) =>
+          db().from("savings_goals").update(p.patch).eq("id", p.id),
+        ),
+      ];
+      if (!writes.length) return;
+      await Promise.all(writes);
+      await refreshData();
+    })();
+  }, [period.startStr]);
+
   const recordItem = (item: RecurringItem) => {
     const st = recurringStatus(item, statusCtx);
     const date = st.dueDate && st.dueDate <= today ? st.dueDate : today;

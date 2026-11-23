@@ -1,6 +1,7 @@
 // Onboarding answers -> complete_onboarding() payload (design handoff, Onboarding).
 // The form keeps rupee strings; the database takes paise. "Nothing blocks": anything
 // that would make the save fail (blank or repeated names) is fixed up here instead.
+import { toMinor } from "./money.mjs";
 
 export const ONBOARDING_CATEGORIES = [
   "Groceries",
@@ -55,15 +56,15 @@ export function onboardingPayload(s) {
   };
   const categories = s.cats
     .filter((c) => c.on)
-    .map((c) => ({ name: unique(c.name), limit: +c.limit > 0 ? +c.limit * 100 : null }));
+    .map((c) => ({ name: unique(c.name), limit: +c.limit > 0 ? toMinor(+c.limit) : null }));
   const bills = keptBills(s.bills).map((b) => ({
     name: unique(b.name),
-    amount: +b.amt * 100,
+    amount: toMinor(+b.amt),
     due_day: b.due ? +clampDay(b.due) : null,
   }));
   const salary = +s.salary || 0;
   return {
-    p_take_home_pay: salary > 0 ? salary * 100 : null,
+    p_take_home_pay: salary > 0 ? toMinor(salary) : null,
     // 31 = the last day of the month; otherwise 1-28.
     p_pay_day: s.payDay === "31" ? 31 : +clampDay(s.payDay) || 1,
     p_savings_pct: s.pct,

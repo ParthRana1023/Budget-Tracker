@@ -238,7 +238,7 @@ export default function UntilPayday({
           <>
             <span className="absolute inset-x-0 border-t border-dashed border-line-2" style={{ top: `${Y(0)}%` }} />
             <span className="absolute left-0 -translate-y-[130%] text-[11px] text-muted" style={{ top: `${Y(0)}%` }}>
-              ₹0
+              {inr(0)}
             </span>
           </>
         )}

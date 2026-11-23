@@ -18,7 +18,7 @@ import {
   channels,
   isQuiet,
   localParts,
-  rupees,
+  money,
   WEEKLY_HOUR,
   weeklyPush,
 } from "./logic.mjs";
@@ -62,7 +62,7 @@ Deno.serve(async (req) => {
   const { data: people, error } = await db
     .from("user_settings")
     .select(
-      "user_id, email_notifications, weekly_summary, notify_due, push_bills, push_weekly, bill_reminder_days, quiet_hours_on, quiet_from, quiet_to, timezone",
+      "user_id, currency, email_notifications, weekly_summary, notify_due, push_bills, push_weekly, bill_reminder_days, quiet_hours_on, quiet_from, quiet_to, timezone",
     )
     .or(filters.join(","));
   if (error) return Response.json({ error: error.message }, { status: 500 });
@@ -119,11 +119,11 @@ Deno.serve(async (req) => {
             await sendEmail(
               to,
               `${bill.name} is due in ${days} day${days === 1 ? "" : "s"}`,
-              `${bill.name} (${rupees(bill.amount)}) is due on ${due}. Record it on your dashboard when you pay: ${env("APP_URL")}/dashboard`,
+              `${bill.name} (${money(bill.amount, s.currency)}) is due on ${due}. Record it on your dashboard when you pay: ${env("APP_URL")}/dashboard`,
             );
             sent++;
           }
-          if (on.bills.push) sent += await push(subs, billPush(bill.name, bill.amount, days));
+          if (on.bills.push) sent += await push(subs, billPush(bill.name, bill.amount, days, s.currency));
         }
       }
 
@@ -143,11 +143,11 @@ Deno.serve(async (req) => {
             await sendEmail(
               to,
               "Your week in SaveFirst",
-              `You spent ${rupees(total)} across ${count} entries last week. See the details: ${env("APP_URL")}/dashboard?view=reports`,
+              `You spent ${money(total, s.currency)} across ${count} entries last week. See the details: ${env("APP_URL")}/dashboard?view=reports`,
             );
             sent++;
           }
-          if (on.weekly.push) sent += await push(subs, weeklyPush(total, count));
+          if (on.weekly.push) sent += await push(subs, weeklyPush(total, count, s.currency));
         }
       }
     } catch (e) {

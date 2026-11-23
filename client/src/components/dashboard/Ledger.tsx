@@ -4,7 +4,7 @@
 
 import { useEffect, useState } from "react";
 import { ChevronDown } from "lucide-react";
-import { inr } from "@/lib/money.mjs";
+import { formatExact, inr } from "@/lib/money.mjs";
 import { dayLabel, shortDate } from "@/lib/cycle.mjs";
 import { methodLabel, NOT_RECORDED, PAYMENT_METHODS } from "@/lib/paymentMethods.mjs";
 import Reveal from "../ui/Reveal";
@@ -141,6 +141,11 @@ export default function Ledger({
                         <span className="rounded-full bg-tile-2 px-2 py-0.5 text-[11px] font-semibold whitespace-nowrap text-ink-2">
                           {r.cat}
                         </span>
+                        {t.original_currency && (
+                          <span className="tabular text-xs whitespace-nowrap text-muted">
+                            {formatExact(Number(t.original_amount), t.original_currency)}
+                          </span>
+                        )}
                         {t.payment_method && (
                           <span className="rounded-full border border-line-2 px-2 py-0.5 text-[11px] font-semibold whitespace-nowrap text-muted">
                             {methodLabel(t.payment_method)}

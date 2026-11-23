@@ -5,14 +5,14 @@
 import { useState, type ReactNode } from "react";
 import { Pencil, Trash2 } from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
-import { inr, showTyped } from "@/lib/money.mjs";
+import { cleanTyped, currencySymbol, inr, showTyped, toMajor, toMinor } from "@/lib/money.mjs";
 import { monthLabel } from "@/lib/cycle.mjs";
 import { analyzeGoal, goalTrack } from "@/lib/goalAnalytics.mjs";
 import Dialog from "../ui/Dialog";
 import Reveal from "../ui/Reveal";
 import { useToast } from "../ui/Toast";
 import { CARD_H2, LINK_BUTTON, type Contribution, type Goal } from "./types";
-import { FIELD, SAVE_FAILED, cleanAmount, paise } from "./popups/parts";
+import { CurrencyFields, FIELD, SAVE_FAILED, cleanAmount, paise, useForeign } from "./popups/parts";
 
 const thisMonth = (today: string) => today.slice(0, 7);
 /** Months from this month to 'YYYY-MM' (the handoff's monthsTo). */
@@ -64,6 +64,8 @@ export default function Goals({
   const toast = useToast();
   const [mode, setMode] = useState<Mode>(null);
   const [form, setForm] = useState({ amount: "", date: today, name: "", target: "", by: "", saved: "" });
+  // Target in any currency: it follows each cycle's rate (contributions are kept as saved).
+  const fx = useForeign(cycleStart);
   const [dirty, setDirty] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -86,10 +88,17 @@ export default function Goals({
       amount: "",
       date: today,
       name: g?.name ?? "",
-      target: g ? String(Number(g.target_amount) / 100) : "",
+      target: g
+        ? String(
+            g.original_currency
+              ? toMajor(Number(g.original_amount), g.original_currency)
+              : toMajor(Number(g.target_amount)),
+          )
+        : "",
       by: g?.target_date?.slice(0, 7) ?? "",
       saved: "",
     });
+    fx.load(g?.original_currency ? { currency: g.original_currency, rate: Number(g.fx_rate) } : null);
     setDirty(false);
     setError(null);
     setMode(m);
@@ -117,7 +126,7 @@ export default function Goals({
     const supabase = createClient();
     if (mode.kind === "add") {
       const amount = paise(form.amount);
-      if (amount <= 0) return setError("Enter an amount above ₹0.");
+      if (amount <= 0) return setError(`Enter an amount above ${inr(0)}.`);
       if (form.date < cycleStart || form.date > today) return setError("Pick a date in this cycle, up to today.");
       return run(
         () =>
@@ -134,10 +143,11 @@ export default function Goals({
       return run(() => supabase.from("savings_goals").delete().eq("id", mode.goal.id), `Deleted ${mode.goal.name}`);
     }
     const name = form.name.trim(),
-      target = paise(form.target),
+      { amount: target, original } = fx.toBase(form.target),
       saved = paise(form.saved);
     if (!name) return setError("Give the goal a name.");
-    if (target <= 0) return setError("Enter a target above ₹0.");
+    if (!fx.rateOk) return setError("Enter the exchange rate for this cycle.");
+    if (target <= 0) return setError(`Enter a target above ${inr(0)}.`);
     if (form.by && monthsTo(form.by, today) < 1)
       return setError(`Pick a target month after ${monthLabel(`${thisMonth(today)}-01`)}.`);
     const target_date = form.by ? `${form.by}-01` : null;
@@ -147,12 +157,16 @@ export default function Goals({
         () =>
           supabase
             .from("savings_goals")
-            .insert({ user_id: userId, name, target_amount: target, target_date, saved_before: saved }),
+            .insert({ user_id: userId, name, target_amount: target, target_date, saved_before: saved, ...original }),
         `Created ${name}`,
       );
     }
     return run(
-      () => supabase.from("savings_goals").update({ name, target_amount: target, target_date }).eq("id", mode.goal.id),
+      () =>
+        supabase
+          .from("savings_goals")
+          .update({ name, target_amount: target, target_date, ...original })
+          .eq("id", mode.goal.id),
       "Goal updated",
     );
   };
@@ -194,7 +208,7 @@ export default function Goals({
   if (current && mode?.kind === "add") {
     if (current.a.hasTargetDate && current.a.monthsRemaining > 0)
       quick.push([`Monthly pace · ${inr(current.a.requiredMonthly)}`, current.a.requiredMonthly]);
-    quick.push([`Finish it · ${inr(current.a.remaining)}`, current.a.remaining], ["₹5,000", 500000]);
+    quick.push([`Finish it · ${inr(current.a.remaining)}`, current.a.remaining], [inr(toMinor(5000)), toMinor(5000)]);
   }
 
   return (
@@ -360,7 +374,7 @@ export default function Goals({
                   Amount
                 </label>
                 <div className="flex items-baseline gap-1.5 border-b-[1.5px] border-line-2 pb-1.5 transition-colors focus-within:border-lime">
-                  <span className="font-serif text-[44px] leading-none text-muted">₹</span>
+                  <span className="font-serif text-[44px] leading-none text-muted">{currencySymbol()}</span>
                   <input
                     id="g-amt"
                     type="text"
@@ -380,7 +394,7 @@ export default function Goals({
                       <button
                         key={text}
                         type="button"
-                        onClick={() => set({ amount: String(v / 100) })}
+                        onClick={() => set({ amount: String(toMajor(v)) })}
                         className="tabular min-h-[34px] cursor-pointer rounded-full border border-line bg-transparent px-3 py-1 text-[13px] font-semibold text-ink-2 hover:border-ink-2 hover:text-ink"
                       >
                         {text}
@@ -420,12 +434,13 @@ export default function Goals({
                     id="ng-target"
                     type="text"
                     inputMode="decimal"
-                    placeholder="₹1,00,000"
+                    placeholder={fx.foreign ? "0" : inr(toMinor(100000))}
                     value={showTyped(form.target)}
-                    onChange={(e) => set({ target: cleanAmount(e.target.value) })}
+                    onChange={(e) => set({ target: cleanTyped(e.target.value, undefined, fx.currency) })}
                     className={`${FIELD} tabular`}
                   />
                 </Labeled>
+                <CurrencyFields id="ng" fx={fx} />
                 <Labeled id="ng-by" label="Target month" optional>
                   <input
                     id="ng-by"
@@ -443,7 +458,7 @@ export default function Goals({
                     id="ng-saved"
                     type="text"
                     inputMode="decimal"
-                    placeholder="₹0"
+                    placeholder={inr(0)}
                     value={showTyped(form.saved)}
                     onChange={(e) => set({ saved: cleanAmount(e.target.value) })}
                     className={`${FIELD} max-w-[240px]`}

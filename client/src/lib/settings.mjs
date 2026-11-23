@@ -4,6 +4,7 @@
 import { addDaysStr } from "./cycle.mjs";
 import { cycleFor, parseLocalDate, toLocalDateString } from "./periods.mjs";
 import { transactionsToCsv } from "./csvExport.mjs";
+import { baseCurrency } from "./money.mjs";
 
 /** @typedef {import("./periods.mjs").PayDayEntry} PayDayEntry */
 /** @typedef {import("./periods.mjs").PlanChange} PlanChange */
@@ -255,7 +256,7 @@ export async function exportAllJson(supabase) {
   if (error) return { json: "", count: 0, error };
   const entries = data.map(({ user_id, category, ...t }) => ({ ...t, category: category?.name ?? null }));
   return {
-    json: JSON.stringify({ amountsIn: "paise", currency: "INR", entries }, null, 2),
+    json: JSON.stringify({ amountsIn: "minor units", currency: baseCurrency(), entries }, null, 2),
     count: data.length,
     error: null,
   };

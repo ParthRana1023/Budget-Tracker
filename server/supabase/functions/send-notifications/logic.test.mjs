@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { addDays, billPush, billsDueOn, channels, isQuiet, localParts, weeklyPush } from "./logic.mjs";
+import { addDays, billPush, billsDueOn, channels, isQuiet, localParts, money, weeklyPush } from "./logic.mjs";
 
 test("local date, hour and weekday in the user's time zone", () => {
   // 20:30 UTC Sunday 22 Nov = 02:00 Monday 23 Nov in India.
@@ -93,4 +93,11 @@ test("push text for bills and the weekly summary", () => {
   });
   assert.equal(billPush("Rent", 1200000, 3).title, "Rent is due in 3 days");
   assert.equal(weeklyPush(450000, 1).body, "You spent ₹4,500 across 1 entry last week.");
+});
+
+test("message amounts follow the user's base currency", () => {
+  assert.equal(money(1200000), "₹12,000");
+  assert.equal(money(150050, "USD"), "$1,501");
+  assert.equal(money(12000, "JPY"), "¥12,000", "yen have no minor unit");
+  assert.equal(billPush("Rent", 150000, 3, "USD").body, "$1,500. Record it in SaveFirst when you pay.");
 });

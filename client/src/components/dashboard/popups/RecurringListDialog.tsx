@@ -7,7 +7,7 @@
 import { useState } from "react";
 import { Trash2 } from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
-import { inr, showTyped } from "@/lib/money.mjs";
+import { currencySymbol, inr, showTyped } from "@/lib/money.mjs";
 import { recurringDiff, recurringProblems } from "@/lib/recurringDiff.mjs";
 import Dialog from "../../ui/Dialog";
 import type { RecurringItem } from "../types";
@@ -57,7 +57,7 @@ export default function RecurringListDialog({ ctx, onClose }: { ctx: PopupContex
     const name = add.name.trim(),
       amount = paise(add.amount);
     if (!name) return setError("Name the recurring item.");
-    if (amount <= 0) return setError("Add an amount above ₹0.");
+    if (amount <= 0) return setError(`Add an amount above ${inr(0)}.`);
     const income = add.cat === INCOME;
     const row = {
       id: crypto.randomUUID(),
@@ -134,7 +134,7 @@ export default function RecurringListDialog({ ctx, onClose }: { ctx: PopupContex
               </span>
             </span>
             <span className="flex items-center gap-1.5">
-              <span className="text-muted">₹</span>
+              <span className="text-muted">{currencySymbol()}</span>
               <input
                 type="text"
                 inputMode="decimal"

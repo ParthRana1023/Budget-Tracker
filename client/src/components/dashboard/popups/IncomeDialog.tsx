@@ -127,7 +127,7 @@ export default function IncomeDialog({
   }
 
   const submit = () => {
-    if (amount <= 0) return setError("Enter an amount above ₹0.");
+    if (amount <= 0) return setError(`Enter an amount above ${inr(0)}.`);
     const name = form.name.trim() || TYPES.find(([k]) => k === form.type)![1];
     const supabase = createClient();
     if (!received) {

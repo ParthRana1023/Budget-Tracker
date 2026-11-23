@@ -6,7 +6,7 @@
 import { useState } from "react";
 import { Minus, Plus } from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
-import { formatMoney, NUMBER_LOCALES } from "@/lib/money.mjs";
+import { currencySymbol, formatMoney, NUMBER_LOCALES, toMajor, toMinor } from "@/lib/money.mjs";
 import { shortDate } from "@/lib/cycle.mjs";
 import {
   applyPlan,
@@ -53,7 +53,7 @@ export default function PlanSection({
   const format: Format = settings.number_format ?? "indian";
   const money = (p: number) => formatMoney(p, format);
   const base = {
-    salary: String(Math.round(Number(settings.take_home_pay ?? 0) / 100)),
+    salary: String(Math.round(toMajor(Number(settings.take_home_pay ?? 0)))),
     payday: String(settings.month_start_day ?? 1),
     save_pct: String(settings.savings_pct ?? 20),
   };
@@ -91,10 +91,10 @@ export default function PlanSection({
   const sal = +form.salary || 0,
     pct = Math.min(100, +form.save_pct || 0),
     payday = +form.payday;
-  const save0 = Math.round((+base.salary * +base.save_pct) / 100) * 100,
-    save1 = Math.round((sal * pct) / 100) * 100;
-  const left0 = +base.salary * 100 - save0 - fixedBills,
-    left1 = sal * 100 - save1 - fixedBills;
+  const save0 = toMinor(Math.round((+base.salary * +base.save_pct) / 100)),
+    save1 = toMinor(Math.round((sal * pct) / 100));
+  const left0 = toMinor(+base.salary) - save0 - fixedBills,
+    left1 = toMinor(sal) - save1 - fixedBills;
   const effects: { label: string; from: string; to: string; color: string }[] = [];
   if (edited.includes("salary") || edited.includes("save_pct")) {
     if (save0 !== save1)
@@ -135,7 +135,7 @@ export default function PlanSection({
     const { error: err } = await applyPlan(
       createClient(),
       {
-        salary: edited.includes("salary") ? sal * 100 : undefined,
+        salary: edited.includes("salary") ? toMinor(sal) : undefined,
         payday: edited.includes("payday") ? payday : undefined,
         savePct: edited.includes("save_pct") ? pct : undefined,
       },
@@ -172,7 +172,7 @@ export default function PlanSection({
       <Card>
         <Row label="Monthly salary" htmlFor="f-sal">
           <span className={`${INPUT} flex flex-[1_1_220px] items-center gap-1.5 focus-within:border-lime`}>
-            <span className="text-muted">₹</span>
+            <span className="text-muted">{currencySymbol()}</span>
             <input
               id="f-sal"
               inputMode="numeric"
@@ -243,8 +243,8 @@ export default function PlanSection({
                   <span className="text-sm font-semibold">Apply from when?</span>
                   {edited.map((k) => (
                     <span key={k} className="tabular text-[13px] text-ink-2">
-                      {LABEL[k]}: {value(k, k === "salary" ? +base.salary * 100 : +base[k])} →{" "}
-                      <strong className="text-ink">{value(k, k === "salary" ? sal * 100 : +form[k])}</strong>
+                      {LABEL[k]}: {value(k, k === "salary" ? toMinor(+base.salary) : +base[k])} →{" "}
+                      <strong className="text-ink">{value(k, k === "salary" ? toMinor(sal) : +form[k])}</strong>
                     </span>
                   ))}
                 </div>

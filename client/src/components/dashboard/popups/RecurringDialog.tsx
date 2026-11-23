@@ -3,19 +3,19 @@
 // Edit recurring item (design handoff, Popups).
 
 import { createClient } from "@/utils/supabase/client";
-import { showTyped } from "@/lib/money.mjs";
+import { cleanTyped, inr, showTyped, toMajor } from "@/lib/money.mjs";
 import Dialog from "../../ui/Dialog";
 import type { RecurringItem } from "../types";
 import type { PopupContext } from "./context";
 import {
+  CurrencyFields,
   FIELD,
   Labeled,
   MethodSelect,
   SAVE_FAILED,
-  cleanAmount,
   cleanDay,
-  paise,
   toField,
+  useForeign,
   usePopupForm,
 } from "./parts";
 
@@ -30,25 +30,39 @@ export default function RecurringDialog({
 }) {
   const { form, set, dirty, error, setError, busy, save } = usePopupForm({
     name: item.name,
-    amount: toField(Number(item.amount)),
+    // A foreign bill is edited in its own currency; its base amount follows each cycle's rate.
+    amount: item.original_currency
+      ? String(toMajor(Number(item.original_amount), item.original_currency))
+      : toField(Number(item.amount)),
     day: item.day_of_month ? String(item.day_of_month) : "",
     method: item.payment_method ?? null,
   });
   const isExpense = item.type === "expense";
+  const fx = useForeign(
+    ctx.period.startStr,
+    item.original_currency ? { currency: item.original_currency, rate: Number(item.fx_rate) } : null,
+  );
 
   const submit = () => {
     const name = form.name.trim(),
-      amount = paise(form.amount),
+      { amount, original } = fx.toBase(form.amount),
       day = form.day ? +form.day : null;
     if (!name) return setError("Give it a name.");
-    if (amount <= 0) return setError("Enter an amount above ₹0.");
+    if (!fx.rateOk) return setError("Enter the exchange rate for this cycle.");
+    if (amount <= 0) return setError(`Enter an amount above ${inr(0)}.`);
     if (day !== null && !(day >= 1 && day <= 28)) return setError("Pick a day from 1 to 28, or leave it blank.");
     const db = createClient();
     save(
       () =>
         db
           .from("recurring_items")
-          .update({ name, amount, day_of_month: day, ...(isExpense && { payment_method: form.method }) })
+          .update({
+            name,
+            amount,
+            day_of_month: day,
+            ...original,
+            ...(isExpense && { payment_method: form.method }),
+          })
           .eq("id", item.id),
       async () => {
         onClose();
@@ -60,6 +74,10 @@ export default function RecurringDialog({
               amount: item.amount,
               day_of_month: item.day_of_month,
               payment_method: item.payment_method ?? null,
+              original_amount: item.original_amount ?? null,
+              original_currency: item.original_currency ?? null,
+              fx_rate: item.fx_rate ?? null,
+              fx_date: item.fx_date ?? null,
             })
             .eq("id", item.id),
         );
@@ -96,7 +114,7 @@ export default function RecurringDialog({
             type="text"
             inputMode="decimal"
             value={showTyped(form.amount)}
-            onChange={(e) => set({ amount: cleanAmount(e.target.value) })}
+            onChange={(e) => set({ amount: cleanTyped(e.target.value, undefined, fx.currency) })}
             className={`${FIELD} tabular`}
           />
         </Labeled>
@@ -120,7 +138,13 @@ export default function RecurringDialog({
             onChange={(method) => set({ method })}
           />
         )}
+        <CurrencyFields id="ru" fx={fx} />
       </div>
+      {fx.foreign && (
+        <span className="tabular text-[13px] text-muted">
+          ≈ {inr(fx.toBase(form.amount).amount)} this cycle. It’s repriced at each new cycle’s rate.
+        </span>
+      )}
       <span className="text-[13px] text-pretty text-muted">
         Changes apply from the next time it’s recorded. Past entries stay as they are.
       </span>

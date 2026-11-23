@@ -1,5 +1,5 @@
 // What the hourly email and push job sends, worked out from a user's settings and rows. No imports, so
-// both the Edge Function (Deno) and node:test (logic.test.mjs) can load it. Amounts are paise.
+// both the Edge Function (Deno) and node:test (logic.test.mjs) can load it. Amounts are minor units of the user's base currency.
 
 /**
  * The user's local date ('YYYY-MM-DD'), hour (0-23) and weekday (0 Sunday) at `now`.
@@ -68,8 +68,20 @@ export function billsDueOn(items, categories, due) {
   ];
 }
 
-/** Whole rupees in Indian format, for email text. @param {number} paise */
-export const rupees = (paise) => `₹${Math.round(paise / 100).toLocaleString("en-IN")}`;
+/**
+ * Whole units of the user's base currency, for message text ("₹12,000", "$1,500").
+ * @param {number} minor amount in minor units (paise, cents; whole yen) @param {string} [currency]
+ */
+export function money(minor, currency = "INR") {
+  const f = new Intl.NumberFormat("en-IN", { style: "currency", currency, currencyDisplay: "narrowSymbol" });
+  const digits = f.resolvedOptions().maximumFractionDigits ?? 2;
+  return new Intl.NumberFormat("en-IN", {
+    style: "currency",
+    currency,
+    currencyDisplay: "narrowSymbol",
+    maximumFractionDigits: 0,
+  }).format(Math.round(minor / 10 ** digits));
+}
 
 /** The weekly summary goes out on Monday from this local hour. */
 export const WEEKLY_HOUR = 9;
@@ -88,18 +100,18 @@ export function channels(s, { emailReady, pushReady, devices }) {
   };
 }
 
-/** Lock-screen text for a bill reminder. @param {string} name @param {number} paise @param {number} days */
-export const billPush = (name, paise, days) => ({
+/** Lock-screen text for a bill reminder. @param {string} name @param {number} minor @param {number} days @param {string} [currency] */
+export const billPush = (name, minor, days, currency = "INR") => ({
   title: `${name} is due ${days === 1 ? "tomorrow" : `in ${days} days`}`,
-  body: `${rupees(paise)}. Record it in SaveFirst when you pay.`,
+  body: `${money(minor, currency)}. Record it in SaveFirst when you pay.`,
   url: "/dashboard",
   tag: `bill:${name}`,
 });
 
-/** Lock-screen text for the weekly summary. @param {number} paise @param {number} entries */
-export const weeklyPush = (paise, entries) => ({
+/** Lock-screen text for the weekly summary. @param {number} minor @param {number} entries @param {string} [currency] */
+export const weeklyPush = (minor, entries, currency = "INR") => ({
   title: "Your week in SaveFirst",
-  body: `You spent ${rupees(paise)} across ${entries} ${entries === 1 ? "entry" : "entries"} last week.`,
+  body: `You spent ${money(minor, currency)} across ${entries} ${entries === 1 ? "entry" : "entries"} last week.`,
   url: "/dashboard?view=reports",
   tag: "weekly",
 });

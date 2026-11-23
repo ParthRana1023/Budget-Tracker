@@ -33,6 +33,7 @@ export function parseCsv(text) {
 }
 
 import { parseMethod } from "./paymentMethods.mjs";
+import { currencySymbol, inr, minorDigits, toMinor } from "./money.mjs";
 
 /** @typedef {{ date: string, type: "expense" | "income", category: string, amount: number, note: string, payment_method?: import("./paymentMethods.mjs").PaymentMethod }} ImportRow */
 
@@ -87,9 +88,14 @@ export function checkImport(text, { categories, existing = [] }) {
     if (type === "savings_transfer" || type === "reserve_transfer")
       return skip("Savings and reserve moves aren’t imported");
     if (type !== "expense" && type !== "income") return skip(`Unknown type “${get(at.type)}”`);
-    const raw = get(at.amount).replace(/[₹,\s]/g, "");
-    const amount = Math.round(parseFloat(raw) * 100);
-    if (!/^\d+(\.\d{1,2})?$/.test(raw) || !(amount > 0)) return skip("Amount must be above ₹0");
+    // Amounts are in the base currency, as exported; a symbol or thousands commas are fine.
+    const raw = get(at.amount)
+      .replaceAll(currencySymbol(), "")
+      .replace(/[₹,\s]/g, "");
+    const amount = toMinor(parseFloat(raw));
+    const d = minorDigits();
+    if (!new RegExp(`^\\d+${d ? `(\\.\\d{1,${d}})?` : ""}$`).test(raw) || !(amount > 0))
+      return skip(`Amount must be above ${inr(0)}`);
     let category = type === "expense" ? get(at.category) : "";
     if (category) {
       const known = names.get(category.toLowerCase());

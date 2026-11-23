@@ -9,7 +9,7 @@ import { Search } from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
 import { cycleFor, paySchedule, toLocalDateString } from "@/lib/periods.mjs";
 import { buildCycleModel } from "@/lib/cycleModel.mjs";
-import { formatMoney, setNumberFormat } from "@/lib/money.mjs";
+import { formatMoney, setCurrency, setNumberFormat } from "@/lib/money.mjs";
 import { deleteAccount, SETTINGS_SELECT, undoPlan } from "@/lib/settings.mjs";
 import { errorFields, reportClientError } from "@/lib/log.mjs";
 import AppHeader from "../AppHeader";
@@ -78,7 +78,7 @@ const INDEX: [string, Section, string | null, string][] = [
   ["Category 80% warning", "notif", null, "alerts limit notices"],
   ["Over a limit", "notif", null, "alerts overspent notices"],
   ["Theme", "prefs", null, "dark light mode appearance"],
-  ["Currency", "prefs", "f-cur", "rupee inr symbol"],
+  ["Base currency", "prefs", "f-cur", "currency rupee inr dollar usd euro symbol"],
   ["Number format", "prefs", "f-num", "commas decimal lakh thousands separator"],
   ["Week starts on", "prefs", "f-wk", "monday sunday"],
   ["Download all my data", "data", null, "export account backup json"],
@@ -117,6 +117,7 @@ export default function SettingsClient({
   const [settings, setSettings] = useState(data.settings);
   // Every amount below (and in the popups) is shown and typed in the user's number format.
   setNumberFormat(settings.number_format);
+  setCurrency(settings.currency);
   const [categories, setCategories] = useState(data.categories);
   const [recurringItems, setRecurringItems] = useState(data.recurringItems);
   const [q, setQ] = useState("");

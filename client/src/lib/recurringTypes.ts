@@ -11,6 +11,11 @@ export interface RecurringItem {
   skip_month?: string | null;
   /** Default method for entries posted from this item (expenses only). */
   payment_method?: import("./paymentMethods.mjs").PaymentMethod | null;
+  /** A foreign bill: its own amount and currency; `amount` is re-priced at each cycle's rate (fx_date). */
+  original_amount?: number | null;
+  original_currency?: string | null;
+  fx_rate?: number | null;
+  fx_date?: string | null;
   active: boolean;
   income_type: "salary" | "variable" | "other";
 }

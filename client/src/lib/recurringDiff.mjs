@@ -1,6 +1,7 @@
 // Recurring items popup (Settings › Categories & fixed bills): edits are made on a draft and
 // applied when the popup closes, with Undo. New rows get their id up front, so Undo is the
 // same diff run backwards (deleted rows come back whole, added rows go).
+import { inr } from "./money.mjs";
 
 /**
  * @typedef {{ id: string, name: string, amount: number, day_of_month: number | null, active: boolean } & Record<string, any>} Item
@@ -16,7 +17,7 @@ export function recurringProblems(draft) {
   const problems = [];
   if (draft.some((r) => !r.name.trim())) problems.push("Every recurring item needs a name.");
   const free = draft.find((r) => !(r.amount > 0));
-  if (free) problems.push(`${free.name.trim() || "An item"} needs an amount above ₹0.`);
+  if (free) problems.push(`${free.name.trim() || "An item"} needs an amount above ${inr(0)}.`);
   return problems;
 }
 

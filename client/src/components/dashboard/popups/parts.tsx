@@ -2,9 +2,20 @@
 
 // Building blocks shared by the dashboard popups (design handoff, Popups).
 
-import { useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Repeat, Trash2, TriangleAlert } from "lucide-react";
-import { cleanTyped, inr, showTyped } from "@/lib/money.mjs";
+import {
+  baseCurrency,
+  cleanTyped,
+  CURRENCIES,
+  currencySymbol,
+  inr,
+  showTyped,
+  toMajor,
+  toMinor,
+} from "@/lib/money.mjs";
+import { convert, fetchRate } from "@/lib/fx.mjs";
+import { shortDate } from "@/lib/cycle.mjs";
 import { errorFields, reportClientError } from "@/lib/log.mjs";
 import { PAYMENT_METHODS, type PaymentMethod } from "@/lib/paymentMethods.mjs";
 
@@ -13,14 +24,14 @@ export const FIELD =
 export const SAVE_FAILED = "Couldn’t save. Check your connection and try again. Nothing was changed.";
 export const OFFLINE = "You’re offline, so this wasn’t saved. Reconnect and try again.";
 
-/** Rupees typed into a field -> paise (0 when blank or invalid). */
-export const paise = (v: string) => Math.round((parseFloat(v.replace(/[^\d.]/g, "")) || 0) * 100);
+/** An amount typed into a field -> minor units of the base currency (0 when blank or invalid). */
+export const paise = (v: string) => toMinor(parseFloat(v.replace(/[^\d.]/g, "")) || 0);
 /** What was typed (in the user's number format) -> "1234.5". Show it back with showTyped. */
 export const cleanAmount = (v: string) => cleanTyped(v);
 /** Day-of-month field: digits only, up to 2. */
 export const cleanDay = (v: string) => v.replace(/\D/g, "").slice(0, 2);
-/** Paise -> the plain rupee string a field shows ("1200", "99.5"). */
-export const toField = (p: number) => String(Math.round(p) / 100);
+/** Minor units -> the plain string a field shows ("1200", "99.5"). */
+export const toField = (p: number) => String(toMajor(Math.round(p)));
 
 /** Form state for a popup: values, dirty flag, inline error and the busy save. */
 export function usePopupForm<T extends object>(initial: T) {
@@ -73,16 +84,19 @@ export function Labeled({
   );
 }
 
-/** The big ₹ amount input at the top of a popup. */
+/** The big amount input at the top of a popup. */
 export function AmountField({
   id,
   value,
   onChange,
+  currency,
   children,
 }: {
   id: string;
   value: string;
   onChange: (v: string) => void;
+  /** Typed in this currency (symbol and decimals); defaults to the base currency. */
+  currency?: string;
   children?: ReactNode;
 }) {
   return (
@@ -91,7 +105,7 @@ export function AmountField({
         Amount
       </label>
       <div className="flex items-baseline gap-1.5 border-b-[1.5px] border-line-2 pb-1.5 transition-colors duration-200 focus-within:border-lime">
-        <span className="font-serif text-[44px] leading-none text-muted">₹</span>
+        <span className="font-serif text-[44px] leading-none text-muted">{currencySymbol(currency)}</span>
         <input
           id={id}
           type="text"
@@ -100,7 +114,7 @@ export function AmountField({
           autoFocus
           placeholder="0"
           value={showTyped(value)}
-          onChange={(e) => onChange(cleanAmount(e.target.value))}
+          onChange={(e) => onChange(cleanTyped(e.target.value, undefined, currency))}
           className="tabular w-full min-w-0 flex-1 border-0 bg-transparent p-0 font-serif text-[clamp(48px,13vw,64px)] leading-[1.05] tracking-[-0.02em] text-ink outline-none focus-visible:outline-none"
         />
       </div>
@@ -110,6 +124,120 @@ export function AmountField({
 }
 
 /** On/off switch row ("Repeat every month", "Pay from annual bills reserve"). */
+type Original = {
+  original_amount: number | null;
+  original_currency: string | null;
+  fx_rate: number | null;
+  fx_date: string | null;
+};
+const PLAIN: Original = { original_amount: null, original_currency: null, fx_rate: null, fx_date: null };
+
+/**
+ * The currency an amount is typed in and, when it isn't the base currency, the rate for the
+ * cycle starting `cycleStart` (fetched once, editable when the rates service is down).
+ * `initial` is a saved foreign row: its rate is kept, not fetched again.
+ */
+export function useForeign(cycleStart: string, initial?: { currency: string; rate: number } | null) {
+  const [currency, setCurrency] = useState(initial?.currency ?? baseCurrency());
+  const [rate, setRate] = useState(initial ? String(initial.rate) : "");
+  const [note, setNote] = useState<string | null>(null);
+  // A saved row's rate is kept while its own currency stays picked.
+  const kept = useRef(initial ?? null);
+  const foreign = currency !== baseCurrency();
+  useEffect(() => {
+    if (!foreign || currency === kept.current?.currency) return;
+    let live = true;
+    setRate("");
+    setNote("Getting this cycle’s rate…");
+    fetchRate(currency, cycleStart).then(
+      (r) => {
+        if (!live) return;
+        setRate(String(r.rate));
+        setNote(
+          r.stale
+            ? `The rates service is down, so this is the rate from ${shortDate(r.date)}. Change it if you need to.`
+            : `The rate on ${shortDate(cycleStart)}, when this cycle started. It stays the same all cycle.`,
+        );
+      },
+      (e: Error) => live && setNote(e.message),
+    );
+    return () => {
+      live = false;
+    };
+  }, [currency, cycleStart]);
+
+  const r = parseFloat(rate);
+  /** What was typed -> the base amount to save, plus the original fields (all null when in base). */
+  const toBase = (typed: string): { amount: number; original: Original } => {
+    const minor = toMinor(parseFloat(typed) || 0, currency);
+    if (!foreign) return { amount: minor, original: PLAIN };
+    return {
+      amount: r > 0 ? convert(minor, currency, r) : 0,
+      original: { original_amount: minor, original_currency: currency, fx_rate: r, fx_date: cycleStart },
+    };
+  };
+  /** Starts over from a saved row (or the base currency), for a form reused across rows. */
+  const load = (saved?: { currency: string; rate: number } | null) => {
+    kept.current = saved ?? null;
+    setCurrency(saved?.currency ?? baseCurrency());
+    setRate(saved ? String(saved.rate) : "");
+    setNote(null);
+  };
+  return { currency, setCurrency, foreign, rate, setRate, rateOk: !foreign || r > 0, note, toBase, load };
+}
+
+/** Currency picker, and the rate when the currency is foreign. Lives in a popup's field grid. */
+export function CurrencyFields({
+  id,
+  fx,
+  onCurrency,
+}: {
+  id: string;
+  fx: ReturnType<typeof useForeign>;
+  /** Called after the currency changes (e.g. to clear a typed amount). */
+  onCurrency?: () => void;
+}) {
+  return (
+    <>
+      <Labeled id={`${id}-cur`} label="Currency">
+        <select
+          id={`${id}-cur`}
+          value={fx.currency}
+          onChange={(e) => {
+            fx.setCurrency(e.target.value);
+            onCurrency?.();
+          }}
+          className={FIELD}
+        >
+          {CURRENCIES.map((c) => (
+            <option key={c} value={c}>
+              {c === baseCurrency() ? `${c} · your currency` : c}
+            </option>
+          ))}
+        </select>
+      </Labeled>
+      {fx.foreign && (
+        <Labeled id={`${id}-rate`} label={`${currencySymbol()} for 1 ${fx.currency}`}>
+          <input
+            id={`${id}-rate`}
+            type="text"
+            inputMode="decimal"
+            value={fx.rate}
+            onChange={(e) => fx.setRate(e.target.value.replace(/[^\d.]/g, "").slice(0, 14))}
+            className={`${FIELD} tabular`}
+            aria-describedby={`${id}-rate-note`}
+          />
+          {fx.note && (
+            <span id={`${id}-rate-note`} className="text-[13px] text-pretty text-muted">
+              {fx.note}
+            </span>
+          )}
+        </Labeled>
+      )}
+    </>
+  );
+}
+
 /** "Paid with" picker for expenses (tracking only). Empty = not recorded. */
 export function MethodSelect({
   id,

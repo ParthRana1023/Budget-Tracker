@@ -1,11 +1,11 @@
 "use client";
 
-// Settings › Preferences (design handoff v2): theme, currency (INR only for now), number
-// format and week start. Each saves on its own.
+// Settings › Preferences (design handoff v2): theme, base currency (until the first entry),
+// number format and week start. Each saves on its own.
 
 import { useEffect, useState } from "react";
 import { createClient } from "@/utils/supabase/client";
-import { NUMBER_LOCALES } from "@/lib/money.mjs";
+import { CURRENCIES, currencySymbol, minorDigits, NUMBER_LOCALES } from "@/lib/money.mjs";
 import { savePreferences } from "@/lib/settings.mjs";
 import { syncSavedTheme, THEME_EVENT, THEME_KEY, type Theme } from "@/lib/theme";
 import type { Settings } from "../dashboard/types";
@@ -42,6 +42,17 @@ export default function PrefsSection({
     if (!settings.theme) read();
     window.addEventListener(THEME_EVENT, read);
     return () => window.removeEventListener(THEME_EVENT, read);
+  }, []);
+
+  // Base currency: changeable until the first entry (set_base_currency checks too).
+  const currencySave = useSave();
+  const currency = settings.currency ?? "INR";
+  const names = new Intl.DisplayNames(["en"], { type: "currency" });
+  const [locked, setLocked] = useState<boolean | null>(null);
+  useEffect(() => {
+    db.from("transactions")
+      .select("id", { count: "exact", head: true })
+      .then(({ count, error }) => setLocked(error ? true : (count ?? 0) > 0));
   }, []);
 
   const format: Format = settings.number_format ?? "indian";
@@ -83,13 +94,37 @@ export default function PrefsSection({
             ))}
           </div>
         </Row>
-        <Row label="Currency">
-          <div id="f-cur" tabIndex={-1} className="flex flex-[0_1_260px] flex-col gap-0.5 outline-none">
-            <span className="flex h-11 items-center rounded-xl border border-line bg-tile-2 px-3 text-[15px]">
-              ₹ Indian rupee
-            </span>
-            <span className="text-xs text-muted">More currencies are coming later.</span>
-          </div>
+        <Row
+          label="Base currency"
+          htmlFor="f-cur"
+          help={
+            locked
+              ? "Locked after your first entry. Log foreign spending in its own currency instead."
+              : "Every amount is kept in this currency. You can change it until your first entry."
+          }
+        >
+          <SaveState status={currencySave.status} />
+          <select
+            id="f-cur"
+            value={currency}
+            disabled={locked !== false}
+            onChange={(e) => {
+              const v = e.target.value;
+              void currencySave.run(async () => {
+                const r = await db.rpc("set_base_currency", { p_currency: v });
+                // Stored amounts were rescaled on the server; load them fresh.
+                if (!r.error) window.location.reload();
+                return r;
+              });
+            }}
+            className={`${SELECT} h-11 flex-[0_1_260px] text-[15px] disabled:opacity-60`}
+          >
+            {CURRENCIES.map((c) => (
+              <option key={c} value={c}>
+                {currencySymbol(c)} {c} · {names.of(c)}
+              </option>
+            ))}
+          </select>
         </Row>
         <div className="flex flex-col gap-3 px-6 py-5 max-[480px]:px-[18px]">
           <div className="flex flex-wrap items-center gap-x-5 gap-y-2.5">
@@ -117,8 +152,12 @@ export default function PrefsSection({
               <span key={label} className="flex flex-col gap-px rounded-[10px] bg-tile-2 px-3 py-2">
                 <span className="text-[11px] text-muted">{label}</span>
                 <span className="tabular text-base font-semibold">
-                  {n < 0 ? "−" : ""}₹
-                  {Math.abs(n).toLocaleString(loc, { minimumFractionDigits: dp, maximumFractionDigits: dp })}
+                  {n < 0 ? "−" : ""}
+                  {currencySymbol(currency)}
+                  {Math.abs(n).toLocaleString(loc, {
+                    minimumFractionDigits: Math.min(dp, minorDigits(currency)),
+                    maximumFractionDigits: Math.min(dp, minorDigits(currency)),
+                  })}
                 </span>
               </span>
             ))}

@@ -17,7 +17,7 @@ import {
   onboardingPayload,
 } from "@/lib/onboarding.mjs";
 import { PAYDAY_OPTIONS } from "@/lib/settings.mjs";
-import { inr as money } from "@/lib/money.mjs";
+import { currencySymbol, inr as money, toMinor } from "@/lib/money.mjs";
 import { errorFields, reportClientError } from "@/lib/log.mjs";
 
 const STEPS: Array<[eyebrow: string, title: string, em: string, lede: string]> = [
@@ -54,7 +54,7 @@ const STEPS: Array<[eyebrow: string, title: string, em: string, lede: string]> =
 ];
 
 /** Rupees (not paise) here: onboarding works in whole rupees. */
-const inr = (rupees: number) => money(rupees * 100);
+const inr = (whole: number) => money(toMinor(whole));
 const FIELD =
   "rounded-[10px] border border-line-2 bg-tile-2 text-[15px] text-ink outline-none focus:border-lime focus-visible:outline-none";
 
@@ -183,7 +183,7 @@ export default function Onboarding() {
                   Monthly take-home pay
                 </label>
                 <div className="flex items-baseline gap-1.5 border-b-[1.5px] border-line-2 pb-1.5">
-                  <span className="font-serif text-[44px] leading-none text-muted">₹</span>
+                  <span className="font-serif text-[44px] leading-none text-muted">{currencySymbol()}</span>
                   <input
                     id="ob-sal"
                     type="text"
@@ -279,7 +279,7 @@ export default function Onboarding() {
                       className={`${FIELD} h-11 min-w-0 flex-[2_1_160px] px-3`}
                     />
                     <span className="flex items-center gap-1.5">
-                      <span className="text-muted">₹</span>
+                      <span className="text-muted">{currencySymbol()}</span>
                       <input
                         type="text"
                         inputMode="numeric"
@@ -351,7 +351,7 @@ export default function Onboarding() {
                     {c.name}
                   </button>
                   <span className="flex items-center gap-1.5" style={{ opacity: c.on ? 1 : 0.4 }}>
-                    <span className="text-muted">₹</span>
+                    <span className="text-muted">{currencySymbol()}</span>
                     <input
                       type="text"
                       inputMode="numeric"
@@ -412,10 +412,10 @@ export default function Onboarding() {
             className="tabular font-serif text-[clamp(56px,10vw,88px)] leading-[.86] tracking-[-0.025em]"
             style={{ color: !sal ? "var(--muted)" : safe < 0 ? "var(--danger)" : "var(--ink)" }}
           >
-            {sal ? inr(safe) : "₹—"}
+            {sal ? inr(safe) : `${currencySymbol()}—`}
           </span>
           <span className="font-serif text-xl text-ink-2">
-            About <em className="text-ink">{sal ? inr(Math.max(0, safe) / 30) : "₹—"} a day</em>.
+            About <em className="text-ink">{sal ? inr(Math.max(0, safe) / 30) : `${currencySymbol()}—`} a day</em>.
           </span>
           <div aria-hidden className="flex h-3 gap-[3px]">
             <span className="rounded-md bg-lime transition-[width] duration-500 ease-soft" style={{ width: w(save) }} />
@@ -430,7 +430,7 @@ export default function Onboarding() {
               [
                 ["var(--lime)", "Savings", inr(save)],
                 ["var(--fixed)", "Bills", inr(billTotal)],
-                ["var(--ink)", "Safe", sal ? inr(safe) : "₹—"],
+                ["var(--ink)", "Safe", sal ? inr(safe) : `${currencySymbol()}—`],
               ] as const
             ).map(([c, label, v]) => (
               <span key={label} className="flex items-center gap-1.5">

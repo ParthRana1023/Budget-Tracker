@@ -3,6 +3,7 @@
 
 import { cycleFor } from "./periods.mjs";
 import { addDaysStr, cycleDayOf, effectiveDate } from "./cycle.mjs";
+import { toMinor } from "./money.mjs";
 
 const MON = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 const MON_L = [
@@ -142,8 +143,8 @@ export function weekdayAverages(cycles, today) {
   return sum.map((s, i) => (cnt[i] ? s / cnt[i] : 0));
 }
 
-/** Round up to the next ₹250, in paise. */
-const roundLimit = (paise) => Math.ceil(paise / 25000) * 25000;
+/** Round up to the next 250 whole units (₹250), in minor units. */
+const roundLimit = (minor) => Math.ceil(minor / toMinor(250)) * toMinor(250);
 
 /**
  * Suggested limits from the last three full cycles (design handoff, Plan ahead).

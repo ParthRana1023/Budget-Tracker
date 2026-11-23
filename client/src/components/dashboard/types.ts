@@ -10,6 +10,11 @@ export interface Category {
   monthly_limit: number;
   due_day?: number | null;
   is_active?: boolean;
+  /** A limit set in another currency: monthly_limit follows each cycle's rate (fx_date). */
+  original_amount?: number | null;
+  original_currency?: string | null;
+  fx_rate?: number | null;
+  fx_date?: string | null;
 }
 
 export interface Tx {
@@ -25,6 +30,11 @@ export interface Tx {
   payee?: string | null;
   /** How an expense was paid (lib/paymentMethods.mjs); null = not recorded. Tracking only. */
   payment_method?: PaymentMethod | null;
+  /** A foreign entry: what was typed (minor units of original_currency), the cycle's rate and its date. */
+  original_amount?: number | null;
+  original_currency?: string | null;
+  fx_rate?: number | null;
+  fx_date?: string | null;
   /** Early income counted toward the cycle starting on this date ('YYYY-MM-DD'). */
   counts_from?: string | null;
   category?: { name: string; type: string } | null;
@@ -34,6 +44,11 @@ export interface Goal {
   id: string;
   name: string;
   target_amount: number;
+  /** A target set in another currency: target_amount follows each cycle's rate (fx_date). */
+  original_amount?: number | null;
+  original_currency?: string | null;
+  fx_rate?: number | null;
+  fx_date?: string | null;
   target_date: string | null;
   saved_before?: number;
 }
@@ -61,6 +76,8 @@ export interface Settings {
   display_name?: string | null;
   avatar_url?: string | null;
   number_format?: "indian" | "international" | "european";
+  /** Base currency (ISO code, lib/money.mjs CURRENCIES): every stored amount is in its minor units. */
+  currency?: string;
   /** 0 = Sunday, 1 = Monday. */
   week_start?: 0 | 1;
   /** Theme saved to the account; null = not chosen yet. */

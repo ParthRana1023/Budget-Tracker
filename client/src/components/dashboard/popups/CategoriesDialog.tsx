@@ -6,7 +6,18 @@
 import { useState } from "react";
 import { Lock, Trash2 } from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
-import { inr, showTyped } from "@/lib/money.mjs";
+import {
+  CURRENCIES,
+  baseCurrency,
+  cleanTyped,
+  currencySymbol,
+  inr,
+  showTyped,
+  toMajor,
+  toMinor,
+} from "@/lib/money.mjs";
+import { convert, fetchRate } from "@/lib/fx.mjs";
+import { shortDate } from "@/lib/cycle.mjs";
 import { categoryDiff, draftProblems } from "@/lib/categoryDiff.mjs";
 import Dialog from "../../ui/Dialog";
 import type { Category } from "../types";
@@ -20,6 +31,12 @@ type Cat = {
   monthly_limit: number;
   due_day: number | null;
   is_active: boolean;
+  original_amount: number | null;
+  original_currency: string | null;
+  fx_rate: number | null;
+  fx_date: string | null;
+  /** The currency the limit is typed in (the base currency for most rows). Not saved itself. */
+  currency: string;
 };
 const asCat = (c: Category): Cat => ({
   id: c.id,
@@ -28,6 +45,11 @@ const asCat = (c: Category): Cat => ({
   monthly_limit: Number(c.monthly_limit),
   due_day: c.due_day ?? null,
   is_active: c.is_active !== false,
+  original_amount: c.original_currency ? Number(c.original_amount) : null,
+  original_currency: c.original_currency ?? null,
+  fx_rate: c.original_currency ? Number(c.fx_rate) : null,
+  fx_date: c.fx_date ?? null,
+  currency: c.original_currency ?? baseCurrency(),
 });
 const SMALL =
   "h-10 rounded-[10px] border border-line-2 bg-tile-2 text-[15px] text-ink outline-none focus:border-lime focus:shadow-[0_0_0_3px_var(--lime-soft)] focus-visible:outline-none";
@@ -48,11 +70,27 @@ async function apply(userId: string, d: ReturnType<typeof categoryDiff>) {
 
 export default function CategoriesDialog({ ctx, onClose }: { ctx: PopupContext; onClose: () => void }) {
   const before = ctx.categories.map(asCat);
+  const saved = new Map(before.map((c) => [c.id, c]));
+  const cycleStart = ctx.period.startStr;
   const [draft, setDraft] = useState<Cat[]>(before);
-  // Typed values, kept as text while editing.
+  // Typed values (in each row's currency), kept as text while editing.
   const [limits, setLimits] = useState<Record<string, string>>(
-    Object.fromEntries(before.map((c) => [c.id, c.monthly_limit ? toField(c.monthly_limit) : ""])),
+    Object.fromEntries(
+      before.map((c) => [
+        c.id,
+        c.original_currency
+          ? String(toMajor(Number(c.original_amount), c.original_currency))
+          : c.monthly_limit
+            ? toField(c.monthly_limit)
+            : "",
+      ]),
+    ),
   );
+  // One rate per foreign currency (base units for 1 of it), this cycle's or a saved row's.
+  const [rates, setRates] = useState<Record<string, string>>(() =>
+    Object.fromEntries(before.filter((c) => c.original_currency).map((c) => [c.currency, String(c.fx_rate)])),
+  );
+  const [rateNotes, setRateNotes] = useState<Record<string, string>>({});
   const [tab, setTab] = useState<"flexible" | "fixed">("flexible");
   const [add, setAdd] = useState({ name: "", limit: "", due: "" });
   const [error, setError] = useState<string | null>(null);
@@ -63,7 +101,43 @@ export default function CategoriesDialog({ ctx, onClose }: { ctx: PopupContext; 
     setDraft((d) => d.map((c) => (c.id === id ? { ...c, ...patch } : c)));
     setError(null);
   };
-  const live = draft.filter((c) => c.is_active);
+  // Each row priced from what was typed: monthly_limit is in the base currency; a foreign limit
+  // also keeps its original amount and rate. A saved rate keeps its date.
+  const priced = draft.map((c): Cat => {
+    const minor = toMinor(parseFloat(limits[c.id] ?? "") || 0, c.currency);
+    const plain = { original_amount: null, original_currency: null, fx_rate: null, fx_date: null };
+    if (c.currency === baseCurrency() || !minor) return { ...c, ...plain, monthly_limit: minor };
+    const r = parseFloat(rates[c.currency] ?? "");
+    const was = saved.get(c.id);
+    return {
+      ...c,
+      monthly_limit: r > 0 ? convert(minor, c.currency, r) : 0,
+      original_amount: minor,
+      original_currency: c.currency,
+      fx_rate: r > 0 ? r : null,
+      fx_date: was?.fx_rate === r && was.fx_date ? was.fx_date : cycleStart,
+    };
+  });
+  const pickCurrency = (id: string, code: string) => {
+    update(id, { currency: code });
+    if (code === baseCurrency() || rates[code] !== undefined) return;
+    setRates((r) => ({ ...r, [code]: "" }));
+    setRateNotes((n) => ({ ...n, [code]: "Getting this cycle’s rate…" }));
+    fetchRate(code, cycleStart).then(
+      (r) => {
+        setRates((x) => ({ ...x, [code]: x[code] || String(r.rate) }));
+        setRateNotes((n) => ({
+          ...n,
+          [code]: r.stale
+            ? `The rates service is down, so this is the rate from ${shortDate(r.date)}. Change it if you need to.`
+            : `The rate on ${shortDate(cycleStart)}, when this cycle started. Limits follow each new cycle’s rate.`,
+        }));
+      },
+      (e: Error) => setRateNotes((n) => ({ ...n, [code]: e.message })),
+    );
+  };
+  const live = priced.filter((c) => c.is_active);
+  const foreignInUse = [...new Set(live.filter((c) => c.original_currency).map((c) => c.currency))];
   const rows = live.filter((c) => c.type === tab);
   const usedThisCycle = (id: string) => (model.spentByCat.get(id) ?? 0) > 0;
 
@@ -71,7 +145,7 @@ export default function CategoriesDialog({ ctx, onClose }: { ctx: PopupContext; 
     const name = add.name.trim();
     if (!name) return setError("Give the new category a name.");
     const limit = paise(add.limit);
-    if (tab === "fixed" && limit <= 0) return setError("A fixed bill needs a monthly amount above ₹0.");
+    if (tab === "fixed" && limit <= 0) return setError(`A fixed bill needs a monthly amount above ${inr(0)}.`);
     const due = add.due ? Math.min(28, Math.max(1, +add.due)) : null;
     // Re-adding a name that was switched off brings that category back.
     const old = draft.find((c) => !c.is_active && c.name.trim().toLowerCase() === name.toLowerCase());
@@ -83,6 +157,11 @@ export default function CategoriesDialog({ ctx, onClose }: { ctx: PopupContext; 
       monthly_limit: limit,
       due_day: tab === "fixed" ? due : null,
       is_active: true,
+      original_amount: null,
+      original_currency: null,
+      fx_rate: null,
+      fx_date: null,
+      currency: baseCurrency(),
     };
     setDraft((d) => (old ? d.map((c) => (c.id === id ? row : c)) : [...d, row]));
     setLimits((l) => ({ ...l, [id]: limit ? toField(limit) : "" }));
@@ -92,9 +171,12 @@ export default function CategoriesDialog({ ctx, onClose }: { ctx: PopupContext; 
 
   // Closing (Done, X, Esc, outside) applies the changes.
   const close = async () => {
-    const problems = draftProblems(draft);
+    const unrated = live.find((c) => c.original_currency && !c.fx_rate);
+    if (unrated)
+      return setError(`Add the rate for 1 ${unrated.currency} to save ${unrated.name.trim() || "this limit"}.`);
+    const problems = draftProblems(priced);
     if (problems.length) return setError(problems[0]);
-    const diff = categoryDiff(before, draft);
+    const diff = categoryDiff(before, priced);
     if (!diff.updates.length && !diff.inserts.length) return onClose();
     if (!navigator.onLine) return setError("You’re offline, so this wasn’t saved. Reconnect and try again.");
     setBusy(true);
@@ -104,7 +186,7 @@ export default function CategoriesDialog({ ctx, onClose }: { ctx: PopupContext; 
     onClose();
     // Undo: back to how it was. New rows can't be removed by a diff, so they are switched off.
     const undo = categoryDiff(
-      draft.filter((c) => !c.id.startsWith("new-")),
+      priced.filter((c) => !c.id.startsWith("new-")),
       before,
     );
     await ctx.saved("Categories updated", async () => {
@@ -190,7 +272,19 @@ export default function CategoriesDialog({ ctx, onClose }: { ctx: PopupContext; 
                 {c.type === "flexible" ? "→ Fixed" : "→ Flexible"}
               </button>
               <span className="flex items-center gap-1.5">
-                <span className="text-muted">₹</span>
+                <select
+                  aria-label={`${c.name} currency`}
+                  value={c.currency}
+                  onChange={(e) => pickCurrency(c.id, e.target.value)}
+                  className={`${SMALL} w-[76px] px-1.5 text-[13px]`}
+                >
+                  {CURRENCIES.map((code) => (
+                    <option key={code} value={code}>
+                      {code}
+                    </option>
+                  ))}
+                </select>
+                <span className="text-muted">{currencySymbol(c.currency)}</span>
                 <input
                   type="text"
                   inputMode="numeric"
@@ -198,13 +292,17 @@ export default function CategoriesDialog({ ctx, onClose }: { ctx: PopupContext; 
                   aria-label={`${c.name} monthly ${c.type === "flexible" ? "limit" : "amount"}`}
                   value={showTyped(limits[c.id] ?? "")}
                   onChange={(e) => {
-                    const v = cleanAmount(e.target.value);
-                    setLimits((l) => ({ ...l, [c.id]: v }));
-                    update(c.id, { monthly_limit: paise(v) });
+                    setLimits((l) => ({ ...l, [c.id]: cleanTyped(e.target.value, undefined, c.currency) }));
+                    setError(null);
                   }}
                   className={`${SMALL} tabular w-28 px-2.5 text-right font-semibold`}
                 />
               </span>
+              {c.original_currency && (
+                <span className="tabular w-full text-right text-xs text-muted">
+                  {c.fx_rate ? `≈ ${inr(c.monthly_limit)} this cycle` : "Needs a rate"}
+                </span>
+              )}
               {c.type === "fixed" && (
                 <span className="flex items-center gap-1.5 text-[13px] text-muted">
                   day
@@ -244,6 +342,25 @@ export default function CategoriesDialog({ ctx, onClose }: { ctx: PopupContext; 
           );
         })}
       </div>
+      {foreignInUse.map((code) => (
+        <label key={code} className="flex flex-col gap-1.5">
+          <span className="text-[13px] font-semibold text-ink-2">
+            {currencySymbol()} for 1 {code}
+          </span>
+          <input
+            type="text"
+            inputMode="decimal"
+            aria-label={`${currencySymbol()} for 1 ${code}`}
+            value={rates[code] ?? ""}
+            onChange={(e) => {
+              setRates((r) => ({ ...r, [code]: e.target.value.replace(/[^\d.]/g, "").slice(0, 14) }));
+              setError(null);
+            }}
+            className={`${FIELD} tabular h-11`}
+          />
+          {rateNotes[code] && <span className="text-[13px] text-pretty text-muted">{rateNotes[code]}</span>}
+        </label>
+      ))}
       <div className="flex flex-col gap-2.5 rounded-[14px] border border-dashed border-line-2 p-4">
         <span className="eyebrow">Add a category</span>
         <div className="flex flex-wrap gap-2">
