@@ -1,5 +1,11 @@
 import { test, expect, Page } from "@playwright/test";
-import { setUpAccount } from "./helpers";
+import { isPhone, openLogExpense, openRecordIncome, setUpAccount } from "./helpers";
+
+// These flows move between Home, Budgets, Goals, Bills and the Ledger on one page; on phones
+// those are separate pages, and mobile.spec covers the phone versions.
+test.beforeEach(({ page }) => {
+  test.skip(isPhone(page), "Wide-screen flow; phones: mobile.spec");
+});
 
 // Design handoff, Dashboard → Popups. Every test starts from setUpAccount:
 // ₹1,00,000 pay, 20% savings, ₹28,000 rent, ₹10,000 groceries limit, no salary recorded yet.
@@ -14,7 +20,7 @@ async function logExpense(
   category: string,
   extra?: (d: ReturnType<typeof dialog>) => Promise<void>,
 ) {
-  await page.getByRole("button", { name: "Log expense" }).first().click();
+  await openLogExpense(page);
   await dialog(page).getByLabel("Amount").fill(amount);
   await dialog(page)
     .getByRole("button", { name: new RegExp(`^${category}`) })
@@ -29,7 +35,7 @@ async function logExpense(
 test.describe("Popups", () => {
   test("Log expense: checks, preview, save and Undo", async ({ page }) => {
     await setUpAccount(page);
-    await page.getByRole("button", { name: "Log expense" }).first().click();
+    await openLogExpense(page);
     await dialog(page).getByRole("button", { name: "Log expense" }).click();
     await expect(dialog(page).getByRole("alert")).toContainText("Enter an amount above ₹0.");
     await dialog(page).getByRole("button", { name: "+500" }).click();
@@ -55,7 +61,7 @@ test.describe("Popups", () => {
 
   test("Record income raises safe to spend; expected income waits on hold", async ({ page }) => {
     await setUpAccount(page);
-    await page.getByRole("button", { name: "Record income" }).first().click();
+    await openRecordIncome(page);
     await dialog(page).getByLabel("Amount").fill("100000");
     await expect(dialog(page)).toContainText("+₹1,00,000");
     await dialog(page).getByRole("button", { name: "Save ₹1,00,000" }).click();
@@ -63,7 +69,7 @@ test.describe("Popups", () => {
     // 1,00,000 − 20,000 savings − 28,000 rent
     await expect(safe(page)).toHaveText("₹52,000", { timeout: 5_000 });
 
-    await page.getByRole("button", { name: "Record income" }).first().click();
+    await openRecordIncome(page);
     await dialog(page).getByLabel("Amount").fill("60000");
     await dialog(page).getByRole("radio", { name: "Variable pay" }).click();
     await expect(dialog(page).getByRole("radio", { name: /Expected later/ })).toHaveAttribute("aria-checked", "true");

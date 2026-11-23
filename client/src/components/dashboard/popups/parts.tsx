@@ -493,3 +493,39 @@ export function Suggestions({
     </div>
   );
 }
+
+/**
+ * Bottom-sheet header for Add (design handoff v3, Mobile): Expense | Income tabs replace the
+ * title. Switching keeps the amount (the parent reopens the other popup with it).
+ */
+export function AddTabs({ current, onSwitch }: { current: "expense" | "income"; onSwitch: () => void }) {
+  return (
+    <div
+      role="tablist"
+      aria-label="Entry type"
+      className="flex h-11 min-w-0 flex-1 gap-0.5 rounded-full border border-line p-[3px]"
+    >
+      {(
+        [
+          ["expense", "Expense"],
+          ["income", "Income"],
+        ] as const
+      ).map(([k, label]) => (
+        <button
+          key={k}
+          type="button"
+          role="tab"
+          aria-selected={current === k}
+          onClick={() => k !== current && onSwitch()}
+          className="min-w-0 flex-1 cursor-pointer rounded-full border-0 text-sm font-semibold transition-colors duration-200"
+          style={{
+            background: current === k ? "var(--ink)" : "transparent",
+            color: current === k ? "var(--bg)" : "var(--muted)",
+          }}
+        >
+          {label}
+        </button>
+      ))}
+    </div>
+  );
+}

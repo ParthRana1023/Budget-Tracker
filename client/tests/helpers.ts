@@ -56,3 +56,36 @@ export async function setUpAccount(page: Page): Promise<string> {
 
   return email;
 }
+
+/** Under 720px the app uses the bottom nav and phone pages (design handoff v3, Mobile). */
+export const isPhone = (page: Page) => (page.viewportSize()?.width ?? 1280) < 720;
+
+const navItem = (page: Page, label: string) =>
+  page
+    .getByRole("navigation", { name: "Main" })
+    .locator("a, button")
+    .filter({ hasText: new RegExp(`^${label}$`) });
+
+/**
+ * Go to where a part of the Dashboard lives: on wide screens one page (Dashboard or Reports
+ * tab); on phones Home, Reports, Ledger, or Bills / Budgets / Goals through More.
+ */
+export async function show(page: Page, where: "Home" | "Reports" | "Ledger" | "Budgets" | "Goals" | "Bills") {
+  if (!isPhone(page)) return navItem(page, where === "Reports" ? "Reports" : "Dashboard").click();
+  if (where === "Home" || where === "Reports" || where === "Ledger") return navItem(page, where).click();
+  await navItem(page, "More").click();
+  await page.getByRole("button", { name: new RegExp(`^${where === "Bills" ? "Bills & recurring" : where}`) }).click();
+}
+
+/** Log expense: the header button, or Add in the bottom nav on phones. */
+export async function openLogExpense(page: Page) {
+  if (isPhone(page)) await page.getByRole("button", { name: "Add an entry" }).click();
+  else await page.getByRole("button", { name: "Log expense" }).first().click();
+}
+
+/** Record income: the header button, or Add then the Income tab on phones. */
+export async function openRecordIncome(page: Page) {
+  if (!isPhone(page)) return page.getByRole("button", { name: "Record income" }).first().click();
+  await page.getByRole("button", { name: "Add an entry" }).click();
+  await page.getByRole("dialog").getByRole("tab", { name: "Income" }).click();
+}

@@ -84,7 +84,7 @@ test.describe("PWA", () => {
     const sheet = page.getByRole("dialog", { name: "Get reminders on this device" });
     await expect(sheet).toBeVisible();
     expect(await asks()).toBe(0);
-    await sheet.getByRole("button", { name: "Cancel" }).click();
+    await sheet.getByRole("button", { name: "Close" }).click();
     await expect(sheet).toBeHidden();
     await expect(toggle).toHaveAttribute("aria-checked", "false");
   });

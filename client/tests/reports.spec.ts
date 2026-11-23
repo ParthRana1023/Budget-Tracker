@@ -1,11 +1,11 @@
 import { test, expect } from "@playwright/test";
-import { setUpAccount } from "./helpers";
+import { setUpAccount, openLogExpense, show } from "./helpers";
 
 // Design handoff, Reports. A brand-new account has no closed cycle yet.
 
 test("Reports: tabs, keyboard, empty states, and habits after one expense", async ({ page }) => {
   await setUpAccount(page);
-  await page.getByRole("button", { name: "Reports", exact: true }).click();
+  await show(page, "Reports");
   await expect(page.getByRole("heading", { name: /Reports & analysis/ })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Your first report arrives after a few entries." })).toBeVisible();
 
@@ -18,8 +18,8 @@ test("Reports: tabs, keyboard, empty states, and habits after one expense", asyn
   await expect(page.getByRole("heading", { name: "Forecasts start after your first cycle." })).toBeVisible();
 
   // One flexible expense fills the habits tab.
-  await page.getByRole("button", { name: "Dashboard", exact: true }).click();
-  await page.getByRole("button", { name: "Log expense" }).first().click();
+  await show(page, "Home");
+  await openLogExpense(page);
   await page.getByRole("dialog").getByLabel("Amount").fill("640");
   await page
     .getByRole("dialog")
@@ -29,7 +29,7 @@ test("Reports: tabs, keyboard, empty states, and habits after one expense", asyn
   await page.getByRole("dialog").getByRole("button", { name: "Log ₹640" }).click();
   await expect(page.getByRole("dialog")).toHaveCount(0);
 
-  await page.getByRole("button", { name: "Reports", exact: true }).click();
+  await show(page, "Reports");
   await page.getByRole("tab", { name: /Spending habits/ }).click();
   await expect(page.getByRole("heading", { name: "Spending pace" })).toBeVisible();
   await page.getByRole("button", { name: "Swiggy: ₹640" }).click();

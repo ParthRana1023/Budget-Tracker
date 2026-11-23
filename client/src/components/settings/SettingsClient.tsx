@@ -13,6 +13,8 @@ import { formatMoney, setCurrency, setNumberFormat } from "@/lib/money.mjs";
 import { deleteAccount, SETTINGS_SELECT, undoPlan } from "@/lib/settings.mjs";
 import { errorFields, reportClientError } from "@/lib/log.mjs";
 import AppHeader from "../AppHeader";
+import BottomNav from "../BottomNav";
+import { useDragScroll } from "../ui/useDragScroll";
 import { useToast } from "../ui/Toast";
 import CategoriesDialog from "../dashboard/popups/CategoriesDialog";
 import RecurringListDialog from "../dashboard/popups/RecurringListDialog";
@@ -223,6 +225,7 @@ export default function SettingsClient({
     window.location.href = "/";
   };
 
+  const dragScroll = useDragScroll<HTMLElement>();
   const qq = q.trim().toLowerCase();
   const results = qq
     ? INDEX.filter(([label, s, , kw]) => `${label} ${kw} ${WHERE[s]}`.toLowerCase().includes(qq)).slice(0, 7)
@@ -246,7 +249,7 @@ export default function SettingsClient({
           }}
         />
         <div className="flex flex-wrap gap-x-12 gap-y-8 pt-[22px] max-[860px]:gap-y-4 max-[860px]:pt-4">
-          <aside className="flex min-w-0 flex-[0_1_240px] flex-col gap-1 self-start max-[860px]:flex-[1_1_100%] min-[861px]:sticky min-[861px]:top-6 min-[861px]:max-h-[calc(100vh-48px)] min-[861px]:overflow-y-auto">
+          <aside className="flex min-w-0 flex-[0_1_240px] flex-col gap-1 self-start max-[860px]:flex-[1_1_100%] min-[861px]:sticky min-[861px]:top-[109px] min-[861px]:max-h-[calc(100vh-125px)] min-[861px]:overflow-y-auto">
             <h1 className="m-0 mb-3.5 font-serif text-[44px] leading-none font-normal max-[860px]:text-[36px]">
               {title}
             </h1>
@@ -297,6 +300,7 @@ export default function SettingsClient({
               )}
             </div>
             <nav
+              {...dragScroll}
               aria-label={`${title} sections`}
               className="flex flex-col gap-1 [scrollbar-width:none] max-[860px]:-mx-6 max-[860px]:flex-row max-[860px]:overflow-x-auto max-[860px]:px-6 max-[480px]:-mx-4 max-[480px]:px-4 [&::-webkit-scrollbar]:hidden"
             >
@@ -446,6 +450,7 @@ export default function SettingsClient({
             )}
           </main>
         </div>
+        <BottomNav current="more" />
       </div>
 
       {dialog === "cats" && <CategoriesDialog ctx={popupCtx} onClose={() => setDialog(null)} />}

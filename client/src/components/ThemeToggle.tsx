@@ -6,6 +6,23 @@ import { applyTheme, THEME_EVENT, THEME_KEY, type ThemeMode } from "@/lib/theme"
 
 /** `onChange` lets a signed-in page save the choice to the account. */
 export default function ThemeToggle({ onChange }: { onChange?: (theme: ThemeMode) => void } = {}) {
+  const { theme, toggleTheme } = useThemeToggle(onChange);
+  const label = theme === "dark" ? "Switch to light mode" : "Switch to dark mode";
+  return (
+    <button
+      type="button"
+      onClick={toggleTheme}
+      aria-label={label}
+      title={label}
+      className="relative flex h-[38px] w-[38px] flex-none cursor-pointer items-center justify-center rounded-full border border-line bg-transparent text-ink-2 after:absolute after:-inset-1 after:rounded-full after:content-[''] transition-[transform,color] duration-300 hover:text-ink active:-rotate-30 active:scale-[.92]"
+    >
+      {theme === "dark" ? <Sun size={16} /> : <Moon size={16} />}
+    </button>
+  );
+}
+
+/** The current theme and a dark/light switch (also the More page's Theme row). */
+export function useThemeToggle(onChange?: (theme: ThemeMode) => void) {
   const [theme, setTheme] = useState<ThemeMode>("dark");
 
   useEffect(() => {
@@ -28,17 +45,5 @@ export default function ThemeToggle({ onChange }: { onChange?: (theme: ThemeMode
     window.dispatchEvent(new Event(THEME_EVENT));
     onChange?.(next);
   };
-
-  const label = theme === "dark" ? "Switch to light mode" : "Switch to dark mode";
-  return (
-    <button
-      type="button"
-      onClick={toggleTheme}
-      aria-label={label}
-      title={label}
-      className="flex h-[38px] w-[38px] flex-none cursor-pointer items-center justify-center rounded-full border border-line bg-transparent text-ink-2 transition-[transform,color] duration-300 hover:text-ink active:-rotate-30 active:scale-[.92]"
-    >
-      {theme === "dark" ? <Sun size={16} /> : <Moon size={16} />}
-    </button>
-  );
+  return { theme, toggleTheme };
 }

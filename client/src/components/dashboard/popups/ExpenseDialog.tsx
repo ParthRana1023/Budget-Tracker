@@ -10,7 +10,10 @@ import type { Category } from "../types";
 import type { PopupContext } from "./context";
 import { cycleKeyFor } from "@/lib/cycle.mjs";
 import type { PaymentMethod } from "@/lib/paymentMethods.mjs";
+import { useKeyboardInset } from "../../ui/useKeyboardInset";
+import { useDragScroll } from "../../ui/useDragScroll";
 import {
+  AddTabs,
   AmountField,
   CurrencyFields,
   DueDayField,
@@ -28,21 +31,33 @@ import {
   type PreviewProps,
 } from "./parts";
 
-export type ExpensePrefill = { categoryId?: string; amount?: number; note?: string; fromReserve?: boolean };
+export type ExpensePrefill = {
+  categoryId?: string;
+  amount?: number;
+  note?: string;
+  fromReserve?: boolean;
+  /** The amount as typed, carried over from the Income tab. */
+  typed?: string;
+};
 const QUICK = [100, 250, 500, 1000, 2000];
 
 export default function ExpenseDialog({
   ctx,
   prefill,
   onClose,
+  onSwitch,
 }: {
   ctx: PopupContext;
   prefill: ExpensePrefill;
   onClose: () => void;
+  /** Opened from Add: the sheet shows Expense | Income tabs; switching passes the typed amount. */
+  onSwitch?: (typed: string) => void;
 }) {
   const { model, today, period } = ctx;
+  const keyboardOpen = useKeyboardInset() > 0;
+  const dragScroll = useDragScroll<HTMLDivElement>();
   const { form, set, dirty, error, setError, busy, save } = usePopupForm({
-    amount: prefill.amount ? toField(prefill.amount) : "",
+    amount: prefill.typed ?? (prefill.amount ? toField(prefill.amount) : ""),
     categoryId: prefill.categoryId ?? "",
     date: today,
     note: prefill.note ?? "",
@@ -283,8 +298,10 @@ export default function ExpenseDialog({
       submitLabel={
         busy ? "Saving…" : error === SAVE_FAILED ? "Try again" : amount > 0 ? `Log ${inr(amount)}` : "Log expense"
       }
+      sheetHeader={onSwitch && <AddTabs current="expense" onSwitch={() => onSwitch(form.amount)} />}
     >
-      <Suggestions items={suggestions} selected={form.itemId} onPick={pick} onStop={stop} icon />
+      {/* With the keyboard up, the amount, categories and Save matter; suggestions wait. */}
+      {!keyboardOpen && <Suggestions items={suggestions} selected={form.itemId} onPick={pick} onStop={stop} icon />}
       <AmountField id="ex-amt" value={form.amount} onChange={(v) => set({ amount: v })} currency={fx.currency}>
         {fx.foreign && amount > 0 && (
           <span className="tabular text-[13px] text-muted">≈ {inr(amount)} at this cycle’s rate</span>
@@ -317,10 +334,44 @@ export default function ExpenseDialog({
           <span className="eyebrow">Category</span>
           <span className="tabular text-[13px] text-muted">{catInfo}</span>
         </div>
-        <span className="font-serif text-[17px] text-ink-2 italic">Flexible</span>
-        <div className={grid}>{model.flex.map(tile)}</div>
-        <span className="pt-1 font-serif text-[17px] text-ink-2 italic">Fixed bills</span>
-        <div className={grid}>{model.fixed.map(tile)}</div>
+        {/* Phones: one swipeable row of 44px chips, flexible first; the dot shows the type. */}
+        <div
+          role="group"
+          aria-label="Category"
+          {...dragScroll}
+          className="-mx-[26px] hidden gap-1.5 overflow-x-auto px-[26px] pt-0.5 pb-1 [scrollbar-width:none] max-[720px]:flex max-[640px]:-mx-[18px] max-[640px]:px-[18px] [&::-webkit-scrollbar]:hidden"
+        >
+          {[...model.flex, ...model.fixed].map((c) => {
+            const sel = form.categoryId === c.id;
+            return (
+              <button
+                key={c.id}
+                type="button"
+                aria-pressed={sel}
+                onClick={() => set({ categoryId: c.id })}
+                className="flex h-11 flex-none cursor-pointer items-center gap-2 rounded-full border px-4 text-sm font-semibold whitespace-nowrap transition-[border-color,background] duration-200 active:scale-[.96]"
+                style={{
+                  borderColor: sel ? "var(--lime)" : "var(--line)",
+                  background: sel ? "var(--lime-soft)" : "transparent",
+                  boxShadow: sel ? "inset 0 0 0 1px var(--lime)" : "none",
+                }}
+              >
+                <span
+                  aria-hidden
+                  className="h-[7px] w-[7px] rounded-full"
+                  style={{ background: c.type === "fixed" ? "var(--fixed)" : "var(--flex)" }}
+                />
+                {c.name}
+              </button>
+            );
+          })}
+        </div>
+        <div className="flex flex-col gap-3 max-[720px]:hidden">
+          <span className="font-serif text-[17px] text-ink-2 italic">Flexible</span>
+          <div className={grid}>{model.flex.map(tile)}</div>
+          <span className="pt-1 font-serif text-[17px] text-ink-2 italic">Fixed bills</span>
+          <div className={grid}>{model.fixed.map(tile)}</div>
+        </div>
       </div>
 
       <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,180px),1fr))] gap-3.5">

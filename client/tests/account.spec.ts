@@ -1,5 +1,5 @@
 import { test, expect, Page } from "@playwright/test";
-import { setUpAccount } from "./helpers";
+import { setUpAccount, openLogExpense } from "./helpers";
 
 // Design handoff v2, Settings.dc.html: Notifications, Data, Security and the Account flows.
 // Sign-in history needs SUPABASE_SECRET_KEY in the server's env (the local stack's SECRET_KEY).
@@ -26,7 +26,7 @@ test.describe("Account and data", () => {
   test("notification switches hide Notices on the Dashboard", async ({ page }) => {
     await setUpAccount(page);
     // ₹9,000 of a ₹10,000 limit: the 80% warning shows.
-    await page.getByRole("button", { name: "Log expense" }).first().click();
+    await openLogExpense(page);
     await page.getByRole("dialog").getByLabel("Amount").fill("9000");
     await page
       .getByRole("dialog")
@@ -82,7 +82,7 @@ test.describe("Account and data", () => {
     await input.setInputFiles({ name: "entries.csv", mimeType: "text/csv", buffer: csv });
     await expect(dialog).toContainText("1 already saved, skipped");
     await page.keyboard.press("Escape");
-    await page.goto("/dashboard");
+    await page.goto("/ledger"); // phones: the Ledger page; wide screens: /dashboard#ledger
     await expect(page.getByText("Imported milk")).toBeVisible();
   });
 

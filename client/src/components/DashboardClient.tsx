@@ -4,7 +4,7 @@
 // loads and refreshes the rows, runs the one-tap actions and lays out the cards.
 
 import { useEffect, useMemo, useState } from "react";
-import { Plus } from "lucide-react";
+import { ChevronLeft, Plus } from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
 import { cycleFor, paySchedule, toLocalDateString } from "@/lib/periods.mjs";
 import { cycleKey, cycleKeyFor, cycleLabel, dayLabel, shortDate } from "@/lib/cycle.mjs";
@@ -18,6 +18,8 @@ import { transactionsToCsv } from "@/lib/csvExport.mjs";
 import { syncSavedTheme } from "@/lib/theme";
 import { errorFields, reportClientError } from "@/lib/log.mjs";
 import AppHeader, { type Tab } from "./AppHeader";
+import BottomNav, { type NavTab } from "./BottomNav";
+import More, { type MoreView } from "./dashboard/More";
 import { useToast } from "./ui/Toast";
 import SafeToSpend from "./dashboard/SafeToSpend";
 import UntilPayday from "./dashboard/UntilPayday";
@@ -48,6 +50,37 @@ import ReportsView from "./ReportsView";
 const NOTES_OFF_KEY = "sf-notes-off";
 const TX_SELECT = "*, category:categories(name, type)";
 
+/**
+ * The Dashboard and Reports tabs, plus the phone-only pages (design handoff v3, Mobile):
+ * /ledger, /more and, from More, /bills, /budgets, /goals. They switch in place with the
+ * URL kept in step; on 720px and wider a phone page becomes /dashboard#section.
+ */
+export type View = Tab | "ledger" | "more" | MoreView;
+const PHONE_VIEWS: View[] = ["ledger", "more", "bills", "budgets", "goals"];
+const urlFor = (v: View) => (v === "dashboard" ? "/dashboard" : v === "reports" ? "/dashboard?view=reports" : `/${v}`);
+const viewAt = (path: string, search: string): View => {
+  const v = path.slice(1) as View;
+  if (PHONE_VIEWS.includes(v)) return v;
+  return new URLSearchParams(search).get("view") === "reports" ? "reports" : "dashboard";
+};
+const NAV_TAB: Record<View, NavTab> = {
+  dashboard: "home",
+  reports: "reports",
+  ledger: "ledger",
+  more: "more",
+  bills: "more",
+  budgets: "more",
+  goals: "more",
+};
+/** Where a phone page lives on the wide Dashboard. */
+const SECTION: Partial<Record<View, string>> = {
+  ledger: "ledger",
+  bills: "bills",
+  budgets: "budgets",
+  goals: "budgets",
+};
+const PHONE_MQ = "(max-width: 719.98px)";
+
 interface DashboardClientProps {
   initialUser: { id: string; email?: string; verified: boolean };
   initialSettings: Settings | null;
@@ -57,8 +90,8 @@ interface DashboardClientProps {
   initialSavingsGoals: Goal[];
   initialContributions: Contribution[];
   initialRecurringItems: RecurringItem[];
-  /** "reports" when opened from another page's Reports tab (/dashboard?view=reports). */
-  initialView?: Tab;
+  /** "reports" for /dashboard?view=reports; a phone page for /ledger, /more, /bills, /budgets, /goals. */
+  initialView?: View;
   /** Opens Log expense on arrival (/dashboard?add=expense, the installed app's shortcut). */
   initialAdd?: boolean;
 }
@@ -66,7 +99,12 @@ interface DashboardClientProps {
 export default function DashboardClient(props: DashboardClientProps) {
   const userId = props.initialUser.id;
   const toast = useToast();
-  const [view, setView] = useState<Tab>(props.initialView ?? "dashboard");
+  const [view, setView] = useState<View>(props.initialView ?? "dashboard");
+  const go = (v: View) => {
+    setView(v);
+    if (window.location.pathname + window.location.search !== urlFor(v)) window.history.pushState(null, "", urlFor(v));
+    window.scrollTo(0, 0);
+  };
   const [settings] = useState<Settings | null>(props.initialSettings);
   // Every amount below is shown and typed in the user's number format.
   setNumberFormat(settings?.number_format);
@@ -84,7 +122,7 @@ export default function DashboardClient(props: DashboardClientProps) {
 
   // Popups.
   const [expense, setExpense] = useState<ExpensePrefill | null>(null);
-  const [income, setIncome] = useState<{ expected: boolean } | null>(null);
+  const [income, setIncome] = useState<{ expected: boolean; typed?: string } | null>(null);
   const [categoriesOpen, setCategoriesOpen] = useState(false);
   const [editing, setEditing] = useState<Tx | null>(null);
   const [windfallId, setWindfallId] = useState<string | null>(null);
@@ -111,6 +149,33 @@ export default function DashboardClient(props: DashboardClientProps) {
     };
   }, []);
 
+  // Back / Forward between in-place pages; a phone page on a wide screen becomes its section.
+  const [jump, setJump] = useState<string | null>(null);
+  useEffect(() => {
+    if (!jump || view !== "dashboard") return;
+    document.getElementById(jump)?.scrollIntoView();
+    setJump(null);
+  }, [jump, view]);
+  useEffect(() => {
+    const onPop = () => setView(viewAt(window.location.pathname, window.location.search));
+    const mq = window.matchMedia(PHONE_MQ);
+    const toWide = () => {
+      const v = viewAt(window.location.pathname, window.location.search);
+      if (mq.matches || !PHONE_VIEWS.includes(v)) return;
+      const id = SECTION[v];
+      window.history.replaceState(null, "", `/dashboard${id ? `#${id}` : ""}`);
+      setView("dashboard");
+      setJump(id ?? null);
+    };
+    toWide();
+    window.addEventListener("popstate", onPop);
+    mq.addEventListener("change", toWide);
+    return () => {
+      window.removeEventListener("popstate", onPop);
+      mq.removeEventListener("change", toWide);
+    };
+  }, []);
+
   // The theme saved to the account follows the user across devices.
   useEffect(() => syncSavedTheme(settings?.theme), [settings?.theme]);
 
@@ -134,6 +199,31 @@ export default function DashboardClient(props: DashboardClientProps) {
   );
   const held = incomeSources.filter((i) => i.status === "expected");
   const holdTotal = held.reduce((s, i) => s + Number(i.amount), 0);
+
+  // More (phones): a live summary under each Plan row. Bills still to pay counts the same
+  // things as "still to pay" on Bills & recurring.
+  const billsLeft =
+    model.fixed.filter((c) => Number(c.monthly_limit) > (model.spentByCat.get(c.id) ?? 0)).length +
+    recurringItems.filter(
+      (r) =>
+        r.type === "expense" &&
+        model.byId.get(r.category_id ?? "")?.type !== "fixed" &&
+        ["due", "upcoming"].includes(recurringStatus(r, statusCtx).key),
+    ).length;
+  const goalsSaved = goals.reduce(
+    (s, g) =>
+      s +
+      Number(g.saved_before ?? 0) +
+      contributions.filter((c) => c.goal_id === g.id).reduce((t, c) => t + Number(c.amount), 0),
+    0,
+  );
+  const morePlan = {
+    bills: billsLeft ? `${billsLeft} still to pay this cycle` : "All paid this cycle",
+    budgets: `${inr(model.flexSpent)} of ${inr(model.flexBudget)} spent`,
+    goals: goals.length
+      ? `${goals.length} ${goals.length === 1 ? "goal" : "goals"} · ${inr(goalsSaved)} saved`
+      : "No goals yet",
+  };
 
   const refreshData = async () => {
     const supabase = createClient();
@@ -337,11 +427,8 @@ export default function DashboardClient(props: DashboardClientProps) {
             avatarUrl: settings?.avatar_url ?? null,
             verified: props.initialUser.verified,
           }}
-          current={view}
-          onTab={(v) => {
-            setView(v);
-            window.scrollTo(0, 0);
-          }}
+          current={view === "reports" ? "reports" : "dashboard"}
+          onTab={go}
         >
           {view === "dashboard" && (
             <>
@@ -374,6 +461,8 @@ export default function DashboardClient(props: DashboardClientProps) {
             today={today}
             onChanged={refreshData}
           />
+        ) : view === "more" ? (
+          <More plan={morePlan} verified={props.initialUser.verified} onGo={go} />
         ) : loadFailed ? (
           <section
             role="alert"
@@ -398,174 +487,217 @@ export default function DashboardClient(props: DashboardClientProps) {
           </section>
         ) : (
           <>
-            <div className="eyebrow flex flex-wrap justify-between gap-x-6 gap-y-1.5 px-1 pb-1">
-              <span>{dateLong}</span>
-              <span>
-                {cycleLabel(period)}
-                {pendingPayDay &&
-                  ` · Payday moves to the ${payDayLabel(pendingPayDay.payDay)} from ${shortDate(pendingPayDay.from)}`}
-              </span>
-            </div>
-
-            <Notices
-              offline={offline}
-              retrying={retrying}
-              onRetry={retryOnline}
-              due={due}
-              warnings={warnings}
-              daysLeft={period.daysRemaining}
-              today={today}
-              onRecord={recordItem}
-              onSkip={skipItem}
-              onDismiss={dismiss}
-            />
-
-            <div className="flex flex-wrap gap-3.5">
-              <SafeToSpend model={model} daysLeft={period.daysRemaining} />
-              <UntilPayday
-                model={model}
-                period={period}
-                today={today}
-                transactions={transactions}
-                recurringItems={recurringItems}
-              />
-            </div>
-
-            <div className="flex flex-wrap gap-3.5">
-              <section
-                className="sf-rise flex min-w-0 flex-[1_1_300px] flex-col gap-2.5 rounded-[18px] border border-line bg-tile p-[22px]"
-                style={{ animationDelay: ".46s" }}
+            {(view === "bills" || view === "budgets" || view === "goals") && (
+              <button
+                type="button"
+                onClick={() => go("more")}
+                className="-mt-2 -mb-1 -ml-2.5 flex h-11 cursor-pointer items-center gap-0.5 self-start rounded-full border-0 bg-transparent pr-3.5 pl-1.5 text-sm font-semibold text-ink-2 hover:text-ink active:bg-tile-2"
               >
-                <span className="eyebrow text-warn">On hold</span>
-                <span className="tabular font-serif text-[44px] leading-none">{inr(holdTotal)}</span>
-                <p className="m-0 text-sm text-pretty text-ink-2">
-                  {held.length === 0
-                    ? "Nothing on hold. Bonuses and incentives you expect will wait here."
-                    : held.length === 1
-                      ? `${held[0].name}${held[0].expected_date ? `, expected ${dayLabel(held[0].expected_date, today)}` : ""}. Not counted until it reaches your bank.`
-                      : `${held.length} payments expected. None count until they reach your bank.`}
-                </p>
-                {held.length > 0 ? (
-                  <button
-                    type="button"
-                    onClick={() => setWindfallId(held[0].id)}
-                    className="mt-auto h-[38px] cursor-pointer self-start rounded-full border border-line-2 bg-transparent px-4 text-[13px] font-semibold transition-colors hover:border-ink hover:bg-ink hover:text-bg"
+                <ChevronLeft size={20} aria-hidden />
+                More
+              </button>
+            )}
+            {view === "dashboard" && (
+              <>
+                <div className="eyebrow flex flex-wrap justify-between gap-x-6 gap-y-1.5 px-1 pb-1">
+                  <span>{dateLong}</span>
+                  <span>
+                    {cycleLabel(period)}
+                    {pendingPayDay &&
+                      ` · Payday moves to the ${payDayLabel(pendingPayDay.payDay)} from ${shortDate(pendingPayDay.from)}`}
+                  </span>
+                </div>
+
+                <Notices
+                  offline={offline}
+                  retrying={retrying}
+                  onRetry={retryOnline}
+                  due={due}
+                  warnings={warnings}
+                  daysLeft={period.daysRemaining}
+                  today={today}
+                  onRecord={recordItem}
+                  onSkip={skipItem}
+                  onDismiss={dismiss}
+                />
+
+                <div className="flex flex-wrap gap-3.5">
+                  <SafeToSpend model={model} daysLeft={period.daysRemaining} />
+                  <UntilPayday
+                    model={model}
+                    period={period}
+                    today={today}
+                    transactions={transactions}
+                    recurringItems={recurringItems}
+                  />
+                </div>
+
+                <div className="flex flex-wrap gap-3.5">
+                  <section
+                    className="sf-rise flex min-w-0 flex-[1_1_300px] flex-col gap-2.5 rounded-[18px] border border-line bg-tile p-[22px]"
+                    style={{ animationDelay: ".46s" }}
                   >
-                    Mark received &amp; allocate
-                  </button>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() => openIncome(true)}
-                    className={`${LINK_BUTTON} mt-auto self-start`}
+                    <span className="eyebrow text-warn">On hold</span>
+                    <span className="tabular font-serif text-[44px] leading-none">{inr(holdTotal)}</span>
+                    <p className="m-0 text-sm text-pretty text-ink-2">
+                      {held.length === 0
+                        ? "Nothing on hold. Bonuses and incentives you expect will wait here."
+                        : held.length === 1
+                          ? `${held[0].name}${held[0].expected_date ? `, expected ${dayLabel(held[0].expected_date, today)}` : ""}. Not counted until it reaches your bank.`
+                          : `${held.length} payments expected. None count until they reach your bank.`}
+                    </p>
+                    {held.length > 0 ? (
+                      <button
+                        type="button"
+                        onClick={() => setWindfallId(held[0].id)}
+                        className="mt-auto h-[38px] cursor-pointer self-start rounded-full border border-line-2 bg-transparent px-4 text-[13px] font-semibold transition-colors hover:border-ink hover:bg-ink hover:text-bg"
+                      >
+                        Mark received &amp; allocate
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => openIncome(true)}
+                        className={`${LINK_BUTTON} mt-auto self-start`}
+                      >
+                        Record expected income
+                      </button>
+                    )}
+                  </section>
+                  <section
+                    className="sf-rise flex min-w-0 flex-[1_1_300px] flex-col gap-2.5 rounded-[18px] border border-line bg-tile p-[22px]"
+                    style={{ animationDelay: ".52s" }}
                   >
-                    Record expected income
-                  </button>
-                )}
-              </section>
-              <section
-                className="sf-rise flex min-w-0 flex-[1_1_300px] flex-col gap-2.5 rounded-[18px] border border-line bg-tile p-[22px]"
-                style={{ animationDelay: ".52s" }}
+                    <span className="eyebrow">Annual bills reserve</span>
+                    <span className="tabular font-serif text-[44px] leading-none">{inr(model.reserveLeft)}</span>
+                    <p className="m-0 text-sm text-pretty text-ink-2">
+                      {model.reserveIn > 0
+                        ? `${inr(model.reserveIn)} set aside from windfalls · ${inr(model.reserveOut)} used`
+                        : "Nothing set aside yet. Split part of a bonus here for insurance, taxes or a car service."}
+                    </p>
+                    {model.reserveLeft > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => openExpense({ fromReserve: true })}
+                        className={`${LINK_BUTTON} mt-auto self-start`}
+                      >
+                        Pay a bill from it
+                      </button>
+                    )}
+                  </section>
+                </div>
+              </>
+            )}
+
+            {/* Phones: budgets, goals, bills and the ledger move to their own pages. */}
+            {(view === "dashboard" || view === "budgets" || view === "goals") && (
+              <div
+                id="budgets"
+                className={`flex scroll-mt-20 flex-wrap gap-3.5 ${view === "dashboard" ? "max-[720px]:hidden" : ""}`}
               >
-                <span className="eyebrow">Annual bills reserve</span>
-                <span className="tabular font-serif text-[44px] leading-none">{inr(model.reserveLeft)}</span>
-                <p className="m-0 text-sm text-pretty text-ink-2">
-                  {model.reserveIn > 0
-                    ? `${inr(model.reserveIn)} set aside from windfalls · ${inr(model.reserveOut)} used`
-                    : "Nothing set aside yet. Split part of a bonus here for insurance, taxes or a car service."}
-                </p>
-                {model.reserveLeft > 0 && (
-                  <button
-                    type="button"
-                    onClick={() => openExpense({ fromReserve: true })}
-                    className={`${LINK_BUTTON} mt-auto self-start`}
-                  >
-                    Pay a bill from it
-                  </button>
+                {view !== "goals" && (
+                  <Budgets
+                    flex={model.flex}
+                    spentByCat={model.spentByCat}
+                    flexSpent={model.flexSpent}
+                    flexBudget={model.flexBudget}
+                    onManage={() => setCategoriesOpen(true)}
+                  />
                 )}
-              </section>
-            </div>
+                {view !== "budgets" && (
+                  <Goals
+                    goals={goals}
+                    contributions={contributions}
+                    userId={userId}
+                    today={today}
+                    cycleStart={period.startStr}
+                    onChanged={async () => void (await refreshData())}
+                  />
+                )}
+              </div>
+            )}
 
-            <div className="flex flex-wrap gap-3.5">
-              <Budgets
-                flex={model.flex}
-                spentByCat={model.spentByCat}
-                flexSpent={model.flexSpent}
-                flexBudget={model.flexBudget}
-                onManage={() => setCategoriesOpen(true)}
-              />
-              <Goals
-                goals={goals}
-                contributions={contributions}
-                userId={userId}
-                today={today}
-                cycleStart={period.startStr}
-                onChanged={async () => void (await refreshData())}
-              />
-            </div>
+            {(view === "dashboard" || view === "bills") && (
+              <div id="bills" className={`scroll-mt-20 ${view === "dashboard" ? "max-[720px]:hidden" : ""}`}>
+                <BillsRecurring
+                  items={recurringItems}
+                  fixed={model.fixed}
+                  byId={model.byId}
+                  spentByCat={model.spentByCat}
+                  skippedCats={model.skippedCats}
+                  cycleTransactions={model.cycleTransactions as Tx[]}
+                  unpaidBills={model.unpaidBills}
+                  period={period}
+                  today={today}
+                  onRecord={recordItem}
+                  onToggle={toggleItem}
+                  onPayBill={(c) =>
+                    openExpense({
+                      categoryId: c.id,
+                      amount: Math.max(0, Number(c.monthly_limit) - (model.spentByCat.get(c.id) ?? 0)),
+                      note: c.name,
+                    })
+                  }
+                  onEdit={setEditingItem}
+                  onManage={() => setCategoriesOpen(true)}
+                />
+              </div>
+            )}
 
-            <BillsRecurring
-              items={recurringItems}
-              fixed={model.fixed}
-              byId={model.byId}
-              spentByCat={model.spentByCat}
-              skippedCats={model.skippedCats}
-              cycleTransactions={model.cycleTransactions as Tx[]}
-              unpaidBills={model.unpaidBills}
-              period={period}
-              today={today}
-              onRecord={recordItem}
-              onToggle={toggleItem}
-              onPayBill={(c) =>
-                openExpense({
-                  categoryId: c.id,
-                  amount: Math.max(0, Number(c.monthly_limit) - (model.spentByCat.get(c.id) ?? 0)),
-                  note: c.name,
-                })
-              }
-              onEdit={setEditingItem}
-              onManage={() => setCategoriesOpen(true)}
-            />
-
-            <Ledger
-              entries={model.cycleTransactions as Tx[]}
-              byId={model.byId}
-              today={today}
-              onEdit={setEditing}
-              onExport={exportCsv}
-              onIncome={() => openIncome()}
-              onExpense={() => openExpense()}
-            />
+            {(view === "dashboard" || view === "ledger") && (
+              <div id="ledger" className={`scroll-mt-20 ${view === "dashboard" ? "max-[720px]:hidden" : ""}`}>
+                <Ledger
+                  entries={model.cycleTransactions as Tx[]}
+                  byId={model.byId}
+                  today={today}
+                  onEdit={setEditing}
+                  onExport={exportCsv}
+                  onIncome={() => openIncome()}
+                  onExpense={() => openExpense()}
+                  alwaysOpen={view === "ledger"}
+                />
+              </div>
+            )}
           </>
         )}
-        {view === "dashboard" && <div aria-hidden className="h-[76px] min-[720px]:hidden" />}
+        <BottomNav
+          current={NAV_TAB[view]}
+          onGo={(t) => go(t === "home" ? "dashboard" : t)}
+          onAdd={() => openExpense()}
+        />
       </div>
 
-      {view === "dashboard" && (
-        <nav
-          aria-label="Quick actions"
-          className="fixed inset-x-0 bottom-0 z-40 flex gap-2.5 border-t border-line bg-bg px-3.5 pt-2.5 pb-[calc(10px+env(safe-area-inset-bottom))] min-[720px]:hidden"
-        >
-          <button
-            type="button"
-            onClick={() => openIncome()}
-            className="h-[50px] flex-1 cursor-pointer rounded-full border border-line-2 bg-transparent text-sm font-semibold active:scale-[.97]"
-          >
-            Record income
-          </button>
-          <button
-            type="button"
-            onClick={() => openExpense()}
-            className="flex h-[50px] flex-[1.4] cursor-pointer items-center justify-center gap-2 rounded-full border-0 bg-lime text-[15px] font-bold text-lime-ink active:scale-[.97]"
-          >
-            <Plus size={16} />
-            Log expense
-          </button>
-        </nav>
+      {expense && (
+        <ExpenseDialog
+          ctx={popupCtx}
+          prefill={expense}
+          onClose={() => setExpense(null)}
+          onSwitch={
+            Object.keys(expense).length === 0 || expense.typed !== undefined
+              ? (typed) => {
+                  setExpense(null);
+                  setIncome({ expected: false, typed });
+                }
+              : undefined
+          }
+        />
       )}
-
-      {expense && <ExpenseDialog ctx={popupCtx} prefill={expense} onClose={() => setExpense(null)} />}
-      {income && <IncomeDialog ctx={popupCtx} expected={income.expected} onClose={() => setIncome(null)} />}
+      {income && (
+        <IncomeDialog
+          ctx={popupCtx}
+          expected={income.expected}
+          typed={income.typed}
+          onClose={() => setIncome(null)}
+          onSwitch={
+            income.expected
+              ? undefined
+              : (typed) => {
+                  setIncome(null);
+                  setExpense({ typed });
+                }
+          }
+        />
+      )}
       {windfallId && <WindfallDialog ctx={popupCtx} incomeId={windfallId} onClose={() => setWindfallId(null)} />}
       {editing && <EditEntryDialog ctx={popupCtx} entry={editing} onClose={() => setEditing(null)} />}
       {categoriesOpen && <CategoriesDialog ctx={popupCtx} onClose={() => setCategoriesOpen(false)} />}

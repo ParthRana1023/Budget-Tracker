@@ -8,7 +8,9 @@ import { inr } from "@/lib/money.mjs";
 import { recurringStatus } from "@/lib/recurringStatus.mjs";
 import Dialog from "../../ui/Dialog";
 import type { PopupContext } from "./context";
+import { useKeyboardInset } from "../../ui/useKeyboardInset";
 import {
+  AddTabs,
   AmountField,
   DueDayField,
   FIELD,
@@ -35,16 +37,23 @@ const TYPES: Array<[IncomeType, string, string]> = [
 export default function IncomeDialog({
   ctx,
   expected = false,
+  typed = "",
   onClose,
+  onSwitch,
 }: {
   ctx: PopupContext;
   expected?: boolean;
+  /** The amount as typed, carried over from the Expense tab. */
+  typed?: string;
   onClose: () => void;
+  /** Opened from Add: the sheet shows Expense | Income tabs; switching passes the typed amount. */
+  onSwitch?: (typed: string) => void;
 }) {
   const { model, today, period } = ctx;
   const later = addDaysStr(today, 7);
+  const keyboardOpen = useKeyboardInset() > 0;
   const { form, set, dirty, error, setError, busy, save } = usePopupForm({
-    amount: "",
+    amount: typed,
     type: (expected ? "variable" : "salary") as IncomeType,
     name: "",
     status: (expected ? "expected" : "received") as "received" | "expected",
@@ -213,8 +222,9 @@ export default function IncomeDialog({
       submitLabel={
         busy ? "Saving…" : error === SAVE_FAILED ? "Try again" : amount > 0 ? `Save ${inr(amount)}` : "Save income"
       }
+      sheetHeader={onSwitch && <AddTabs current="income" onSwitch={() => onSwitch(form.amount)} />}
     >
-      <Suggestions items={suggestions} selected={form.itemId} onPick={pick} onStop={stop} />
+      {!keyboardOpen && <Suggestions items={suggestions} selected={form.itemId} onPick={pick} onStop={stop} />}
       <AmountField id="in-amt" value={form.amount} onChange={(v) => set({ amount: v })} />
       <div className="flex flex-col gap-2.5">
         <span className="eyebrow">Type</span>

@@ -1,5 +1,11 @@
 import { test, expect, Page } from "@playwright/test";
-import { setUpAccount } from "./helpers";
+import { isPhone, openLogExpense, setUpAccount } from "./helpers";
+
+// These flows move between Home, Budgets, Goals, Bills and the Ledger on one page; on phones
+// those are separate pages, and mobile.spec covers the phone versions.
+test.beforeEach(({ page }) => {
+  test.skip(isPhone(page), "Wide-screen flow; phones: mobile.spec");
+});
 
 // Phase 4: base currency and foreign-currency entries. /api/rates is mocked: the specs never
 // reach the real rates service.
@@ -18,7 +24,7 @@ test("a USD expense converts at this cycle's rate and keeps what was typed", asy
   );
   await setUpAccount(page);
 
-  await page.getByRole("button", { name: "Log expense" }).first().click();
+  await openLogExpense(page);
   const dialog = page.getByRole("dialog");
   await dialog.getByLabel("Currency").selectOption("USD");
   await expect(dialog.getByLabel("₹ for 1 USD")).toHaveValue("92.68");
@@ -78,7 +84,7 @@ test("base currency: changeable before the first entry, then locked", async ({ p
 
   await page.goto("/dashboard");
   await expect(page.getByTestId("safe-to-spend")).toContainText("$");
-  await page.getByRole("button", { name: "Log expense" }).first().click();
+  await openLogExpense(page);
   const dialog = page.getByRole("dialog");
   await dialog.getByLabel("Amount").fill("12.5");
   await dialog.getByRole("button", { name: /^Groceries/ }).click();

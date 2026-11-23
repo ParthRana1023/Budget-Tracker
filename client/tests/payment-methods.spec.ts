@@ -1,10 +1,16 @@
 import { test, expect, Page } from "@playwright/test";
-import { setUpAccount } from "./helpers";
+import { isPhone, openLogExpense, setUpAccount, show } from "./helpers";
+
+// These flows move between Home, Budgets, Goals, Bills and the Ledger on one page; on phones
+// those are separate pages, and mobile.spec covers the phone versions.
+test.beforeEach(({ page }) => {
+  test.skip(isPhone(page), "Wide-screen flow; phones: mobile.spec");
+});
 
 // Phase 3: how an expense was paid. Tracking only; safe to spend doesn't change with it.
 
 async function logExpense(page: Page, amount: string, note: string, method?: string) {
-  await page.getByRole("button", { name: "Log expense" }).first().click();
+  await openLogExpense(page);
   const dialog = page.getByRole("dialog");
   await dialog.getByLabel("Amount").fill(amount);
   await dialog.getByRole("button", { name: /^Groceries/ }).click();
@@ -33,13 +39,13 @@ test("payment method: log with UPI, see it in the Ledger, filter, Reports, and e
   await expect(upiRow).toHaveCount(0);
   await filter.selectOption({ label: "All entries" });
 
-  await page.getByRole("button", { name: "Reports", exact: true }).click();
+  await show(page, "Reports");
   await page.getByRole("tab", { name: /Spending habits/ }).click();
   await expect(page.getByRole("button", { name: "UPI: ₹640" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Not recorded: ₹300" })).toBeVisible();
 
   // Change it to a credit card in Edit entry.
-  await page.getByRole("button", { name: "Dashboard", exact: true }).click();
+  await show(page, "Home");
   await ledger.getByRole("button", { name: /^Edit Swiggy dinner/ }).click();
   const edit = page.getByRole("dialog");
   await expect(edit.getByLabel("Paid with")).toHaveValue("upi");

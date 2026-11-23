@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { setUpAccount } from "./helpers";
+import { isPhone, setUpAccount, show } from "./helpers";
 
 // Design handoff, Dashboard. A fresh account set up with ₹1,00,000 pay, 20% savings,
 // a ₹28,000 rent bill and a ₹10,000 groceries limit, before any salary is recorded.
@@ -13,17 +13,21 @@ test.describe("Dashboard", () => {
     await expect(page.getByTestId("safe-to-spend")).toHaveText("₹0", { timeout: 5_000 });
     await expect(page.getByText(/after ₹20,000 to savings and ₹28,000 in bills still due/)).toBeVisible();
 
+    await show(page, "Budgets");
     const groceries = page.locator('[data-testid="budget-row"][data-name="Groceries"]');
     await expect(groceries).toContainText("₹0 / ₹10,000");
     await expect(page.locator('[data-testid="budget-row"][data-name="Dining out"]')).toContainText("no limit");
 
+    await show(page, "Bills");
     await expect(page.locator('[data-testid="bill-row"][data-name="Rent"]')).toContainText("Fixed bill");
+    await show(page, "Home");
     await expect(page.getByRole("img", { name: /Money left this cycle/ })).toBeVisible();
     await expect(page.getByText(/Until payday · \d+ days/)).toBeVisible();
   });
 
   test("goals: create, add money, edit and delete", async ({ page }) => {
     await setUpAccount(page);
+    await show(page, "Goals");
     await expect(page.getByText("No goals yet.")).toBeVisible();
 
     await page.getByRole("button", { name: "New goal" }).click();
@@ -56,6 +60,7 @@ test.describe("Dashboard", () => {
 
   test("a goal form checks its fields and asks before discarding", async ({ page }) => {
     await setUpAccount(page);
+    await show(page, "Goals");
     await page.getByRole("button", { name: "New goal" }).click();
     const dialog = page.getByRole("dialog");
     await dialog.getByRole("button", { name: "Create goal" }).click();
@@ -68,6 +73,7 @@ test.describe("Dashboard", () => {
   });
 
   test("the ledger collapses and remembers it", async ({ page }) => {
+    test.skip(isPhone(page), "On phones the Ledger is its own page and always open (mobile.spec).");
     await setUpAccount(page);
     const toggle = page.getByRole("button", { name: "Ledger" });
     await expect(toggle).toHaveAttribute("aria-expanded", "true");
@@ -91,14 +97,14 @@ test.describe("Dashboard", () => {
     await expect(avatar).toBeFocused();
 
     // Log expense and Record income live on the Dashboard tab only.
-    await page.getByRole("button", { name: "Reports", exact: true }).click();
+    await show(page, "Reports");
     await expect(page.getByRole("button", { name: "Log expense" })).toHaveCount(0);
-    await page.getByRole("button", { name: "Dashboard", exact: true }).click();
+    await show(page, "Home");
 
     await avatar.click();
     await menu.getByRole("menuitem", { name: "Account profile" }).click();
     await page.waitForURL("**/settings/account");
-    await page.getByRole("link", { name: "Dashboard", exact: true }).click();
+    await show(page, "Home");
     await page.waitForURL("**/dashboard");
 
     await avatar.click();

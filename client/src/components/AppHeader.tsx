@@ -62,15 +62,10 @@ export default function AppHeader({
       </Link>
     );
   };
-  const signOut = async () => {
-    await clearDeviceOnSignOut(createClient());
-    await fetch("/auth/signout", { method: "POST" });
-    window.location.href = "/login";
-  };
-
   return (
     <>
-      <header className="flex flex-wrap items-center gap-x-6 gap-y-3 pt-0.5 pb-2.5 max-[559px]:gap-2">
+      {/* Sticky, and drawn under the notch in the installed app (padding takes the top inset). */}
+      <header className="sticky top-0 z-50 -mt-[18px] flex flex-wrap items-center gap-x-6 gap-y-3 bg-bg pt-[calc(20px+env(safe-area-inset-top))] pb-2.5 max-[559px]:gap-2">
         <Link
           href="/dashboard"
           aria-label="SaveFirst, go to Dashboard"
@@ -80,7 +75,7 @@ export default function AppHeader({
         </Link>
         <nav
           aria-label="Main"
-          className="box-border flex h-[38px] flex-none gap-0.5 rounded-full border border-line p-[3px]"
+          className="box-border flex h-[38px] flex-none gap-0.5 rounded-full border border-line p-[3px] max-[720px]:hidden"
         >
           {tab("dashboard", "Dashboard")}
           {tab("reports", "Reports")}
@@ -91,9 +86,23 @@ export default function AppHeader({
           <AccountMenu account={account} inAccount={inAccount} onSignOut={() => setSignOutOpen(true)} />
         </div>
       </header>
+      <SignOutDialog open={signOutOpen} onClose={() => setSignOutOpen(false)} />
+    </>
+  );
+}
+
+/** "Sign out?" confirm, shared by the account menu and the phone More page. */
+export function SignOutDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const signOut = async () => {
+    await clearDeviceOnSignOut(createClient());
+    await fetch("/auth/signout", { method: "POST" });
+    window.location.href = "/login";
+  };
+  return (
+    <>
       <Dialog
-        open={signOutOpen}
-        onClose={() => setSignOutOpen(false)}
+        open={open}
+        onClose={onClose}
         eyebrow="SaveFirst"
         title="Sign out?"
         size="sm"
@@ -159,7 +168,7 @@ function AccountMenu({
         aria-label={account.verified ? "Account menu" : "Account menu, email not verified"}
         aria-haspopup="menu"
         aria-expanded={open}
-        className="flex h-[38px] w-[38px] cursor-pointer items-center justify-center overflow-hidden rounded-full border border-line-2 bg-lime-soft p-0 text-[13px] font-bold text-lime-text transition-shadow duration-200 hover:shadow-[0_0_0_2px_var(--bg),0_0_0_4px_var(--line-2)]"
+        className="relative flex h-[38px] w-[38px] cursor-pointer items-center justify-center rounded-full border border-line-2 bg-lime-soft p-0 after:absolute after:-inset-1 after:rounded-full after:content-[''] text-[13px] font-bold text-lime-text transition-shadow duration-200 hover:shadow-[0_0_0_2px_var(--bg),0_0_0_4px_var(--line-2)]"
         style={open || inAccount ? { boxShadow: RING } : undefined}
       >
         <Avatar url={account.avatarUrl} name={name} size={36} />

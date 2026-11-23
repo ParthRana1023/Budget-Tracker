@@ -1,5 +1,5 @@
 import { test, expect, Page } from "@playwright/test";
-import { setUpAccount } from "./helpers";
+import { openLogExpense, openRecordIncome, setUpAccount, show } from "./helpers";
 
 // Design handoff v2, Dashboard: early income, the pending-payday note, number formats.
 // Every test starts from setUpAccount (₹1,00,000 pay, payday the 1st, no income yet).
@@ -26,7 +26,7 @@ test.describe("Dashboard v2", () => {
     await applyPayday(page, soon.getDate() > 28 ? 31 : soon.getDate(), "This cycle");
 
     await page.goto("/dashboard");
-    await page.getByRole("button", { name: "Record income" }).first().click();
+    await openRecordIncome(page);
     const dialog = page.getByRole("dialog");
     await dialog.getByLabel("Amount").fill("5000");
     const early = dialog.getByRole("switch", { name: /^Count toward the cycle starting / });
@@ -56,8 +56,9 @@ test.describe("Dashboard v2", () => {
     await expect(page.getByText("Saving…")).toHaveCount(0);
 
     await page.goto("/dashboard");
+    await show(page, "Budgets");
     await expect(page.locator('[data-testid="budget-row"][data-name="Groceries"]')).toContainText("₹0 / ₹10.000");
-    await page.getByRole("button", { name: "Log expense" }).first().click();
+    await openLogExpense(page);
     const amount = page.getByRole("dialog").getByLabel("Amount");
     await amount.pressSequentially("1234,5");
     await expect(amount).toHaveValue("1.234,5");

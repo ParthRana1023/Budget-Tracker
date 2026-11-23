@@ -20,6 +20,7 @@ export default function Ledger({
   onExport,
   onIncome,
   onExpense,
+  alwaysOpen = false,
 }: {
   entries: Tx[];
   byId: Map<string, Category>;
@@ -28,17 +29,20 @@ export default function Ledger({
   onExport: () => void;
   onIncome: () => void;
   onExpense: () => void;
+  /** The phone Ledger page: always expanded, no collapse button. */
+  alwaysOpen?: boolean;
 }) {
-  const [open, setOpen] = useState(true);
+  const [savedOpen, setOpen] = useState(true);
+  const open = alwaysOpen || savedOpen;
   useEffect(() => {
     try {
       setOpen(localStorage.getItem(OPEN_KEY) !== "0");
     } catch {}
   }, []);
   const toggle = () => {
-    setOpen(!open);
+    setOpen(!savedOpen);
     try {
-      localStorage.setItem(OPEN_KEY, open ? "0" : "1");
+      localStorage.setItem(OPEN_KEY, savedOpen ? "0" : "1");
     } catch {}
   };
 
@@ -73,22 +77,26 @@ export default function Ledger({
         style={{ paddingBottom: open ? 10 : 0, borderColor: open ? "var(--line-2)" : "transparent" }}
       >
         <h2 className={CARD_H2}>
-          <button
-            type="button"
-            onClick={toggle}
-            aria-expanded={open}
-            aria-controls="ledger-body"
-            className="flex cursor-pointer items-center gap-2.5 border-0 bg-transparent p-0 [font:inherit] text-inherit hover:text-lime-text"
-          >
-            Ledger
-            <span className="flex h-[30px] w-[30px] items-center justify-center rounded-full border border-line-2 text-ink-2">
-              <ChevronDown
-                size={14}
-                className="transition-transform duration-200"
-                style={{ transform: `rotate(${open ? 180 : 0}deg)` }}
-              />
-            </span>
-          </button>
+          {alwaysOpen ? (
+            "Ledger"
+          ) : (
+            <button
+              type="button"
+              onClick={toggle}
+              aria-expanded={open}
+              aria-controls="ledger-body"
+              className="flex cursor-pointer items-center gap-2.5 border-0 bg-transparent p-0 [font:inherit] text-inherit hover:text-lime-text"
+            >
+              Ledger
+              <span className="flex h-[30px] w-[30px] items-center justify-center rounded-full border border-line-2 text-ink-2">
+                <ChevronDown
+                  size={14}
+                  className="transition-transform duration-200"
+                  style={{ transform: `rotate(${open ? 180 : 0}deg)` }}
+                />
+              </span>
+            </button>
+          )}
         </h2>
         <span className="flex flex-wrap items-center gap-x-1 text-[13px] text-muted">
           {open && entries.some((t) => t.type === "expense") && (
