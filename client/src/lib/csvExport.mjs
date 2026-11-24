@@ -1,7 +1,7 @@
 import { baseCurrency, formatExact, minorDigits, toMajor } from "./money.mjs";
 import { methodLabel } from "./paymentMethods.mjs";
 
-function escapeCsv(value) {
+export function escapeCsv(value) {
   const text = String(value ?? "");
   return /[",\r\n]/.test(text) ? `"${text.replaceAll('"', '""')}"` : text;
 }

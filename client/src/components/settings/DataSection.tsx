@@ -7,6 +7,7 @@ import { useRef, useState } from "react";
 import { Download, Upload } from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
 import { checkImport } from "@/lib/csvImport.mjs";
+import { myDataToCsv } from "@/lib/myDataCsv.mjs";
 import { inr } from "@/lib/money.mjs";
 import { exportAllCsv, exportAllJson, exportMyData, fetchAllTransactions, importEntries } from "@/lib/settings.mjs";
 import { errorFields, reportClientError } from "@/lib/log.mjs";
@@ -18,11 +19,15 @@ import { BTN_LINE, Card, Row, SectionHead, download } from "./parts";
 const FAILED = "Couldn’t reach SaveFirst. Check your connection and try again.";
 type Preview = ReturnType<typeof checkImport> & { file: string };
 
-/** "Download all my data" as one JSON file; shared with the Delete account card. */
-export async function downloadAllData(): Promise<boolean> {
+/**
+ * "Download all my data": one JSON file, or the same as one CSV for a spreadsheet
+ * (lib/myDataCsv.mjs). JSON is shared with the Delete account card.
+ */
+export async function downloadAllData(kind: "json" | "csv" = "json"): Promise<boolean> {
   const { json, error } = await exportMyData(createClient());
   if (error) return false;
-  download("savefirst-my-data.json", json, "application/json");
+  if (kind === "csv") download("savefirst-my-data.csv", myDataToCsv(JSON.parse(json)), "text/csv");
+  else download("savefirst-my-data.json", json, "application/json");
   return true;
 }
 
@@ -34,9 +39,9 @@ export default function DataSection({ categories, onImported }: { categories: Ca
   const [importError, setImportError] = useState<string | null>(null);
   const file = useRef<HTMLInputElement>(null);
 
-  const all = async () => {
-    setBusy("all");
-    const ok = await downloadAllData();
+  const all = async (kind: "json" | "csv") => {
+    setBusy(`all-${kind}`);
+    const ok = await downloadAllData(kind);
     setBusy(null);
     if (!ok) {
       reportClientError("download_all_data_failed");
@@ -95,17 +100,23 @@ export default function DataSection({ categories, onImported }: { categories: Ca
       <Card>
         <Row
           label="Download all my data"
-          help="Profile, plan, plan history, categories, recurring items, goals, every entry and your settings, in one JSON file."
+          help="Profile, plan, plan history, categories, recurring items, goals, every entry and your settings. JSON keeps everything as stored; CSV opens in Excel or Google Sheets."
         >
-          <button
-            type="button"
-            onClick={all}
-            disabled={!!busy}
-            className="flex h-[38px] cursor-pointer items-center gap-2 rounded-full border-0 bg-ink px-4 text-[13px] font-bold text-bg disabled:opacity-60"
-          >
-            <Download size={14} />
-            {busy === "all" ? "Preparing…" : "Download"}
-          </button>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => all("json")}
+              disabled={!!busy}
+              className="flex h-[38px] cursor-pointer items-center gap-2 rounded-full border-0 bg-ink px-4 text-[13px] font-bold text-bg disabled:opacity-60"
+            >
+              <Download size={14} />
+              {busy === "all-json" ? "Preparing…" : "JSON"}
+            </button>
+            <button type="button" onClick={() => all("csv")} disabled={!!busy} className={`${BTN_LINE} gap-2`}>
+              <Download size={14} />
+              {busy === "all-csv" ? "Preparing…" : "CSV for Excel"}
+            </button>
+          </div>
         </Row>
         <Row
           label="Export entries"

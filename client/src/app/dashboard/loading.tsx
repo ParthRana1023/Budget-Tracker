@@ -1,6 +1,3 @@
-"use client";
-
-import { useEffect, useState } from "react";
 import { StatusShell } from "@/components/StatusPage";
 
 const STEPS = [
@@ -16,30 +13,35 @@ const SEGS: Array<[string, string]> = [
   ["13.6%", "var(--flex)"],
   ["17.6%", "var(--ink)"],
 ];
+/** Seconds per step. */
+const STEP = 0.7;
 
-/** Shown while the dashboard's data loads (design handoff, Status Pages → Loading). */
+/**
+ * Shown while the dashboard's data loads (design handoff, Status Pages → Loading). Pure CSS: it
+ * arrives before the page's JavaScript, so a timer in React would sit still until the dashboard
+ * replaced it. Each step finishes STEP seconds after the last (globals.css sf-late / sf-gone /
+ * sf-step-*); styles here are the finished state, which reduced motion shows straight away.
+ */
 export default function DashboardLoading() {
-  const [tick, setTick] = useState(0);
-  useEffect(() => {
-    const slow = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
-    const t = setInterval(() => setTick((s) => (s + 1) % 6), slow ? 2000 : 700);
-    return () => clearInterval(t);
-  }, []);
-  const step = Math.min(tick, 4);
-
+  const done = (i: number) => `${(i + 1) * STEP}s`;
   return (
     <StatusShell>
       <div role="status" aria-live="polite" className="flex w-full max-w-[520px] flex-col gap-[22px]">
         <span className="eyebrow">Loading your cycle</span>
-        <h1 className="m-0 font-serif text-[clamp(44px,9vw,72px)] leading-[.95] font-normal tracking-[-0.02em] text-balance">
-          {step >= 4 ? "Almost there." : "Paying yourself first…"}
+        <h1 className="m-0 grid font-serif text-[clamp(44px,9vw,72px)] leading-[.95] font-normal tracking-[-0.02em] text-balance">
+          <span className="col-start-1 row-start-1 opacity-0" style={{ animation: `sf-gone ${done(3)} both` }}>
+            Paying yourself first…
+          </span>
+          <span aria-hidden className="col-start-1 row-start-1" style={{ animation: `sf-late ${done(3)} both` }}>
+            Almost there.
+          </span>
         </h1>
         <div aria-hidden className="flex h-3.5 gap-[3px]">
           {SEGS.map(([w, c], i) => (
             <span
               key={c}
-              className="rounded-md transition-[width] duration-700 ease-soft"
-              style={{ width: step > i ? w : "0%", background: c }}
+              className="rounded-md"
+              style={{ width: w, background: c, animation: `sf-grow ${STEP}s var(--ease-soft) ${done(i)} both` }}
             />
           ))}
         </div>
@@ -47,17 +49,25 @@ export default function DashboardLoading() {
           {STEPS.map((label, i) => (
             <li
               key={label}
-              className="flex items-center gap-3 border-b border-line py-3 transition-colors duration-300"
-              style={{ color: step > i ? "var(--ink)" : step === i ? "var(--ink-2)" : "var(--muted)" }}
+              className="flex items-center gap-3 border-b border-line py-3 text-ink"
+              style={{ animation: `sf-step-ink ${done(i)} both` }}
             >
               <span
                 aria-hidden
-                className="h-2 w-2 flex-none rounded-full transition-colors duration-300"
-                style={{ background: step > i ? "var(--lime)" : step === i ? "var(--ink-2)" : "var(--track)" }}
+                className="h-2 w-2 flex-none rounded-full bg-lime"
+                style={{ animation: `sf-step-dot ${done(i)} both` }}
               />
               <span className="flex-1 font-medium">{label}</span>
-              <span className="font-serif text-[17px] text-muted italic">
-                {step > i ? "done" : step === i ? "working" : ""}
+              <span aria-hidden className="grid justify-items-end font-serif text-[17px] text-muted italic">
+                {/* "working" from the step's start to its end, then "done". */}
+                <span className="col-start-1 row-start-1" style={{ animation: `sf-late ${i * STEP}s both` }}>
+                  <span className="opacity-0" style={{ animation: `sf-gone ${done(i)} both` }}>
+                    working
+                  </span>
+                </span>
+                <span className="col-start-1 row-start-1" style={{ animation: `sf-late ${done(i)} both` }}>
+                  done
+                </span>
               </span>
             </li>
           ))}

@@ -161,7 +161,8 @@ export default function Ledger({
                     <span
                       aria-hidden
                       className="flex overflow-hidden transition-[width,opacity] duration-200"
-                      style={{ width: on && k ? 12 : 0, opacity: on && k ? 1 : 0 }}
+                      // Hidden, it also takes back the 6px gap, so the label stays centred.
+                      style={{ width: on && k ? 12 : 0, marginRight: on && k ? 0 : -6, opacity: on && k ? 1 : 0 }}
                     >
                       <Check size={12} className="flex-none" />
                     </span>

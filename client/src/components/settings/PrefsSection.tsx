@@ -152,7 +152,7 @@ export default function PrefsSection({
           </button>
         </Row>
         {(curOpen || next) && (
-          <div className="-mt-2 flex flex-col gap-3 px-6 pb-5 max-[480px]:px-[18px]">
+          <div className="-mt-2 flex flex-col gap-3 px-6 pb-5">
             {curOpen && <CurrencyList value={next ?? currency} onPick={pickBase} onClose={() => setCurOpen(false)} />}
             {next && settings.currency_from && (
               <div
@@ -180,7 +180,7 @@ export default function PrefsSection({
             )}
           </div>
         )}
-        <div className="flex flex-col gap-3 px-6 py-5 max-[480px]:px-[18px]">
+        <div className="flex flex-col gap-3 px-6 py-5">
           <div className="flex flex-wrap items-center gap-x-5 gap-y-2.5">
             <label htmlFor="f-num" className="flex-[1_1_200px] text-sm font-semibold">
               Number format

@@ -140,7 +140,7 @@ export default function ProfileSection({
       </div>
 
       <Card>
-        <Row label="Name" htmlFor="f-name">
+        <Row narrow label="Name" htmlFor="f-name">
           <input
             id="f-name"
             value={name}
@@ -157,7 +157,7 @@ export default function ProfileSection({
           />
           <SaveState status={nameSave.status} />
         </Row>
-        <Row label="Email">
+        <Row narrow label="Email">
           {email.sentTo ? (
             <span className="flex min-w-0 flex-[1_1_220px] flex-col text-sm [overflow-wrap:anywhere]">
               {user.email}

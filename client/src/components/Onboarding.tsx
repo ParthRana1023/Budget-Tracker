@@ -142,7 +142,7 @@ export default function Onboarding() {
   return (
     <div className="flex min-h-screen w-full flex-col">
       <header className="mx-auto flex h-16 w-full max-w-[1200px] items-center gap-4 border-b border-line px-6">
-        <Logo />
+        <Logo size={28} />
         <span className="tabular ml-auto text-[13px] text-muted">Step {step + 1} of 5</span>
       </header>
       <div className="mx-auto w-full max-w-[1200px] px-6">

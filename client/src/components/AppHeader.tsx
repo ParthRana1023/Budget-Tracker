@@ -66,7 +66,10 @@ export default function AppHeader({
   return (
     <>
       {/* Sticky, and drawn under the notch in the installed app (padding takes the top inset). */}
-      <header className="sticky top-0 z-50 -mt-[18px] flex flex-wrap items-center gap-x-6 gap-y-3 bg-bg pt-[calc(20px+env(safe-area-inset-top))] pb-2.5 max-[559px]:gap-2">
+      {/* Settings and Account (Settings.dc.html) draw a divider under it; the Dashboard doesn't. */}
+      <header
+        className={`sticky top-0 z-50 -mt-[18px] flex flex-wrap items-center gap-x-6 gap-y-3 bg-bg pt-[calc(20px+env(safe-area-inset-top))] max-[559px]:gap-2 ${inAccount ? "border-b border-line pb-3.5" : "pb-2.5"}`}
+      >
         <Link
           href="/dashboard"
           aria-label="SaveFirst, go to Dashboard"

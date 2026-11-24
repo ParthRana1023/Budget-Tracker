@@ -154,7 +154,7 @@ export default function NotifSection({
           <Card>
             {VAPID_KEY && (
               <div className="flex flex-col">
-                <div className="flex flex-wrap items-center gap-x-5 gap-y-2.5 px-6 py-[18px] max-[480px]:px-[18px]">
+                <div className="flex flex-wrap items-center gap-x-5 gap-y-2.5 px-6 py-[18px]">
                   <div className="flex min-w-0 flex-[1_1_260px] flex-col gap-0.5">
                     <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
                       <span className="text-sm font-semibold">Push notifications</span>
@@ -325,7 +325,7 @@ export default function NotifSection({
             <option value={7}>A week before</option>
           </select>
         </Row>
-        <div className="flex flex-col gap-3.5 px-6 py-5 max-[480px]:px-[18px]">
+        <div className="flex flex-col gap-3.5 px-6 py-5">
           <div className="flex flex-wrap items-center gap-x-5 gap-y-2.5">
             <div className="flex min-w-0 flex-[1_1_260px] flex-col">
               <span className="text-sm font-semibold">Quiet hours</span>

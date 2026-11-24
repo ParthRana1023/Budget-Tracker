@@ -7,6 +7,7 @@ import {
   formatExact,
   formatMoney,
   inr,
+  inrShort,
   minorDigits,
   setCurrency,
   setNumberFormat,
@@ -71,4 +72,16 @@ test("minor-unit digits: 0, 2 and 3 decimals, and the SQL list matches", () => {
     ZERO_DECIMAL,
     "currency_digits() in the multicurrency migration lists the same zero-decimal currencies",
   );
+});
+
+test("inrShort: calendar-cell amounts (design handoff inrK)", () => {
+  setNumberFormat("indian");
+  assert.equal(inrShort(64000), "₹640");
+  assert.equal(inrShort(1234567), "₹12k");
+  assert.equal(inrShort(12500000), "₹1.3L");
+  assert.equal(inrShort(10000000), "₹1L");
+  setNumberFormat("international");
+  assert.equal(inrShort(12500000), "₹125k");
+  assert.equal(inrShort(250000000), "₹2.5M");
+  setNumberFormat("indian");
 });

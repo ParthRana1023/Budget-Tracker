@@ -5,7 +5,7 @@
 
 import { useMemo, useState, type KeyboardEvent, type ReactNode } from "react";
 import { createClient } from "@/utils/supabase/client";
-import { formatExact, inr } from "@/lib/money.mjs";
+import { formatExact, inr, inrShort } from "@/lib/money.mjs";
 import { addDaysStr, dayLabel, shortDate } from "@/lib/cycle.mjs";
 import { cycleFor, paySchedule } from "@/lib/periods.mjs";
 import { planFor } from "@/lib/plan.mjs";
@@ -541,6 +541,15 @@ export default function ReportsView({
     const order = weekStart === 1 ? [0, 1, 2, 3, 4, 5, 6] : [6, 0, 1, 2, 3, 4, 5];
     const lead = (new Date(`${cal.period.startStr}T12:00:00`).getDay() - weekStart + 7) % 7;
     const maxD = Math.max(1, ...cal.daily);
+    // Calendar shade: lime up to the day's share of the flexible budget, --warn above it (the most
+    // spent day otherwise). Kept soft so the --ink text stays readable in both themes.
+    const dayShare = budget / cal.period.totalDays;
+    const calShade = (v: number) => {
+      const high = dayShare > 0 ? v > dayShare : v / maxD > 0.6;
+      return high
+        ? `color-mix(in srgb, var(--warn) ${Math.round(25 + (v / maxD) * 25)}%, transparent)`
+        : `color-mix(in srgb, var(--lime) ${Math.round(12 + (v / maxD) * 28)}%, transparent)`;
+    };
     const wk = weekdayAverages([prev, cur].filter(Boolean) as Cycle[], today),
       wkMax = Math.max(1, ...wk);
     const weekday = (wk[0] + wk[1] + wk[2] + wk[3] + wk[4]) / 5,
@@ -686,18 +695,18 @@ export default function ReportsView({
                     aria-label={`${shortDate(date)}: ${inr(v)}`}
                     className="flex aspect-square min-h-9 cursor-pointer flex-col items-start justify-between rounded-lg border border-line p-1.5 text-left disabled:cursor-default disabled:opacity-40"
                     style={{
-                      background: v
-                        ? `color-mix(in srgb, var(--lime) ${Math.round(15 + (v / maxD) * 70)}%, transparent)`
-                        : "var(--track)",
+                      background: v ? calShade(v) : "var(--track)",
                     }}
                   >
                     <span className="text-[10px] text-muted">{+date.slice(8)}</span>
-                    {v > 0 && (
-                      <span className="tabular text-[10px] font-semibold text-ink max-[480px]:hidden">{inr(v)}</span>
-                    )}
+                    {v > 0 && <span className="tabular text-[10px] font-semibold text-ink">{inrShort(v)}</span>}
                   </button>
                 );
               })}
+            </div>
+            <div className="flex flex-wrap gap-x-4 gap-y-1">
+              <Key color="var(--lime)" label={dayShare > 0 ? `Up to ${inr(dayShare)} a day` : "Lower spend"} />
+              <Key color="var(--warn)" label={dayShare > 0 ? "Over the day’s share" : "Higher spend"} />
             </div>
           </section>
           <section className={`${CARD} flex-[2_1_300px]`}>

@@ -90,7 +90,7 @@ export default function SecuritySection({ onChangePassword }: { onChangePassword
           return (
             <div
               key={s.id}
-              className="flex flex-wrap items-center gap-x-4 gap-y-2.5 px-6 py-[18px] max-[480px]:px-[18px]"
+              className="flex flex-wrap items-center gap-x-4 gap-y-2.5 px-6 py-[18px]"
               data-testid="session-row"
             >
               <span className="flex h-[38px] w-[38px] flex-none items-center justify-center rounded-xl bg-tile-2 text-ink-2">
@@ -142,7 +142,7 @@ export default function SecuritySection({ onChangePassword }: { onChangePassword
           {shown?.map((e) => {
             const d = new Date(e.created_at);
             return (
-              <div key={e.id} className="flex flex-wrap items-center gap-x-4 gap-y-1 px-6 py-3.5 max-[480px]:px-[18px]">
+              <div key={e.id} className="flex flex-wrap items-center gap-x-4 gap-y-1 px-6 py-3.5">
                 <span className="tabular flex-[0_0_150px] text-[13px] text-muted">
                   {d.toLocaleDateString("en-GB", { day: "numeric", month: "short" })} ·{" "}
                   {d.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}

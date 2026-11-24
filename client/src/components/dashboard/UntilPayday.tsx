@@ -307,9 +307,14 @@ export default function UntilPayday({
           className="absolute -mt-[5.5px] -ml-[5.5px] h-[11px] w-[11px] rounded-full border-2 border-tile bg-ink"
           style={{ left: `${todayX}%`, top: `${Y(p.todayValue)}%` }}
         />
+        {/* Past the middle the label sits left of the dot, so it never runs off the card. */}
         <span
-          className="pointer-events-none absolute translate-x-2 -translate-y-[150%] text-xs whitespace-nowrap"
-          style={{ left: `${todayX}%`, top: `${Y(p.todayValue)}%` }}
+          className="pointer-events-none absolute text-xs whitespace-nowrap"
+          style={{
+            left: `${todayX}%`,
+            top: `${Y(p.todayValue)}%`,
+            transform: `translate(${+todayX > 60 ? "calc(-100% - 8px)" : "8px"}, -150%)`,
+          }}
         >
           {label("Today", inr(p.todayValue))}
         </span>
@@ -360,14 +365,18 @@ export default function UntilPayday({
         )}
       </div>
       <div className="relative mx-2 h-[18px] text-xs text-muted">
-        <span className="absolute left-0">{dateOf(1)}</span>
+        {/* Near either end, Today takes that end's place instead of overlapping its date. */}
+        {+todayX > 22 && <span className="absolute left-0">{dateOf(1)}</span>}
         <span
-          className="absolute -translate-x-1/2 font-semibold whitespace-nowrap text-ink-2"
-          style={{ left: `${todayX}%` }}
+          className="absolute font-semibold whitespace-nowrap text-ink-2"
+          style={{
+            left: `${todayX}%`,
+            transform: `translateX(${+todayX <= 22 ? "0%" : +todayX >= 70 ? "-100%" : "-50%"})`,
+          }}
         >
           Today · {dateOf(DAY)}
         </span>
-        <span className="absolute right-0">Payday · {dateOf(N + 1)}</span>
+        {+todayX < 70 && <span className="absolute right-0">Payday · {dateOf(N + 1)}</span>}
       </div>
       <div className="flex flex-wrap gap-x-[18px] gap-y-1 text-xs text-muted">
         <span className="flex items-center gap-1.5">

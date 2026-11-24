@@ -62,17 +62,20 @@ export function Row({
   label,
   help,
   htmlFor,
+  narrow = false,
   children,
 }: {
   label: string;
   help?: ReactNode;
   htmlFor?: string;
+  /** Budget plan rows: a fixed 180px label, so the field and its status get the rest. */
+  narrow?: boolean;
   children: ReactNode;
 }) {
   const Label = htmlFor ? "label" : "span";
   return (
-    <div className="flex flex-wrap items-center gap-x-5 gap-y-2.5 px-6 py-5 max-[480px]:px-[18px]">
-      <div className="flex min-w-0 flex-[1_1_200px] flex-col">
+    <div className="flex flex-wrap items-center gap-x-5 gap-y-2.5 px-6 py-5">
+      <div className={`flex min-w-0 flex-col ${narrow ? "flex-[0_0_180px]" : "flex-[1_1_200px]"}`}>
         <Label {...(htmlFor ? { htmlFor } : {})} className="text-sm font-semibold">
           {label}
         </Label>

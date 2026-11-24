@@ -192,7 +192,7 @@ export default function PlanSection({
     <>
       <SectionHead title="Budget plan" lede="What you earn, when it lands, and how much is set aside first." />
       <Card>
-        <Row label="Monthly salary" htmlFor="f-sal">
+        <Row narrow label="Monthly salary" htmlFor="f-sal">
           <span className={`${INPUT} flex flex-[1_1_220px] items-center gap-1.5 focus-within:border-lime`}>
             <span className="text-muted">{currencySymbol()}</span>
             <input
@@ -206,7 +206,7 @@ export default function PlanSection({
           </span>
           {statusCell("salary")}
         </Row>
-        <Row label="Payday" htmlFor="f-pay">
+        <Row narrow label="Payday" htmlFor="f-pay">
           <select
             id="f-pay"
             value={form.payday}
@@ -222,7 +222,7 @@ export default function PlanSection({
           {statusCell("payday")}
         </Row>
         <div>
-          <Row label="Save first" htmlFor="f-pct" help={<span className="tabular">{money(save1)} a month</span>}>
+          <Row narrow label="Save first" htmlFor="f-pct" help={<span className="tabular">{money(save1)} a month</span>}>
             <span className={`${INPUT} flex flex-[1_1_220px] items-center gap-1.5 pr-1.5 focus-within:border-lime`}>
               <input
                 id="f-pct"
@@ -255,7 +255,7 @@ export default function PlanSection({
             {statusCell("save_pct")}
           </Row>
           {edited.length > 0 && (
-            <div className="px-6 pb-5 max-[480px]:px-[18px]">
+            <div className="px-6 pb-5">
               <div
                 role="region"
                 aria-label="Apply plan changes"
@@ -336,7 +336,7 @@ export default function PlanSection({
         <h3 className="eyebrow m-0">Plan history</h3>
         <Card>
           {shown.map((h) => (
-            <div key={h.key} className="flex flex-wrap items-center gap-x-4 gap-y-1 px-6 py-3.5 max-[480px]:px-[18px]">
+            <div key={h.key} className="flex flex-wrap items-center gap-x-4 gap-y-1 px-6 py-3.5">
               <span className="tabular flex-[0_0_110px] text-[13px] text-muted">{longDate(h.date)}</span>
               <span className="tabular flex-[1_1_220px] text-sm">
                 {h.field === "created" ? (

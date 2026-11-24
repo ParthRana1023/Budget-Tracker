@@ -54,9 +54,24 @@ test.describe("Account and data", () => {
     await page.goto("/settings?s=data");
     const [file] = await Promise.all([
       page.waitForEvent("download"),
-      page.getByRole("button", { name: "Download", exact: true }).click(),
+      page.getByRole("button", { name: "JSON", exact: true }).first().click(),
     ]);
     expect(file.suggestedFilename()).toBe("savefirst-my-data.json");
+    // The same, as one CSV for a spreadsheet: a section per part, amounts in rupees.
+    const [sheet] = await Promise.all([
+      page.waitForEvent("download"),
+      page.getByRole("button", { name: "CSV for Excel" }).click(),
+    ]);
+    expect(sheet.suggestedFilename()).toBe("savefirst-my-data.csv");
+    const sheetText = await new Promise<string>((done) =>
+      sheet.createReadStream().then((s) => {
+        let text = "";
+        s.on("data", (c) => (text += c));
+        s.on("end", () => done(text));
+      }),
+    );
+    expect(sheetText).toContain("Plan\r\nField,Value\r\n");
+    expect(sheetText).toContain("\r\nsalary,100000.00\r\n"); // rows follow the database's key order
 
     const today = await page.evaluate(() => {
       const d = new Date();

@@ -20,12 +20,13 @@ SaveFirst flips traditional budgeting on its head. Instead of tracking expenses 
 - **Variable Pay & Windfalls**: Bonuses and incentives are held safely aside until received in your bank, then split across savings goals, an annual bills reserve, and everyday spending.
 - **Early Income Handling**: Income arriving 1–5 days before payday can optionally count toward the next cycle without skewing current safe-to-spend.
 - **Multiple Currencies**:
-  - Pick a base currency from 30 (the ones the ECB publishes rates for). It locks after your first entry.
+  - Pick a base currency from 30 (the ones the ECB publishes rates for). Before your first entry it changes at once; after that a new base starts with your next cycle (Keep cancels it), so a cycle never mixes two.
+  - At the switch, salary, money already saved and income on hold are converted once; bills, limits and goals set in the old base keep their amount and follow each cycle's rate. Older cycles in Reports, the reserve and goal totals are shown in today's base at the current cycle's rate.
   - Log expenses, bills, category limits and goal targets in any of them. Each keeps what you typed and the rate on the day your cycle started.
   - Bills, limits and goal targets re-price at each new cycle's rate; logged entries keep theirs.
   - If the rates service is down, the last cached rate is used and you can type your own.
 - **Payment Methods**: Tag expenses with how they were paid (card, UPI, cash and more), with defaults per recurring bill, a Ledger filter and a Reports breakdown.
-- **Installable App & Push**: Installs as a PWA with offline handling and an update prompt, plus optional Web Push reminders for bills and a weekly summary.
+- **Phone-first & Installable**: Bottom navigation, bottom-sheet popups and phone pages under 720px. Installs as a PWA with offline handling (no amounts shown while offline) and an update prompt, plus optional Web Push bill reminders and a weekly summary with what's safe to spend.
 - **Spending Habits & Analytics**:
   - Month-over-month comparisons, savings rate tracking, and spending pace curves.
   - Interactive calendar heatmaps and weekday spending distributions.
@@ -37,7 +38,7 @@ SaveFirst flips traditional budgeting on its head. Instead of tracking expenses 
   - Geographic sign-in history tracking without storing raw IP addresses.
 - **Data Ownership**:
   - Full account export in structured JSON format (`savefirst-my-data.json`).
-  - Two-way CSV export and import with preview, deduplication, and row-level validation.
+  - Two-way CSV export and import with preview, deduplication, and row-level validation. Each exported entry carries the currency it was recorded in.
   - Complete permanent account deletion with automated avatar storage cleanup.
 - **Custom Preferences**:
   - Number formatting: Indian (`1,00,000.00`), International (`100,000.00`), and European (`100.000,00`).
@@ -79,7 +80,7 @@ SaveFirst flips traditional budgeting on its head. Instead of tracking expenses 
                                            │ Scheduled Cron
                                            ▼
                     ┌──────────────────────────────────────────────┐
-                    │      Supabase Edge Functions / Resend        │
+                    │  Supabase Edge Functions · Resend · Web Push │
                     │   Hourly notification job (quiet hours aware)│
                     └──────────────────────────────────────────────┘
 ```
@@ -139,10 +140,10 @@ local development (`.env.development`) and production builds (`.env.production`)
 and every secret go in the uncommitted files shown below, or in the host's environment settings,
 which override everything.
 
-| Folder                                   | Your values (not committed)      | Production                                          |
-| ---------------------------------------- | -------------------------------- | --------------------------------------------------- |
-| `client/` (Next.js)                      | `client/.env.local`              | Vercel › Project › Settings › Environment Variables |
-| `server/supabase/functions/` (email job) | `server/supabase/functions/.env` | `npx supabase secrets set --env-file …`             |
+| Folder                                       | Your values (not committed)      | Production                                          |
+| -------------------------------------------- | -------------------------------- | --------------------------------------------------- |
+| `client/` (Next.js)                          | `client/.env.local`              | Vercel › Project › Settings › Environment Variables |
+| `server/supabase/functions/` (notifications) | `server/supabase/functions/.env` | `npx supabase secrets set --env-file …`             |
 
 No env file is needed at the repo root.
 
@@ -158,7 +159,7 @@ No env file is needed at the repo root.
 | `NEXT_PUBLIC_VAPID_PUBLIC_KEY`         | Optional    | Public VAPID key for Web Push. Empty hides push in Settings             |
 | `VAPID_PRIVATE_KEY` / `VAPID_SUBJECT`  | Server-only | Same key pair's private half and `mailto:` contact; used by Send a test |
 
-### Email job (`server/supabase/functions/.env.example`)
+### Notification job (`server/supabase/functions/.env.example`)
 
 | Variable                                 | Description                                                                |
 | ---------------------------------------- | -------------------------------------------------------------------------- |
@@ -181,7 +182,9 @@ To initialize or completely reset your database schema:
 
 1. Open your Supabase Project SQL Editor.
 2. Run the script located at [server/supabase/savefirst_full_setup.sql](server/supabase/savefirst_full_setup.sql).
-3. The script is idempotent and transactional: it cleanly drops existing application tables and builds the complete schema from scratch.
+3. The script is idempotent and transactional: it cleanly drops existing application tables and builds the complete schema from scratch. **It deletes all data.**
+
+To update a project that already has data, run only the migrations it doesn't have yet, in order, from [server/supabase/migrations](server/supabase/migrations/) (each file is re-runnable).
 
 ### Setup Checklist
 
@@ -196,7 +199,7 @@ To initialize or completely reset your database schema:
 | **Raise sign-in rate limits**              | Supabase › Auth › Rate Limits       | Password and code sign-ins go through the app's server, so every user shares its IP's limit.                                                                  |
 | **`NEXT_PUBLIC_GOOGLE_AUTH=1`**            | Vercel / Client env                 | Enables Google Sign-In and identity linking UI.                                                                                                               |
 | **Redirect URLs**                          | Supabase › Auth › URL Configuration | Add `<APP_URL>/**` and `http://localhost:3000/**`. The wildcard is needed because the callback carries `?next=`.                                              |
-| **Deploy `send-notifications`**            | Supabase Edge Functions             | Deploy background email worker with `RESEND_API_KEY`, `EMAIL_FROM`, `CRON_SECRET`, `APP_URL`.                                                                 |
+| **Deploy `send-notifications`**            | Supabase Edge Functions             | Deploy the hourly email and push job with `RESEND_API_KEY`, `EMAIL_FROM`, `CRON_SECRET`, `APP_URL` (and the VAPID keys for push).                             |
 | **Schedule Notifications Cron**            | Supabase SQL editor                 | Run [server/supabase/cron/send-notifications.sql](server/supabase/cron/send-notifications.sql) with your project URL and keys.                                |
 | **`NEXT_PUBLIC_EMAIL_NOTIFICATIONS=1`**    | Vercel / Client env                 | Reveals email notification toggles in Settings once the worker is active.                                                                                     |
 
@@ -206,7 +209,7 @@ To initialize or completely reset your database schema:
 
 ```bash
 # Unit tests across all timezones (UTC, Asia/Kolkata, America/Los_Angeles, Pacific/Auckland).
-# Covers client/src and the email job's logic in server/supabase/functions.
+# Covers client/src and the notification job's logic in server/supabase/functions.
 npm run test:unit
 
 # Check code formatting with Prettier
@@ -219,8 +222,9 @@ npm --workspace=client run lint
 npm run test:db
 
 # End-to-end tests (Playwright). They refuse to run against a hosted Supabase:
-# point NEXT_PUBLIC_SUPABASE_URL / _PUBLISHABLE_KEY at the local stack, and set
-# SUPABASE_SECRET_KEY to its SECRET_KEY so sign-in history is covered.
+# point NEXT_PUBLIC_SUPABASE_URL / _PUBLISHABLE_KEY / SUPABASE_SECRET_KEY at the local
+# stack's API_URL / PUBLISHABLE_KEY / SECRET_KEY (`npx supabase status --workdir server -o env`).
+# Test accounts are created through its admin API, so the secret key is required.
 npm run test:e2e
 ```
 
@@ -235,7 +239,7 @@ Budget-Tracker/
 │   ├── src/
 │   │   ├── app/                # App Router (pages, error boundaries, API routes)
 │   │   │   ├── (auth)/         # Login, signup, password reset routes
-│   │   │   ├── api/            # Server endpoints (/api/auth, /api/account, /api/rates, /api/log, /api/budget, /api/health)
+│   │   │   ├── api/            # Server endpoints (/api/auth, /api/account, /api/rates, /api/push, /api/log, /api/budget, /api/health)
 │   │   │   ├── auth/           # OAuth and token exchange callbacks
 │   │   │   ├── dashboard/      # Safe to spend, Until Payday, Ledger, Budgets
 │   │   │   ├── onboarding/     # 5-step interactive setup flow
@@ -247,7 +251,7 @@ Budget-Tracker/
 ├── server/                     # Database and background jobs (no Node server; the API lives in client/)
 │   └── supabase/
 │       ├── cron/               # Scheduled pg_cron notification scripts
-│       ├── functions/          # Deno Edge Functions (send-notifications, with its unit tests)
+│       ├── functions/          # Deno Edge Functions (send-notifications, with its unit tests; _shared/budget mirrors client/src/lib maths)
 │       ├── migrations/         # Versioned SQL migration files
 │       ├── tests/database/     # pgTAP database tests
 │       └── savefirst_full_setup.sql # Consolidated idempotent database setup

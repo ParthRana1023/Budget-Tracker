@@ -108,6 +108,25 @@ export function formatMoney(minor, format, code = base) {
 /** Design-handoff money format in the base currency and the user's number format ("₹1,00,000", "−₹650"). */
 export const inr = (/** @type {number} */ minor) => formatMoney(minor);
 
+/**
+ * A short amount for tight spots like the Reports calendar cells (design handoff `inrK`): "₹640",
+ * "₹12k", and lakhs ("₹1.2L") in the Indian format or millions ("$1.2M") otherwise.
+ * @param {number} minor
+ */
+export function inrShort(minor) {
+  const a = Math.abs(toMajor(Math.round(minor))),
+    indian = current === "indian";
+  const s =
+    indian && a >= 100000
+      ? `${(a / 100000).toFixed(1).replace(/\.0$/, "")}L`
+      : !indian && a >= 1e6
+        ? `${(a / 1e6).toFixed(1).replace(/\.0$/, "")}M`
+        : a >= 1000
+          ? `${Math.round(a / 1000)}k`
+          : String(Math.round(a));
+  return `${minor < 0 ? "−" : ""}${prefix(base)}${s}`;
+}
+
 /** An amount as typed, with its decimals: "$19.99", "¥1,200". For original foreign amounts. */
 export function formatExact(/** @type {number} */ minor, /** @type {string} */ code) {
   const d = minorDigits(code);

@@ -167,6 +167,32 @@ html[data-theme="light"] {
     width: 0;
   }
 }
+/* Loading screen steps (app/dashboard/loading.tsx): switch at the end of the animation, so the
+   delay comes from its length and the screen moves on before any JavaScript has loaded. */
+@keyframes sf-late {
+  0%,
+  99.9% {
+    opacity: 0;
+  }
+}
+@keyframes sf-gone {
+  0%,
+  99.9% {
+    opacity: 1;
+  }
+}
+@keyframes sf-step-ink {
+  0%,
+  99.9% {
+    color: var(--muted);
+  }
+}
+@keyframes sf-step-dot {
+  0%,
+  99.9% {
+    background: var(--track);
+  }
+}
 @keyframes sf-rise {
   from {
     opacity: 0;
