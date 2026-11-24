@@ -89,15 +89,20 @@ const prefix = (/** @type {string} */ code) => {
 };
 
 /**
- * Whole units of the base currency with a true minus sign: "₹1,00,000" Indian, "₹100,000"
- * international, "₹100.000" European. Never abbreviated.
+ * An amount with its currency's decimals (design handoff v3, Multicurrency) and a true minus
+ * sign: "₹1,00,000.00" Indian, "₹100,000.00" international, "₹100.000,00" European; "¥3,200",
+ * "KWD 4.250". Never abbreviated.
  * @param {number} minor @param {NumberFormat | null} [format] defaults to the user's
  * @param {string} [code] defaults to the base currency
  * @returns {string}
  */
 export function formatMoney(minor, format, code = base) {
-  const whole = Math.round(Math.abs(toMajor(minor, code)));
-  return `${minor < 0 && whole > 0 ? "−" : ""}${prefix(code)}${whole.toLocaleString(NUMBER_LOCALES[format ?? current])}`;
+  const d = minorDigits(code);
+  const n = Math.abs(toMajor(Math.round(minor), code)).toLocaleString(NUMBER_LOCALES[format ?? current], {
+    minimumFractionDigits: d,
+    maximumFractionDigits: d,
+  });
+  return `${Math.round(minor) < 0 ? "−" : ""}${prefix(code)}${n}`;
 }
 
 /** Design-handoff money format in the base currency and the user's number format ("₹1,00,000", "−₹650"). */

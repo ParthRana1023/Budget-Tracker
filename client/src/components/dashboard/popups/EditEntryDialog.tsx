@@ -5,9 +5,9 @@
 import { useState } from "react";
 import { Trash2 } from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
-import { currencySymbol, inr, toMajor, toMinor } from "@/lib/money.mjs";
+import { baseCurrency, cleanTyped, formatExact, inr, showTyped, toMajor, toMinor } from "@/lib/money.mjs";
 import { convert } from "@/lib/fx.mjs";
-import { dayLabel } from "@/lib/cycle.mjs";
+import { dayLabel, shortDate } from "@/lib/cycle.mjs";
 import Dialog from "../../ui/Dialog";
 import type { Tx } from "../types";
 import type { PopupContext } from "./context";
@@ -23,6 +23,7 @@ import {
   toField,
   usePopupForm,
 } from "./parts";
+import { rateText } from "./currency";
 
 const KIND = { income: "Income", savings_transfer: "Savings transfer", reserve_transfer: "Reserve" } as const;
 
@@ -49,7 +50,10 @@ export default function EditEntryDialog({
   });
   const [confirming, setConfirming] = useState(false);
   const originalMinor = cur ? toMinor(parseFloat(form.amount) || 0, cur) : null;
-  const amount = cur ? convert(originalMinor!, cur, Number(entry.fx_rate)) : paise(form.amount);
+  // A foreign entry's base amount follows the saved rate, unless typed over (bank fees).
+  const [charged, setCharged] = useState("");
+  const atRate = cur ? convert(originalMinor!, cur, Number(entry.fx_rate)) : 0;
+  const amount = cur ? (charged ? paise(charged) : atRate) : paise(form.amount);
   const label = isExpense
     ? (model.byId.get(entry.category_id ?? "")?.name ?? entry.category?.name ?? "Uncategorised")
     : KIND[entry.type as keyof typeof KIND];
@@ -151,10 +155,26 @@ export default function EditEntryDialog({
     >
       <AmountField id="ed-amt" value={form.amount} onChange={(v) => set({ amount: v })} currency={cur ?? undefined}>
         {cur && (
-          <span className="tabular text-[13px] text-muted">
-            Logged in {cur} at {currencySymbol()}
-            {Number(entry.fx_rate)} for 1 {cur} · ≈ {inr(amount)}
-          </span>
+          <div className="flex flex-col gap-3 rounded-xl bg-tile-2 px-3.5 py-3">
+            <span className="tabular text-sm">
+              <span className="font-semibold">
+                Paid {formatExact(originalMinor!, cur)} at {rateText(Number(entry.fx_rate), cur)}
+              </span>
+              <span className="text-muted"> · rate from {shortDate(entry.fx_date ?? entry.date)}</span>
+            </span>
+            <Labeled id="ed-charged" label={`Charged in ${baseCurrency()}`}>
+              <input
+                id="ed-charged"
+                type="text"
+                inputMode="decimal"
+                placeholder={showTyped(toField(atRate))}
+                value={showTyped(charged)}
+                onChange={(e) => setCharged(cleanTyped(e.target.value))}
+                className={`${FIELD} tabular`}
+              />
+            </Labeled>
+            <span className="-mt-1.5 text-xs text-muted">Change it to match your bank statement, fees included.</span>
+          </div>
         )}
       </AmountField>
       {isExpense && (

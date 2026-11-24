@@ -161,9 +161,9 @@ test("budget warnings at 80% and over, dismissed per level", () => {
 test("labels: rupees, dates and the cycle line", async () => {
   const { inr } = await import("./money.mjs");
   const { cycleLabel, dayLabel, monthLabel, shortDate } = await import("./cycle.mjs");
-  assert.equal(inr(10000000), "₹1,00,000");
-  assert.equal(inr(-65000), "−₹650");
-  assert.equal(inr(-20), "₹0", "no minus sign on a rounded zero");
+  assert.equal(inr(10000000), "₹1,00,000.00");
+  assert.equal(inr(-65000), "−₹650.00");
+  assert.equal(inr(-20), "−₹0.20", "paise show, with their sign");
   assert.equal(shortDate("2026-11-20"), "20 Nov");
   assert.equal(dayLabel("2026-11-16", "2026-11-16"), "Today");
   assert.equal(dayLabel("2026-11-15", "2026-11-16"), "Yesterday");

@@ -45,7 +45,7 @@ test("bad rows are listed with a reason; duplicates are counted", () => {
   assert.deepEqual(r.skipped, [
     { line: 2, reason: "Date isn’t YYYY-MM-DD" },
     { line: 3, reason: "No category called “Gym”" },
-    { line: 4, reason: "Amount must be above ₹0" },
+    { line: 4, reason: "Amount must be above ₹0.00" },
     { line: 5, reason: "Savings and reserve moves aren’t imported" },
     { line: 6, reason: "Unknown type “refund”" },
   ]);

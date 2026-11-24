@@ -7,17 +7,8 @@ import { cleanTyped, inr, showTyped, toMajor } from "@/lib/money.mjs";
 import Dialog from "../../ui/Dialog";
 import type { RecurringItem } from "../types";
 import type { PopupContext } from "./context";
-import {
-  CurrencyFields,
-  FIELD,
-  Labeled,
-  MethodPicker,
-  SAVE_FAILED,
-  cleanDay,
-  toField,
-  useForeign,
-  usePopupForm,
-} from "./parts";
+import { FIELD, Labeled, MethodPicker, SAVE_FAILED, cleanDay, toField, useForeign, usePopupForm } from "./parts";
+import { CurrencyChip, CurrencyList, RateLine } from "./currency";
 
 export default function RecurringDialog({
   ctx,
@@ -40,7 +31,9 @@ export default function RecurringDialog({
   const isExpense = item.type === "expense";
   const fx = useForeign(
     ctx.period.startStr,
-    item.original_currency ? { currency: item.original_currency, rate: Number(item.fx_rate) } : null,
+    item.original_currency
+      ? { currency: item.original_currency, rate: Number(item.fx_rate), date: item.fx_date ?? null }
+      : null,
   );
 
   const submit = () => {
@@ -109,14 +102,22 @@ export default function RecurringDialog({
       </Labeled>
       <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,180px),1fr))] gap-3.5">
         <Labeled id="ru-amt" label="Amount">
-          <input
-            id="ru-amt"
-            type="text"
-            inputMode="decimal"
-            value={showTyped(form.amount)}
-            onChange={(e) => set({ amount: cleanTyped(e.target.value, undefined, fx.currency) })}
-            className={`${FIELD} tabular`}
-          />
+          <div className="flex gap-2">
+            <input
+              id="ru-amt"
+              type="text"
+              inputMode="decimal"
+              value={showTyped(form.amount)}
+              onChange={(e) => set({ amount: cleanTyped(e.target.value, undefined, fx.currency) })}
+              className={`${FIELD} tabular`}
+            />
+            <CurrencyChip
+              size={48}
+              currency={fx.currency}
+              open={fx.listOpen}
+              onToggle={() => fx.setListOpen(!fx.listOpen)}
+            />
+          </div>
         </Labeled>
         <Labeled id="ru-day" label="Day (1–28)" optional>
           <input
@@ -130,8 +131,19 @@ export default function RecurringDialog({
             className={FIELD}
           />
         </Labeled>
-        <CurrencyFields id="ru" fx={fx} />
       </div>
+      {fx.listOpen && (
+        <CurrencyList
+          value={fx.currency}
+          onPick={(c) => {
+            fx.setCurrency(c);
+            set({ amount: "" });
+          }}
+          onClose={() => fx.setListOpen(false)}
+        />
+      )}
+      {/* Bills are worked out again each cycle, so there's no "your own rate" here. */}
+      <RateLine fx={fx} typed={form.amount} cycleStart={ctx.period.startStr} id="ru" />
       {isExpense && (
         <MethodPicker
           id="ru-method"
@@ -140,11 +152,6 @@ export default function RecurringDialog({
           onChange={(method) => set({ method })}
           hint="Entries recorded from this item use it: Due notices, Record buttons and suggestions."
         />
-      )}
-      {fx.foreign && (
-        <span className="tabular text-[13px] text-muted">
-          ≈ {inr(fx.toBase(form.amount).amount)} this cycle. It’s repriced at each new cycle’s rate.
-        </span>
       )}
       <span className="text-[13px] text-pretty text-muted">
         Changes apply from the next time it’s recorded. Past entries stay as they are.

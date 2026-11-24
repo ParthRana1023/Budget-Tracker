@@ -5,14 +5,15 @@
 import { useState, type ReactNode } from "react";
 import { Pencil, Trash2 } from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
-import { cleanTyped, currencySymbol, inr, showTyped, toMajor, toMinor } from "@/lib/money.mjs";
+import { cleanTyped, currencySymbol, formatExact, inr, showTyped, toMajor, toMinor } from "@/lib/money.mjs";
 import { monthLabel } from "@/lib/cycle.mjs";
 import { analyzeGoal, goalTrack } from "@/lib/goalAnalytics.mjs";
 import Dialog from "../ui/Dialog";
 import Reveal from "../ui/Reveal";
 import { useToast } from "../ui/Toast";
 import { CARD_H2, LINK_BUTTON, type Contribution, type Goal } from "./types";
-import { CurrencyFields, FIELD, SAVE_FAILED, cleanAmount, paise, useForeign } from "./popups/parts";
+import { FIELD, SAVE_FAILED, cleanAmount, paise, useForeign } from "./popups/parts";
+import { CurrencyChip, CurrencyList, RateLine } from "./popups/currency";
 
 const thisMonth = (today: string) => today.slice(0, 7);
 /** Months from this month to 'YYYY-MM' (the handoff's monthsTo). */
@@ -98,7 +99,9 @@ export default function Goals({
       by: g?.target_date?.slice(0, 7) ?? "",
       saved: "",
     });
-    fx.load(g?.original_currency ? { currency: g.original_currency, rate: Number(g.fx_rate) } : null);
+    fx.load(
+      g?.original_currency ? { currency: g.original_currency, rate: Number(g.fx_rate), date: g.fx_date ?? null } : null,
+    );
     setDirty(false);
     setError(null);
     setMode(m);
@@ -262,6 +265,8 @@ export default function Goals({
               </button>
               <span className="tabular text-[13px] text-muted">
                 {inr(a.current)} of {inr(a.targetAmount)}
+                {g.original_currency &&
+                  ` · ${formatExact(Number(g.original_amount), g.original_currency)} target, rate changes each cycle`}
               </span>
               <span
                 className="text-[13px]"
@@ -430,17 +435,24 @@ export default function Goals({
               </Labeled>
               <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,180px),1fr))] gap-3.5">
                 <Labeled id="ng-target" label="Target amount">
-                  <input
-                    id="ng-target"
-                    type="text"
-                    inputMode="decimal"
-                    placeholder={fx.foreign ? "0" : inr(toMinor(100000))}
-                    value={showTyped(form.target)}
-                    onChange={(e) => set({ target: cleanTyped(e.target.value, undefined, fx.currency) })}
-                    className={`${FIELD} tabular`}
-                  />
+                  <div className="flex gap-2">
+                    <input
+                      id="ng-target"
+                      type="text"
+                      inputMode="decimal"
+                      placeholder={fx.foreign ? "0" : inr(toMinor(100000))}
+                      value={showTyped(form.target)}
+                      onChange={(e) => set({ target: cleanTyped(e.target.value, undefined, fx.currency) })}
+                      className={`${FIELD} tabular`}
+                    />
+                    <CurrencyChip
+                      size={48}
+                      currency={fx.currency}
+                      open={fx.listOpen}
+                      onToggle={() => fx.setListOpen(!fx.listOpen)}
+                    />
+                  </div>
                 </Labeled>
-                <CurrencyFields id="ng" fx={fx} />
                 <Labeled id="ng-by" label="Target month" optional>
                   <input
                     id="ng-by"
@@ -452,6 +464,18 @@ export default function Goals({
                   />
                 </Labeled>
               </div>
+              {fx.listOpen && (
+                <CurrencyList
+                  value={fx.currency}
+                  onPick={(c) => {
+                    fx.setCurrency(c);
+                    set({ target: "" });
+                  }}
+                  onClose={() => fx.setListOpen(false)}
+                />
+              )}
+              {/* The target floats with each cycle's rate; money already saved never changes. */}
+              <RateLine fx={fx} typed={form.target} cycleStart={cycleStart} id="ng" />
               {mode.kind === "new" && (
                 <Labeled id="ng-saved" label="Already saved" optional>
                   <input

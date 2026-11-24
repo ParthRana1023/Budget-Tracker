@@ -99,6 +99,7 @@ export function AmountField({
   value,
   onChange,
   currency,
+  chip,
   children,
 }: {
   id: string;
@@ -106,6 +107,8 @@ export function AmountField({
   onChange: (v: string) => void;
   /** Typed in this currency (symbol and decimals); defaults to the base currency. */
   currency?: string;
+  /** The currency chip, at the end of the amount row (the number never moves). */
+  chip?: ReactNode;
   children?: ReactNode;
 }) {
   return (
@@ -126,6 +129,7 @@ export function AmountField({
           onChange={(e) => onChange(cleanTyped(e.target.value, undefined, currency))}
           className="tabular w-full min-w-0 flex-1 border-0 bg-transparent p-0 font-serif text-[clamp(48px,13vw,64px)] leading-[1.05] tracking-[-0.02em] text-ink outline-none focus-visible:outline-none"
         />
+        {chip && <span className="flex-none self-center">{chip}</span>}
       </div>
       {children}
     </div>
@@ -141,39 +145,49 @@ type Original = {
 };
 const PLAIN: Original = { original_amount: null, original_currency: null, fx_rate: null, fx_date: null };
 
+/** Where a foreign amount's rate stands (design handoff v3, Currency: rate line states). */
+export type RateStatus = "base" | "loading" | "ready" | "stale" | "error" | "manual";
+
 /**
  * The currency an amount is typed in and, when it isn't the base currency, the rate for the
- * cycle starting `cycleStart` (fetched once, editable when the rates service is down).
+ * cycle starting `cycleStart` (fetched once; Try again after an error; your own rate on request).
  * `initial` is a saved foreign row: its rate is kept, not fetched again.
  */
-export function useForeign(cycleStart: string, initial?: { currency: string; rate: number } | null) {
-  const [currency, setCurrency] = useState(initial?.currency ?? baseCurrency());
-  const [rate, setRate] = useState(initial ? String(initial.rate) : "");
-  const [note, setNote] = useState<string | null>(null);
+export function useForeign(
+  cycleStart: string,
+  initial?: { currency: string; rate: number; date?: string | null } | null,
+) {
+  const [currency, setCurrencyState] = useState(initial?.currency ?? baseCurrency());
+  const [rate, setRateState] = useState(initial ? String(initial.rate) : "");
+  const [cycleRate, setCycleRate] = useState<number | null>(initial ? Number(initial.rate) : null);
+  const [rateDate, setRateDate] = useState<string | null>(initial?.date ?? null);
+  const [status, setStatus] = useState<RateStatus>(initial ? "ready" : "base");
+  const [tries, setTries] = useState(0);
+  const [listOpen, setListOpen] = useState(false);
   // A saved row's rate is kept while its own currency stays picked.
   const kept = useRef(initial ?? null);
   const foreign = currency !== baseCurrency();
   useEffect(() => {
-    if (!foreign || currency === kept.current?.currency) return;
+    if (!foreign) return setStatus("base");
+    if (currency === kept.current?.currency) return;
     let live = true;
-    setRate("");
-    setNote("Getting this cycle’s rate…");
+    setRateState("");
+    setCycleRate(null);
+    setStatus("loading");
     fetchRate(currency, cycleStart).then(
       (r) => {
         if (!live) return;
-        setRate(String(r.rate));
-        setNote(
-          r.stale
-            ? `The rates service is down, so this is the rate from ${shortDate(r.date)}. Change it if you need to.`
-            : `The rate on ${shortDate(cycleStart)}, when this cycle started. It stays the same all cycle.`,
-        );
+        setRateState(String(r.rate));
+        setCycleRate(r.rate);
+        setRateDate(r.date);
+        setStatus(r.stale ? "stale" : "ready");
       },
-      (e: Error) => live && setNote(e.message),
+      () => live && setStatus("error"),
     );
     return () => {
       live = false;
     };
-  }, [currency, cycleStart]);
+  }, [currency, cycleStart, tries]);
 
   const r = parseFloat(rate);
   /** What was typed -> the base amount to save, plus the original fields (all null when in base). */
@@ -185,66 +199,47 @@ export function useForeign(cycleStart: string, initial?: { currency: string; rat
       original: { original_amount: minor, original_currency: currency, fx_rate: r, fx_date: cycleStart },
     };
   };
-  /** Starts over from a saved row (or the base currency), for a form reused across rows. */
-  const load = (saved?: { currency: string; rate: number } | null) => {
-    kept.current = saved ?? null;
-    setCurrency(saved?.currency ?? baseCurrency());
-    setRate(saved ? String(saved.rate) : "");
-    setNote(null);
+  const setCurrency = (code: string) => {
+    setCurrencyState(code);
+    setListOpen(false);
   };
-  return { currency, setCurrency, foreign, rate, setRate, rateOk: !foreign || r > 0, note, toBase, load };
-}
-
-/** Currency picker, and the rate when the currency is foreign. Lives in a popup's field grid. */
-export function CurrencyFields({
-  id,
-  fx,
-  onCurrency,
-}: {
-  id: string;
-  fx: ReturnType<typeof useForeign>;
-  /** Called after the currency changes (e.g. to clear a typed amount). */
-  onCurrency?: () => void;
-}) {
-  return (
-    <>
-      <Labeled id={`${id}-cur`} label="Currency">
-        <select
-          id={`${id}-cur`}
-          value={fx.currency}
-          onChange={(e) => {
-            fx.setCurrency(e.target.value);
-            onCurrency?.();
-          }}
-          className={FIELD}
-        >
-          {CURRENCIES.map((c) => (
-            <option key={c} value={c}>
-              {c === baseCurrency() ? `${c} · your currency` : c}
-            </option>
-          ))}
-        </select>
-      </Labeled>
-      {fx.foreign && (
-        <Labeled id={`${id}-rate`} label={`${currencySymbol()} for 1 ${fx.currency}`}>
-          <input
-            id={`${id}-rate`}
-            type="text"
-            inputMode="decimal"
-            value={fx.rate}
-            onChange={(e) => fx.setRate(e.target.value.replace(/[^\d.]/g, "").slice(0, 14))}
-            className={`${FIELD} tabular`}
-            aria-describedby={`${id}-rate-note`}
-          />
-          {fx.note && (
-            <span id={`${id}-rate-note`} className="text-[13px] text-pretty text-muted">
-              {fx.note}
-            </span>
-          )}
-        </Labeled>
-      )}
-    </>
-  );
+  /** Your own rate (or, after an error, the only rate); off goes back to the cycle's. */
+  const setManual = (on: boolean) => {
+    if (on) {
+      setStatus("manual");
+      if (!rate && cycleRate) setRateState(String(cycleRate));
+    } else if (cycleRate) {
+      setRateState(String(cycleRate));
+      setStatus("ready");
+    }
+  };
+  /** Starts over from a saved row (or the base currency), for a form reused across rows. */
+  const load = (saved?: { currency: string; rate: number; date?: string | null } | null) => {
+    kept.current = saved ?? null;
+    setCurrencyState(saved?.currency ?? baseCurrency());
+    setRateState(saved ? String(saved.rate) : "");
+    setCycleRate(saved ? Number(saved.rate) : null);
+    setRateDate(saved?.date ?? null);
+    setStatus(saved ? "ready" : "base");
+    setListOpen(false);
+  };
+  return {
+    currency,
+    setCurrency,
+    foreign,
+    rate,
+    setRate: setRateState,
+    cycleRate,
+    rateDate,
+    status,
+    retry: () => setTries((n) => n + 1),
+    setManual,
+    rateOk: !foreign || r > 0,
+    toBase,
+    load,
+    listOpen,
+    setListOpen,
+  };
 }
 
 /** Picker icons (lucide), as in the handoff. */

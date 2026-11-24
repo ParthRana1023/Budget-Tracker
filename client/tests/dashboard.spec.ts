@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { isPhone, setUpAccount, show } from "./helpers";
+import { setUpAccount, show } from "./helpers";
 
 // Design handoff, Dashboard. A fresh account set up with ₹1,00,000 pay, 20% savings,
 // a ₹28,000 rent bill and a ₹10,000 groceries limit, before any salary is recorded.
@@ -10,12 +10,12 @@ test.describe("Dashboard", () => {
 
     await expect(page.getByText(/^Cycle .* · Day \d+ of \d+$/)).toBeVisible();
     // No salary recorded yet: nothing is safe to spend.
-    await expect(page.getByTestId("safe-to-spend")).toHaveText("₹0", { timeout: 5_000 });
-    await expect(page.getByText(/after ₹20,000 to savings and ₹28,000 in bills still due/)).toBeVisible();
+    await expect(page.getByTestId("safe-to-spend")).toHaveText("₹0.00", { timeout: 5_000 });
+    await expect(page.getByText(/after ₹20,000.00 to savings and ₹28,000.00 in bills still due/)).toBeVisible();
 
     await show(page, "Budgets");
     const groceries = page.locator('[data-testid="budget-row"][data-name="Groceries"]');
-    await expect(groceries).toContainText("₹0 / ₹10,000");
+    await expect(groceries).toContainText("₹0.00 / ₹10,000.00");
     await expect(page.locator('[data-testid="budget-row"][data-name="Dining out"]')).toContainText("no limit");
 
     await show(page, "Bills");
@@ -39,13 +39,13 @@ test.describe("Dashboard", () => {
     await expect(page.getByRole("status").filter({ hasText: "Created Emergency fund" })).toBeVisible();
 
     const goal = page.locator('[data-testid="goal-row"][data-name="Emergency fund"]');
-    await expect(goal).toContainText("₹25,000 of ₹1,00,000");
+    await expect(goal).toContainText("₹25,000.00 of ₹1,00,000.00");
     await expect(goal).toContainText("25%");
 
     await goal.getByRole("button", { name: "Add money to Emergency fund" }).click();
     await page.getByRole("dialog").getByLabel("Amount").fill("5000");
-    await page.getByRole("dialog").getByRole("button", { name: "Add ₹5,000" }).click();
-    await expect(goal).toContainText("₹30,000 of ₹1,00,000");
+    await page.getByRole("dialog").getByRole("button", { name: "Add ₹5,000.00" }).click();
+    await expect(goal).toContainText("₹30,000.00 of ₹1,00,000.00");
 
     await goal.getByRole("button", { name: "Edit Emergency fund" }).click();
     await page.getByRole("dialog").getByLabel("Goal name").fill("Rainy day");
@@ -73,13 +73,12 @@ test.describe("Dashboard", () => {
   });
 
   test("the ledger collapses and remembers it", async ({ page }) => {
-    test.skip(isPhone(page), "On phones the Ledger is its own page and always open (mobile.spec).");
     await setUpAccount(page);
     const toggle = page.getByRole("button", { name: "Ledger" });
     await expect(toggle).toHaveAttribute("aria-expanded", "true");
     await toggle.click();
     await expect(toggle).toHaveAttribute("aria-expanded", "false");
-    await expect(page.getByText(/0 entries · ₹0 spent this cycle/)).toBeVisible();
+    await expect(page.getByText(/0 entries · ₹0.00 spent this cycle/)).toBeVisible();
     await page.reload();
     await expect(page.getByRole("button", { name: "Ledger" })).toHaveAttribute("aria-expanded", "false");
   });

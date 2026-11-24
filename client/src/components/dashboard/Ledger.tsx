@@ -10,6 +10,7 @@ import { formatExact, inr } from "@/lib/money.mjs";
 import { dayLabel, shortDate } from "@/lib/cycle.mjs";
 import { methodLabel, methodShort, NOT_SET, parseMethodFilter, PAYMENT_METHODS } from "@/lib/paymentMethods.mjs";
 import Reveal from "../ui/Reveal";
+import { rateText } from "./popups/currency";
 import { useDragScroll } from "../ui/useDragScroll";
 import { CARD_H2, LINK_BUTTON, PILL_LIME, PILL_LINE, type Category, type Tx } from "./types";
 
@@ -214,17 +215,20 @@ export default function Ledger({
                           <span className="rounded-full bg-tile-2 px-2 py-0.5 text-[11px] font-semibold whitespace-nowrap text-ink-2">
                             {r.cat}
                           </span>
-                          {t.original_currency && (
-                            <span className="tabular text-xs whitespace-nowrap text-muted">
-                              {formatExact(Number(t.original_amount), t.original_currency)}
-                            </span>
-                          )}
                           {t.payment_method && <MethodChip method={t.payment_method} />}
-                          <span
-                            className="tabular ml-auto min-w-20 text-right font-semibold whitespace-nowrap"
-                            style={{ color: r.color }}
-                          >
-                            {r.amt}
+                          {/* The base amount leads; what was paid sits under it, with the rate on hover. */}
+                          <span className="ml-auto flex min-w-20 flex-col items-end">
+                            <span className="tabular font-semibold whitespace-nowrap" style={{ color: r.color }}>
+                              {r.amt}
+                            </span>
+                            {t.original_currency && (
+                              <span
+                                title={`Rate used: ${rateText(Number(t.fx_rate), t.original_currency)}`}
+                                className="tabular text-xs whitespace-nowrap text-muted"
+                              >
+                                {formatExact(Number(t.original_amount), t.original_currency)}
+                              </span>
+                            )}
                           </span>
                         </button>
                       );

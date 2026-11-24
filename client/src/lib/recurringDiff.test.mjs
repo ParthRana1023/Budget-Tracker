@@ -28,6 +28,6 @@ test("every item needs a name and an amount", () => {
       { ...rent, name: " " },
       { ...net, amount: 0 },
     ]),
-    ["Every recurring item needs a name.", "Internet needs an amount above ₹0."],
+    ["Every recurring item needs a name.", "Internet needs an amount above ₹0.00."],
   );
 });

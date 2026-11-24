@@ -26,16 +26,16 @@ test("Reports: tabs, keyboard, empty states, and habits after one expense", asyn
     .getByRole("button", { name: /^Groceries/ })
     .click();
   await page.getByRole("dialog").getByLabel("Payee").fill("Swiggy");
-  await page.getByRole("dialog").getByRole("button", { name: "Log ₹640" }).click();
+  await page.getByRole("dialog").getByRole("button", { name: "Log ₹640.00" }).click();
   await expect(page.getByRole("dialog")).toHaveCount(0);
 
   await show(page, "Reports");
   await page.getByRole("tab", { name: /Spending habits/ }).click();
   await expect(page.getByRole("heading", { name: "Spending pace" })).toBeVisible();
-  await page.getByRole("button", { name: "Swiggy: ₹640" }).click();
+  await page.getByRole("button", { name: "Swiggy: ₹640.00" }).click();
   const drawer = page.getByRole("dialog");
   await expect(drawer).toContainText("Swiggy");
-  await expect(drawer).toContainText("₹640");
+  await expect(drawer).toContainText("₹640.00");
   await page.keyboard.press("Escape");
   await expect(drawer).toHaveCount(0);
 });

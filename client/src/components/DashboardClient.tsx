@@ -12,7 +12,7 @@ import { payDayLabel, payDayStatus } from "@/lib/settings.mjs";
 import { buildCycleModel } from "@/lib/cycleModel.mjs";
 import { recurringStatus } from "@/lib/recurringStatus.mjs";
 import { budgetWarnings } from "@/lib/notices.mjs";
-import { inr, setCurrency, setNumberFormat } from "@/lib/money.mjs";
+import { baseCurrency, formatExact, inr, setCurrency, setNumberFormat, toMinor } from "@/lib/money.mjs";
 import { fetchRate, repricePatches, staleCurrencies } from "@/lib/fx.mjs";
 import { transactionsToCsv } from "@/lib/csvExport.mjs";
 import { syncSavedTheme } from "@/lib/theme";
@@ -26,7 +26,8 @@ import { useOnline } from "./ui/useOnline";
 import { useToast } from "./ui/Toast";
 import SafeToSpend from "./dashboard/SafeToSpend";
 import UntilPayday from "./dashboard/UntilPayday";
-import Notices from "./dashboard/Notices";
+import Notices, { type Note } from "./dashboard/Notices";
+import { rateText } from "./dashboard/popups/currency";
 import Budgets from "./dashboard/Budgets";
 import Goals from "./dashboard/Goals";
 import BillsRecurring from "./dashboard/BillsRecurring";
@@ -128,6 +129,9 @@ export default function DashboardClient(props: DashboardClientProps) {
   const [contributions, setContributions] = useState(props.initialContributions);
   const [recurringItems, setRecurringItems] = useState(props.initialRecurringItems);
   const [notesOff, setNotesOff] = useState<string[]>([]);
+  const [fxNote, setFxNote] = useState<
+    { kind: "stale"; date: string } | { kind: "updated"; rates: Array<[string, number]> } | null
+  >(null);
   const offline = !useOnline();
   const [retrying, setRetrying] = useState(false);
   /** When these numbers last came from the server (shown while offline). */
@@ -224,6 +228,31 @@ export default function DashboardClient(props: DashboardClientProps) {
   const warnings = budgetWarnings({ flex: model.flex, spentByCat: model.spentByCat, dismissed: notesOff }).filter(
     (w) => (w.level === "80" ? settings?.notify_warn : settings?.notify_over) !== false,
   );
+  const fxKey = fxNote ? `fx-${fxNote.kind}-${period.startStr}` : "";
+  const notes: Note[] =
+    fxNote && !notesOff.includes(fxKey)
+      ? [
+          fxNote.kind === "stale"
+            ? {
+                key: fxKey,
+                label: "Rates",
+                tone: "var(--warn)",
+                text: `Couldn’t update exchange rates. Foreign amounts use the last known rates${fxNote.date ? `, from ${shortDate(fxNote.date)}` : ""}.`,
+              }
+            : {
+                key: fxKey,
+                label: "New cycle",
+                tone: "var(--lime-text)",
+                text: `Exchange rates updated for this cycle: ${fxNote.rates
+                  .map(([c, r]) =>
+                    r >= 1
+                      ? `${formatExact(toMinor(1, c), c)} = ${rateText(r, c)}`
+                      : `${formatExact(toMinor(100, c), c)} = ${formatExact(toMinor(r * 100), baseCurrency())}`,
+                  )
+                  .join(", ")}. Foreign bills, budgets and goals moved with them.`,
+              },
+        ]
+      : [];
   const held = incomeSources.filter((i) => i.status === "expected");
   const holdTotal = held.reduce((s, i) => s + Number(i.amount), 0);
 
@@ -315,10 +344,15 @@ export default function DashboardClient(props: DashboardClientProps) {
     if (!stale.length) return;
     void (async () => {
       const rates = new Map<string, number>();
+      let staleFrom: string | null = null;
       for (const c of stale) {
         const r = await fetchRate(c, cycleStart).catch(() => null);
         if (r && !r.stale) rates.set(c, r.rate);
+        else staleFrom = r?.date ?? staleFrom ?? "";
       }
+      // Notices (design handoff v3, Currency): rates couldn't update, or they did for this cycle.
+      if (staleFrom !== null) setFxNote({ kind: "stale", date: staleFrom });
+      else if (rates.size) setFxNote({ kind: "updated", rates: [...rates] });
       const writes = [
         ...repricePatches(recurringItems, "amount", cycleStart, rates).map((p) =>
           db().from("recurring_items").update(p.patch).eq("id", p.id),
@@ -551,6 +585,7 @@ export default function DashboardClient(props: DashboardClientProps) {
                 <InstallCard />
 
                 <Notices
+                  notes={notes}
                   due={due}
                   warnings={warnings}
                   daysLeft={period.daysRemaining}

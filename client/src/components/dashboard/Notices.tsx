@@ -14,6 +14,8 @@ const TAG = "flex-[0_0_108px] text-xs font-bold tracking-[.09em] uppercase";
 
 export type DueRow = { item: RecurringItem; dueDate: string };
 export type Warning = { key: string; name: string; level: "80" | "over"; pct: number; spent: number; limit: number };
+/** Any other notice (exchange rates, base currency): a tag, a sentence and Dismiss. */
+export type Note = { key: string; label: string; tone: string; text: string };
 
 export default function Notices({
   due,
@@ -23,6 +25,7 @@ export default function Notices({
   onRecord,
   onSkip,
   onDismiss,
+  notes = [],
 }: {
   due: DueRow[];
   warnings: Warning[];
@@ -31,6 +34,7 @@ export default function Notices({
   onRecord: (item: RecurringItem) => void;
   onSkip: (item: RecurringItem) => void;
   onDismiss: (key: string) => void;
+  notes?: Note[];
 }) {
   const [open, setOpen] = useState(true);
   useEffect(() => {
@@ -45,9 +49,10 @@ export default function Notices({
     } catch {}
   };
 
-  const count = due.length + warnings.length;
+  const count = notes.length + due.length + warnings.length;
   if (!count) return null;
   const summary = [
+    notes.map((n) => n.label).join(", "),
     due.length && `${due.length} due`,
     warnings.map((w) => (w.level === "over" ? "over limit" : "note")).join(", "),
   ]
@@ -74,6 +79,17 @@ export default function Notices({
       </div>
       {open && (
         <>
+          {notes.map((n) => (
+            <div key={n.key} role="status" className={ROW}>
+              <span className={TAG} style={{ color: n.tone }}>
+                {n.label}
+              </span>
+              <span className="min-w-0 flex-[1_1_240px] font-serif text-xl text-pretty">{n.text}</span>
+              <button type="button" onClick={() => onDismiss(n.key)} className={PILL_LINE}>
+                Dismiss
+              </button>
+            </div>
+          ))}
           {due.map(({ item, dueDate }) => (
             <div key={item.id} role="status" className={ROW}>
               <span className={`${TAG} text-warn`}>Due</span>

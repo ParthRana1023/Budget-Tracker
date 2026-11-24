@@ -32,7 +32,7 @@ test.describe("Account and data", () => {
       .getByRole("dialog")
       .getByRole("button", { name: /^Groceries/ })
       .click();
-    await page.getByRole("dialog").getByRole("button", { name: "Log ₹9,000" }).click();
+    await page.getByRole("dialog").getByRole("button", { name: "Log ₹9,000.00" }).click();
     await expect(page.getByText(warning)).toBeVisible();
 
     await page.goto("/settings?s=notif");

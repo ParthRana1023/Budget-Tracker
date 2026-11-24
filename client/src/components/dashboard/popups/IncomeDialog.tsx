@@ -2,9 +2,10 @@
 
 // Record income (design handoff, Popups): received now, or expected later (on hold).
 
+import { useEffect } from "react";
 import { createClient } from "@/utils/supabase/client";
 import { addDaysStr, cycleDayOf, cycleKeyFor, nextCycleOffer, shortDate } from "@/lib/cycle.mjs";
-import { inr } from "@/lib/money.mjs";
+import { baseCurrency, inr } from "@/lib/money.mjs";
 import { recurringStatus } from "@/lib/recurringStatus.mjs";
 import Dialog from "../../ui/Dialog";
 import type { PopupContext } from "./context";
@@ -23,9 +24,11 @@ import {
   paise,
   safeAfterPreview,
   toField,
+  useForeign,
   usePopupForm,
   type PreviewProps,
 } from "./parts";
+import { CurrencyChip, CurrencyList, RateLine } from "./currency";
 
 type IncomeType = "salary" | "variable" | "other";
 const TYPES: Array<[IncomeType, string, string]> = [
@@ -63,7 +66,15 @@ export default function IncomeDialog({
     itemId: null as string | null,
     early: false,
   });
-  const amount = paise(form.amount);
+  // Received income can be typed in another currency (saved in base at this cycle's rate);
+  // money on hold stays in the base currency.
+  const fx = useForeign(period.startStr);
+  const received0 = form.status === "received";
+  useEffect(() => {
+    if (!received0 && fx.foreign) fx.setCurrency(baseCurrency());
+  }, [received0]);
+  const inBase = fx.toBase(form.amount);
+  const amount = fx.foreign ? inBase.amount : paise(form.amount);
   const received = form.status === "received";
   // Income 1-5 days before payday can count toward the next cycle (counts_from).
   const offer: string | null = received ? nextCycleOffer(form.date, ctx.schedule) : null;
@@ -136,6 +147,7 @@ export default function IncomeDialog({
   }
 
   const submit = () => {
+    if (!fx.rateOk) return setError("Enter the exchange rate for this cycle.");
     if (amount <= 0) return setError(`Enter an amount above ${inr(0)}.`);
     const name = form.name.trim() || TYPES.find(([k]) => k === form.type)![1];
     const supabase = createClient();
@@ -172,8 +184,8 @@ export default function IncomeDialog({
     const viaRecurring = !!form.itemId || form.repeat;
     const countsFrom = early ? offer : null;
     save(
-      () =>
-        viaRecurring
+      async () => {
+        const r = await (viaRecurring
           ? supabase.rpc("record_entry_with_recurring", {
               p_type: "income",
               p_amount: amount,
@@ -193,7 +205,14 @@ export default function IncomeDialog({
               p_date: form.date,
               p_type: form.type,
               p_counts_from: countsFrom,
-            }),
+            }));
+        // The income RPCs take base amounts; keep what was typed on the new entry.
+        if (!r.error && fx.foreign && typeof r.data === "string") {
+          const u = await supabase.from("transactions").update(inBase.original).eq("id", r.data);
+          if (u.error) return { error: u.error, data: r.data };
+        }
+        return r;
+      },
       async (txId) => {
         onClose();
         // The income row and its transaction are linked; deleting the transaction removes both.
@@ -225,7 +244,29 @@ export default function IncomeDialog({
       sheetHeader={onSwitch && <AddTabs current="income" onSwitch={() => onSwitch(form.amount)} />}
     >
       {!keyboardOpen && <Suggestions items={suggestions} selected={form.itemId} onPick={pick} onStop={stop} />}
-      <AmountField id="in-amt" value={form.amount} onChange={(v) => set({ amount: v })} />
+      <AmountField
+        id="in-amt"
+        value={form.amount}
+        onChange={(v) => set({ amount: v })}
+        currency={fx.currency}
+        chip={
+          received0 && (
+            <CurrencyChip currency={fx.currency} open={fx.listOpen} onToggle={() => fx.setListOpen(!fx.listOpen)} />
+          )
+        }
+      >
+        {fx.listOpen && received0 && (
+          <CurrencyList
+            value={fx.currency}
+            onPick={(c) => {
+              fx.setCurrency(c);
+              set({ amount: "" });
+            }}
+            onClose={() => fx.setListOpen(false)}
+          />
+        )}
+        {received0 && <RateLine fx={fx} typed={form.amount} cycleStart={period.startStr} ownRate id="in" />}
+      </AmountField>
       <div className="flex flex-col gap-2.5">
         <span className="eyebrow">Type</span>
         <div

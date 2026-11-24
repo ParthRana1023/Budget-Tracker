@@ -29,7 +29,7 @@ test.describe("Phones", () => {
     await expect(page.getByRole("heading", { name: "More" })).toBeVisible();
     await page.getByRole("button", { name: /^Budgets/ }).click();
     await expect(page).toHaveURL(/\/budgets$/);
-    await expect(page.locator('[data-testid="budget-row"][data-name="Groceries"]')).toContainText("₹0 / ₹10,000");
+    await expect(page.locator('[data-testid="budget-row"][data-name="Groceries"]')).toContainText("₹0.00 / ₹10,000.00");
     await expect(tab(page, "More")).toHaveAttribute("aria-current", "page");
     await page.getByRole("button", { name: "More", exact: true }).first().click();
     await page.getByRole("button", { name: /^Bills & recurring/ }).click();
@@ -59,9 +59,9 @@ test.describe("Phones", () => {
     await expect(sheet.getByLabel("Amount")).toHaveValue("250");
 
     await sheet.getByRole("group", { name: "Category" }).getByRole("button", { name: "Groceries" }).click();
-    await sheet.getByRole("button", { name: "Log ₹250" }).click();
+    await sheet.getByRole("button", { name: "Log ₹250.00" }).click();
     await expect(sheet).toHaveCount(0);
-    await expect(page.getByText("Logged ₹250 to Groceries")).toBeVisible();
+    await expect(page.getByText("Logged ₹250.00 to Groceries")).toBeVisible();
 
     await tab(page, "Ledger").click();
     await expect(page.locator("#ledger-body").getByRole("button", { name: /^Edit Groceries/ })).toBeVisible();
@@ -70,11 +70,21 @@ test.describe("Phones", () => {
   test("dragging the handle down closes the sheet, asking first when half-filled", async ({ page }) => {
     await setUpAccount(page);
     const drag = async () => {
-      // Measure once the sheet has finished sliding in.
+      // Measure once the sheet has slid in and stopped growing: it's anchored to the bottom, so
+      // content that appears while typing moves its top (and the handle) up.
       await expect(page.getByRole("dialog")).toHaveCSS("transform", "none");
-      const box = (await page.getByRole("dialog").boundingBox())!;
+      const handle = page.getByRole("dialog").locator(":scope > div").first(); // 26px, aria-hidden
+      let box = (await handle.boundingBox())!;
+      await expect
+        .poll(async () => {
+          const was = box.y;
+          await page.waitForTimeout(150);
+          box = (await handle.boundingBox())!;
+          return box.y === was;
+        })
+        .toBe(true);
       const x = box.x + box.width / 2,
-        y = box.y + 12; // the 26px handle zone at the top
+        y = box.y + box.height / 2;
       await page.mouse.move(x, y);
       await page.mouse.down();
       await page.mouse.move(x, y + 80, { steps: 4 });

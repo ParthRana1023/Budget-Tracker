@@ -6,16 +6,7 @@
 import { useState } from "react";
 import { Lock, Trash2 } from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
-import {
-  CURRENCIES,
-  baseCurrency,
-  cleanTyped,
-  currencySymbol,
-  inr,
-  showTyped,
-  toMajor,
-  toMinor,
-} from "@/lib/money.mjs";
+import { baseCurrency, cleanTyped, currencySymbol, inr, showTyped, toMajor, toMinor } from "@/lib/money.mjs";
 import { convert, fetchRate } from "@/lib/fx.mjs";
 import { shortDate } from "@/lib/cycle.mjs";
 import { categoryDiff, draftProblems } from "@/lib/categoryDiff.mjs";
@@ -23,6 +14,7 @@ import Dialog from "../../ui/Dialog";
 import type { Category } from "../types";
 import type { PopupContext } from "./context";
 import { FIELD, Preview, SAVE_FAILED, cleanAmount, cleanDay, paise, toField } from "./parts";
+import { CurrencyChip, CurrencyList } from "./currency";
 
 type Cat = {
   id: string;
@@ -118,6 +110,8 @@ export default function CategoriesDialog({ ctx, onClose }: { ctx: PopupContext; 
       fx_date: was?.fx_rate === r && was.fx_date ? was.fx_date : cycleStart,
     };
   });
+  // The row whose currency list is open (one at a time; it opens under that row).
+  const [listFor, setListFor] = useState<string | null>(null);
   const pickCurrency = (id: string, code: string) => {
     update(id, { currency: code });
     if (code === baseCurrency() || rates[code] !== undefined) return;
@@ -272,18 +266,12 @@ export default function CategoriesDialog({ ctx, onClose }: { ctx: PopupContext; 
                 {c.type === "flexible" ? "→ Fixed" : "→ Flexible"}
               </button>
               <span className="flex items-center gap-1.5">
-                <select
-                  aria-label={`${c.name} currency`}
-                  value={c.currency}
-                  onChange={(e) => pickCurrency(c.id, e.target.value)}
-                  className={`${SMALL} w-[76px] px-1.5 text-[13px]`}
-                >
-                  {CURRENCIES.map((code) => (
-                    <option key={code} value={code}>
-                      {code}
-                    </option>
-                  ))}
-                </select>
+                <CurrencyChip
+                  currency={c.currency}
+                  label={`${c.name} currency`}
+                  open={listFor === c.id}
+                  onToggle={() => setListFor(listFor === c.id ? null : c.id)}
+                />
                 <span className="text-muted">{currencySymbol(c.currency)}</span>
                 <input
                   type="text"
@@ -298,6 +286,18 @@ export default function CategoriesDialog({ ctx, onClose }: { ctx: PopupContext; 
                   className={`${SMALL} tabular w-28 px-2.5 text-right font-semibold`}
                 />
               </span>
+              {listFor === c.id && (
+                <div className="w-full">
+                  <CurrencyList
+                    value={c.currency}
+                    onPick={(code) => {
+                      pickCurrency(c.id, code);
+                      setListFor(null);
+                    }}
+                    onClose={() => setListFor(null)}
+                  />
+                </div>
+              )}
               {c.original_currency && (
                 <span className="tabular w-full text-right text-xs text-muted">
                   {c.fx_rate ? `≈ ${inr(c.monthly_limit)} this cycle` : "Needs a rate"}

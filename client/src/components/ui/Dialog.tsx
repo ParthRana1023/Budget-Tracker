@@ -68,6 +68,8 @@ export default function Dialog({
   const keyboard = useKeyboardInset();
   const [dragY, setDragY] = useState<number | null>(null);
   const dragFrom = useRef<number | null>(null);
+  // The live distance: pointerup can arrive before the last move has re-rendered.
+  const dragDist = useRef(0);
 
   useEffect(() => {
     if (!open) setDiscard(false);
@@ -80,8 +82,9 @@ export default function Dialog({
     if (!busy) onSubmit?.(e);
   };
   const endDrag = () => {
-    const y = dragY ?? 0;
+    const y = dragDist.current;
     dragFrom.current = null;
+    dragDist.current = 0;
     setDragY(null);
     if (y > DRAG_CLOSE_PX) requestClose();
   };
@@ -118,10 +121,15 @@ export default function Dialog({
           aria-hidden
           onPointerDown={(e: PointerEvent<HTMLDivElement>) => {
             dragFrom.current = e.clientY;
+            dragDist.current = 0;
             e.currentTarget.setPointerCapture?.(e.pointerId);
             setDragY(0);
           }}
-          onPointerMove={(e) => dragFrom.current !== null && setDragY(Math.max(0, e.clientY - dragFrom.current))}
+          onPointerMove={(e) => {
+            if (dragFrom.current === null) return;
+            dragDist.current = Math.max(0, e.clientY - dragFrom.current);
+            setDragY(dragDist.current);
+          }}
           onPointerUp={endDrag}
           onPointerCancel={endDrag}
           className="hidden h-[26px] flex-none cursor-grab touch-none items-center justify-center max-[640px]:flex"

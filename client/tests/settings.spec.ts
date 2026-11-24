@@ -21,18 +21,18 @@ test.describe("Settings", () => {
     await page.getByLabel("Monthly salary").fill("120000");
     await expect(page.getByText("Not saved")).toBeVisible();
     const panel = page.getByRole("region", { name: "Apply plan changes" });
-    await expect(panel).toContainText("Salary: ₹1,00,000 → ₹1,20,000");
+    await expect(panel).toContainText("Salary: ₹1,00,000.00 → ₹1,20,000.00");
     await expect(panel).toContainText("Saved first each month");
     await panel.getByRole("button", { name: "This cycle · recalculate now" }).click();
 
     await expect(toast(page, "Plan updated for this cycle")).toBeVisible();
-    await expect(history(page)).toContainText("Salary ₹1,00,000 → ₹1,20,000");
+    await expect(history(page)).toContainText("Salary ₹1,00,000.00 → ₹1,20,000.00");
     await expect(history(page)).toContainText("Applied at once");
     await expect(panel).toHaveCount(0);
 
     await toast(page, "Plan updated").getByRole("button", { name: "Undo" }).click();
     await expect(page.getByLabel("Monthly salary")).toHaveValue("1,00,000");
-    await expect(history(page)).not.toContainText("₹1,20,000");
+    await expect(history(page)).not.toContainText("₹1,20,000.00");
 
     // Save first from the next cycle: the field says when it starts.
     await page.getByRole("button", { name: "Raise save first" }).click();

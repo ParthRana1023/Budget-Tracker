@@ -10,12 +10,12 @@ import type { Category } from "../types";
 import type { PopupContext } from "./context";
 import { cycleKeyFor } from "@/lib/cycle.mjs";
 import type { PaymentMethod } from "@/lib/paymentMethods.mjs";
+import { CurrencyChip, CurrencyList, RateLine } from "./currency";
 import { useKeyboardInset } from "../../ui/useKeyboardInset";
 import { useDragScroll } from "../../ui/useDragScroll";
 import {
   AddTabs,
   AmountField,
-  CurrencyFields,
   DueDayField,
   FIELD,
   Labeled,
@@ -324,11 +324,26 @@ export default function ExpenseDialog({
     >
       {/* With the keyboard up, the amount, categories and Save matter; suggestions wait. */}
       {!keyboardOpen && <Suggestions items={suggestions} selected={form.itemId} onPick={pick} onStop={stop} icon />}
-      <AmountField id="ex-amt" value={form.amount} onChange={(v) => set({ amount: v })} currency={fx.currency}>
-        {fx.foreign && amount > 0 && (
-          <span className="tabular text-[13px] text-muted">≈ {inr(amount)} at this cycle’s rate</span>
+      <AmountField
+        id="ex-amt"
+        value={form.amount}
+        onChange={(v) => set({ amount: v })}
+        currency={fx.currency}
+        chip={<CurrencyChip currency={fx.currency} open={fx.listOpen} onToggle={() => fx.setListOpen(!fx.listOpen)} />}
+      >
+        {fx.listOpen && (
+          <CurrencyList
+            value={fx.currency}
+            onPick={(c) => {
+              fx.setCurrency(c);
+              set({ amount: "" }); // what was typed meant the old currency
+            }}
+            onClose={() => fx.setListOpen(false)}
+          />
         )}
-        <div className="flex flex-wrap gap-1.5">
+        <RateLine fx={fx} typed={form.amount} cycleStart={period.startStr} ownRate id="ex" />
+        {/* Quick amounts are in the base currency, so they hide for a foreign one. */}
+        <div className={fx.foreign ? "hidden" : "flex flex-wrap gap-1.5"}>
           {QUICK.map((q) => (
             <button
               key={q}
@@ -436,7 +451,6 @@ export default function ExpenseDialog({
             className={FIELD}
           />
         </Labeled>
-        <CurrencyFields id="ex" fx={fx} />
       </div>
 
       {model.reserveLeft > 0 && (

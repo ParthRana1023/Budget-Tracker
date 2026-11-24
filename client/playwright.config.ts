@@ -41,8 +41,11 @@ export default defineConfig({
       use: { ...devices["Desktop Chrome"] },
     },
     {
+      // Phones only where they differ: the phone shell and sheets, the PWA, Settings/Account and
+      // sign-in. The rest are the same flows at a wider width.
       name: "mobile-chrome",
       use: { ...devices["Pixel 5"] },
+      testMatch: /(mobile|pwa|settings|account|auth)\.spec\.ts$/,
     },
   ],
   webServer: {

@@ -33,13 +33,13 @@ test.describe("Dashboard v2", () => {
     await expect(early).toHaveAttribute("aria-checked", "false");
     await expect(dialog).toContainText(/This arrived \d days? before payday/);
     await early.click();
-    await expect(dialog).toContainText(/Counts from .*\+₹5,000/);
+    await expect(dialog).toContainText(/Counts from .*\+₹5,000.00/);
     await expect(dialog).toContainText("added to next cycle’s income");
-    await dialog.getByRole("button", { name: "Save ₹5,000" }).click();
+    await dialog.getByRole("button", { name: "Save ₹5,000.00" }).click();
 
-    await expect(toast(page, /Added ₹5,000 · counts toward the cycle starting /)).toBeVisible();
+    await expect(toast(page, /Added ₹5,000.00 · counts toward the cycle starting /)).toBeVisible();
     // It stays out of this cycle: safe to spend is still ₹0.
-    await expect(page.getByTestId("safe-to-spend")).toHaveText("₹0");
+    await expect(page.getByTestId("safe-to-spend")).toHaveText("₹0.00");
   });
 
   test("a payday change from the next cycle shows on the cycle line", async ({ page }) => {
@@ -57,11 +57,11 @@ test.describe("Dashboard v2", () => {
 
     await page.goto("/dashboard");
     await show(page, "Budgets");
-    await expect(page.locator('[data-testid="budget-row"][data-name="Groceries"]')).toContainText("₹0 / ₹10.000");
+    await expect(page.locator('[data-testid="budget-row"][data-name="Groceries"]')).toContainText("₹0,00 / ₹10.000,00");
     await openLogExpense(page);
     const amount = page.getByRole("dialog").getByLabel("Amount");
     await amount.pressSequentially("1234,5");
     await expect(amount).toHaveValue("1.234,5");
-    await expect(page.getByRole("dialog").getByRole("button", { name: "Log ₹1.235" })).toBeVisible();
+    await expect(page.getByRole("dialog").getByRole("button", { name: "Log ₹1.234,50" })).toBeVisible();
   });
 });

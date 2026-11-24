@@ -3,7 +3,7 @@
 // Bills & recurring card (design handoff): calendar strip of the cycle, then each
 // recurring item and each fixed bill that has no recurring item of its own.
 
-import { inr } from "@/lib/money.mjs";
+import { formatExact, inr } from "@/lib/money.mjs";
 import { addDaysStr, cycleDayOf, dayLabel, dueDateInCycle, shortDate } from "@/lib/cycle.mjs";
 import { recurringStatus } from "@/lib/recurringStatus.mjs";
 import Reveal from "../ui/Reveal";
@@ -193,14 +193,22 @@ export default function BillsRecurring({
               <span className="text-[13px] text-muted">
                 {item.type === "income" ? "Income" : (cat?.name ?? "Expense")} ·{" "}
                 {item.day_of_month ? `day ${item.day_of_month}` : "no fixed day"}
+                {item.original_currency ? " · rate changes each cycle" : ""}
               </span>
             </span>
             <span className={PILL_STATUS} style={{ borderColor: s.border, color: s.color }}>
               {s.label}
             </span>
-            <span className="tabular min-w-[90px] text-right font-semibold">
-              {item.type === "income" ? "+ " : "− "}
-              {inr(item.amount)}
+            <span className="flex min-w-[90px] flex-col items-end">
+              <span className="tabular font-semibold">
+                {item.type === "income" ? "+ " : "− "}
+                {inr(item.amount)}
+              </span>
+              {item.original_currency && (
+                <span className="tabular text-xs text-muted">
+                  {formatExact(Number(item.original_amount), item.original_currency)}
+                </span>
+              )}
             </span>
             <span className="flex gap-1.5">
               {item.active && (st.key === "due" || st.key === "suggested") && (

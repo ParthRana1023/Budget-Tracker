@@ -1,11 +1,5 @@
 import { test, expect, Page } from "@playwright/test";
-import { isPhone, openLogExpense, setUpAccount, show } from "./helpers";
-
-// These flows move between Home, Budgets, Goals, Bills and the Ledger on one page; on phones
-// those are separate pages, and mobile.spec covers the phone versions.
-test.beforeEach(({ page }) => {
-  test.skip(isPhone(page), "Wide-screen flow; phones: mobile.spec");
-});
+import { openLogExpense, setUpAccount, show } from "./helpers";
 
 // Design handoff v3, Payment: how an expense was paid. Tracking only; safe to spend doesn't change.
 
@@ -44,7 +38,7 @@ test("payment method: pick, default to last used, filter in the URL, Reports, an
   await expect(page).toHaveURL(/[?&]method=upi\b/);
   await expect(upiRow).toBeVisible();
   await expect(shopRow).toHaveCount(0);
-  await expect(page.getByText("1 of 2 expenses · UPI · ₹640")).toBeVisible();
+  await expect(page.getByText("1 of 2 expenses · UPI · ₹640.00")).toBeVisible();
 
   // Kept across a reload; Not set added alongside.
   await page.reload();
@@ -63,8 +57,8 @@ test("payment method: pick, default to last used, filter in the URL, Reports, an
   await page.getByRole("tab", { name: /Spending habits/ }).click();
   const card = page.locator("#pm-card");
   await expect(card.getByRole("heading", { name: "Spend by payment method" })).toBeVisible();
-  await expect(card.getByRole("button", { name: /^UPI: ₹640/ })).toBeVisible();
-  await expect(card.getByRole("button").last()).toHaveAccessibleName(/^Not set: ₹300/); // Not set is last
+  await expect(card.getByRole("button", { name: /^UPI: ₹640.00/ })).toBeVisible();
+  await expect(card.getByRole("button").last()).toHaveAccessibleName(/^Not set: ₹300.00/); // Not set is last
 
   // Change it to a credit card in Edit entry.
   await show(page, "Home");

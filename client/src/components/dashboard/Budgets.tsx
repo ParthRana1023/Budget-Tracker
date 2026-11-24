@@ -1,6 +1,6 @@
 "use client";
 
-import { inr } from "@/lib/money.mjs";
+import { formatExact, inr } from "@/lib/money.mjs";
 import Reveal from "../ui/Reveal";
 import { CARD_H2, LINK_BUTTON, PILL_LINE, type Category } from "./types";
 
@@ -45,7 +45,14 @@ export default function Budgets({
             data-name={c.name}
           >
             <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-              <span className="font-medium">{c.name}</span>
+              <span className="flex items-center gap-1.5 font-medium">
+                {c.name}
+                {c.original_currency && (
+                  <span className="rounded-md bg-tile-2 px-1.5 py-px text-[11px] font-bold text-ink-2">
+                    {c.original_currency}
+                  </span>
+                )}
+              </span>
               <span aria-hidden className="flex-[1_1_24px] -translate-y-1 border-b border-dotted border-line-2" />
               <span className="tabular text-sm">
                 <strong className="font-semibold" style={{ color: tone }}>
@@ -54,6 +61,11 @@ export default function Budgets({
                 <span className="text-muted">{limit ? ` / ${inr(limit)}` : " · no limit"}</span>
               </span>
             </div>
+            {c.original_currency && (
+              <span className="tabular -mt-0.5 text-xs text-muted">
+                {formatExact(Number(c.original_amount), c.original_currency)} a month · {inr(limit)} this cycle
+              </span>
+            )}
             <div className="h-1 overflow-hidden rounded-full bg-track">
               <div
                 className="rv-bar h-full rounded-full"

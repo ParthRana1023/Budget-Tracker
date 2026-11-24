@@ -17,19 +17,20 @@ import {
 } from "./money.mjs";
 
 test("money in each number format", () => {
-  assert.equal(formatMoney(10000000, "indian"), "₹1,00,000");
-  assert.equal(formatMoney(10000000, "international"), "₹100,000");
-  assert.equal(formatMoney(10000000, "european"), "₹100.000");
-  assert.equal(formatMoney(-84000, "indian"), "−₹840");
+  assert.equal(formatMoney(10000000, "indian"), "₹1,00,000.00");
+  assert.equal(formatMoney(10000000, "international"), "₹100,000.00");
+  assert.equal(formatMoney(10000000, "european"), "₹100.000,00");
+  assert.equal(formatMoney(-84000, "indian"), "−₹840.00");
+  assert.equal(formatMoney(100450, "indian"), "₹1,004.50", "every amount keeps its decimals");
 });
 
 test("inr follows the user's format; unknown formats fall back to Indian", () => {
   setNumberFormat("international");
-  assert.equal(inr(10000000), "₹100,000");
+  assert.equal(inr(10000000), "₹100,000.00");
   setNumberFormat("nope");
-  assert.equal(inr(10000000), "₹1,00,000");
+  assert.equal(inr(10000000), "₹1,00,000.00");
   setNumberFormat(null);
-  assert.equal(inr(-65000), "−₹650");
+  assert.equal(inr(-65000), "−₹650.00");
 });
 
 test("typed amounts are grouped as you type and read back in each format", () => {
@@ -50,12 +51,12 @@ test("base currency: symbol, minor units and typing follow it", () => {
   assert.equal(toMinor(1200), 1200);
   assert.equal(cleanTyped("1,200.50", "indian"), "1200", "no decimals for yen");
   setCurrency("USD");
-  assert.equal(inr(-1999), "−$20");
+  assert.equal(inr(-1999), "−$19.99");
   assert.equal(toMinor(19.99), 1999);
   assert.equal(toMajor(1999), 19.99);
   setCurrency("KWD");
   assert.equal(baseCurrency(), "INR", "unsupported currencies fall back to INR");
-  assert.equal(formatMoney(150000, "international", "CHF"), "CHF 1,500", "letter codes get a space");
+  assert.equal(formatMoney(150000, "international", "CHF"), "CHF 1,500.00", "letter codes get a space");
   assert.equal(formatExact(1999, "USD"), "$19.99");
   assert.equal(formatExact(1200, "JPY"), "¥1,200");
 });

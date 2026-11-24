@@ -1,11 +1,5 @@
 import { test, expect, Page } from "@playwright/test";
-import { isPhone, openLogExpense, openRecordIncome, setUpAccount } from "./helpers";
-
-// These flows move between Home, Budgets, Goals, Bills and the Ledger on one page; on phones
-// those are separate pages, and mobile.spec covers the phone versions.
-test.beforeEach(({ page }) => {
-  test.skip(isPhone(page), "Wide-screen flow; phones: mobile.spec");
-});
+import { openLogExpense, openRecordIncome, setUpAccount } from "./helpers";
 
 // Design handoff, Dashboard → Popups. Every test starts from setUpAccount:
 // ₹1,00,000 pay, 20% savings, ₹28,000 rent, ₹10,000 groceries limit, no salary recorded yet.
@@ -37,10 +31,10 @@ test.describe("Popups", () => {
     await setUpAccount(page);
     await openLogExpense(page);
     await dialog(page).getByRole("button", { name: "Log expense" }).click();
-    await expect(dialog(page).getByRole("alert")).toContainText("Enter an amount above ₹0.");
+    await expect(dialog(page).getByRole("alert")).toContainText("Enter an amount above ₹0.00.");
     await dialog(page).getByRole("button", { name: "+500" }).click();
     await expect(dialog(page).getByLabel("Amount")).toHaveValue("500");
-    await dialog(page).getByRole("button", { name: "Log ₹500" }).click();
+    await dialog(page).getByRole("button", { name: "Log ₹500.00" }).click();
     await expect(dialog(page).getByRole("alert")).toContainText("Pick a category.");
     await dialog(page)
       .getByRole("button", { name: /^Groceries/ })
@@ -49,35 +43,37 @@ test.describe("Popups", () => {
     // No income recorded yet, so safe to spend stays at ₹0.
     await expect(dialog(page)).toContainText("nothing left to spend this cycle");
     await dialog(page).getByLabel("Payee").fill("DMart");
-    await dialog(page).getByRole("button", { name: "Log ₹500" }).click();
+    await dialog(page).getByRole("button", { name: "Log ₹500.00" }).click();
 
-    await expect(toast(page, "Logged ₹500 to Groceries")).toBeVisible();
-    await expect(page.locator('[data-testid="budget-row"][data-name="Groceries"]')).toContainText("₹500 / ₹10,000");
-    await expect(page.getByRole("button", { name: /Edit Groceries, − ₹500/ })).toBeVisible();
+    await expect(toast(page, "Logged ₹500.00 to Groceries")).toBeVisible();
+    await expect(page.locator('[data-testid="budget-row"][data-name="Groceries"]')).toContainText(
+      "₹500.00 / ₹10,000.00",
+    );
+    await expect(page.getByRole("button", { name: /Edit Groceries, − ₹500.00/ })).toBeVisible();
 
-    await toast(page, "Logged ₹500").getByRole("button", { name: "Undo" }).click();
-    await expect(page.locator('[data-testid="budget-row"][data-name="Groceries"]')).toContainText("₹0 / ₹10,000");
+    await toast(page, "Logged ₹500.00").getByRole("button", { name: "Undo" }).click();
+    await expect(page.locator('[data-testid="budget-row"][data-name="Groceries"]')).toContainText("₹0.00 / ₹10,000.00");
   });
 
   test("Record income raises safe to spend; expected income waits on hold", async ({ page }) => {
     await setUpAccount(page);
     await openRecordIncome(page);
     await dialog(page).getByLabel("Amount").fill("100000");
-    await expect(dialog(page)).toContainText("+₹1,00,000");
-    await dialog(page).getByRole("button", { name: "Save ₹1,00,000" }).click();
-    await expect(toast(page, "Added ₹1,00,000 to this cycle’s income")).toBeVisible();
+    await expect(dialog(page)).toContainText("+₹1,00,000.00");
+    await dialog(page).getByRole("button", { name: "Save ₹1,00,000.00" }).click();
+    await expect(toast(page, "Added ₹1,00,000.00 to this cycle’s income")).toBeVisible();
     // 1,00,000 − 20,000 savings − 28,000 rent
-    await expect(safe(page)).toHaveText("₹52,000", { timeout: 5_000 });
+    await expect(safe(page)).toHaveText("₹52,000.00", { timeout: 5_000 });
 
     await openRecordIncome(page);
     await dialog(page).getByLabel("Amount").fill("60000");
     await dialog(page).getByRole("radio", { name: "Variable pay" }).click();
     await expect(dialog(page).getByRole("radio", { name: /Expected later/ })).toHaveAttribute("aria-checked", "true");
     await dialog(page).getByLabel("Source").fill("Annual bonus");
-    await dialog(page).getByRole("button", { name: "Save ₹60,000" }).click();
-    await expect(toast(page, "₹60,000 is on hold until it reaches your bank")).toBeVisible();
+    await dialog(page).getByRole("button", { name: "Save ₹60,000.00" }).click();
+    await expect(toast(page, "₹60,000.00 is on hold until it reaches your bank")).toBeVisible();
     await expect(page.getByText(/Annual bonus, expected .*Not counted until it reaches your bank\./)).toBeVisible();
-    await expect(safe(page)).toHaveText("₹52,000");
+    await expect(safe(page)).toHaveText("₹52,000.00");
   });
 
   test("Bonus split: savings to a goal, the rest to the reserve and this cycle", async ({ page }) => {
@@ -90,25 +86,25 @@ test.describe("Popups", () => {
 
     await page.getByRole("button", { name: "Record expected income" }).click();
     await dialog(page).getByLabel("Amount").fill("60000");
-    await dialog(page).getByRole("button", { name: "Save ₹60,000" }).click();
+    await dialog(page).getByRole("button", { name: "Save ₹60,000.00" }).click();
     await expect(dialog(page)).toHaveCount(0);
 
     await page.getByRole("button", { name: "Mark received & allocate" }).click();
     await expect(dialog(page).getByLabel("Amount to savings")).toHaveValue("30,000");
     await dialog(page).getByLabel("Amount to spend this cycle").fill("1000");
-    await expect(dialog(page)).toContainText("₹11,000 still to allocate.");
+    await expect(dialog(page)).toContainText("₹11,000.00 still to allocate.");
     await dialog(page).getByRole("button", { name: "Confirm & allocate" }).click();
-    await expect(dialog(page).getByRole("alert")).toContainText("The three amounts need to add up to ₹60,000.");
+    await expect(dialog(page).getByRole("alert")).toContainText("The three amounts need to add up to ₹60,000.00.");
     await dialog(page)
       .getByRole("button", { name: /50 \/ 30 \/ 20/ })
       .click();
     await dialog(page).getByRole("button", { name: "Confirm & allocate" }).click();
 
-    await expect(toast(page, "Allocated ₹60,000 · ₹12,000 added to safe to spend")).toBeVisible();
+    await expect(toast(page, "Allocated ₹60,000.00 · ₹12,000.00 added to safe to spend")).toBeVisible();
     await expect(page.locator('[data-testid="goal-row"][data-name="Emergency fund"]')).toContainText(
-      "₹30,000 of ₹1,00,000",
+      "₹30,000.00 of ₹1,00,000.00",
     );
-    await expect(page.getByText("₹18,000 set aside from windfalls · ₹0 used")).toBeVisible();
+    await expect(page.getByText("₹18,000.00 set aside from windfalls · ₹0.00 used")).toBeVisible();
     // The reserve can now pay a bill without touching safe to spend.
     await page.getByRole("button", { name: "Pay a bill from it" }).click();
     await expect(dialog(page).getByRole("switch", { name: "Pay from annual bills reserve" })).toHaveAttribute(
@@ -120,12 +116,12 @@ test.describe("Popups", () => {
   test("Edit entry and delete it", async ({ page }) => {
     await setUpAccount(page);
     await logExpense(page, "800", "Groceries");
-    await page.getByRole("button", { name: /Edit Groceries, − ₹800/ }).click();
+    await page.getByRole("button", { name: /Edit Groceries, − ₹800.00/ }).click();
     await expect(dialog(page)).toContainText("Edit entry");
     await dialog(page).getByLabel("Amount").fill("650");
     await dialog(page).getByRole("button", { name: "Save changes" }).click();
     await expect(toast(page, "Entry updated")).toBeVisible();
-    await page.getByRole("button", { name: /Edit Groceries, − ₹650/ }).click();
+    await page.getByRole("button", { name: /Edit Groceries, − ₹650.00/ }).click();
     await dialog(page).getByRole("button", { name: "Delete this entry" }).click();
     await dialog(page).getByRole("alertdialog").getByRole("button", { name: "Delete" }).click();
     await expect(page.getByRole("button", { name: /Edit Groceries/ })).toHaveCount(0);
@@ -143,13 +139,13 @@ test.describe("Popups", () => {
       .click();
     await dialog(page).getByLabel("Rent monthly amount").fill("");
     await dialog(page).getByRole("button", { name: "Done" }).click();
-    await expect(dialog(page).getByRole("alert")).toContainText("Rent needs a monthly amount above ₹0.");
+    await expect(dialog(page).getByRole("alert")).toContainText("Rent needs a monthly amount above ₹0.00.");
     await dialog(page).getByLabel("Rent monthly amount").fill("30000");
     await page.keyboard.press("Escape");
 
     await expect(toast(page, "Categories updated")).toBeVisible();
     await expect(page.locator('[data-testid="budget-row"][data-name="Food"]')).toBeVisible();
-    await expect(page.locator('[data-testid="budget-row"][data-name="Pets"]')).toContainText("₹0 / ₹2,000");
+    await expect(page.locator('[data-testid="budget-row"][data-name="Pets"]')).toContainText("₹0.00 / ₹2,000.00");
     await toast(page, "Categories updated").getByRole("button", { name: "Undo" }).click();
     await expect(page.locator('[data-testid="budget-row"][data-name="Groceries"]')).toBeVisible();
     await expect(page.locator('[data-testid="budget-row"][data-name="Pets"]')).toHaveCount(0);
@@ -164,7 +160,7 @@ test.describe("Popups", () => {
       await d.getByLabel("Due on day").fill("1");
     });
     await expect(page.locator('[data-testid="recurring-row"][data-name="Gym"]')).toContainText("Recorded");
-    await page.getByRole("button", { name: /Edit Gym, − ₹1,500/ }).click();
+    await page.getByRole("button", { name: /Edit Gym, − ₹1,500.00/ }).click();
     await dialog(page).getByRole("button", { name: "Delete this entry" }).click();
     await dialog(page).getByRole("alertdialog").getByRole("button", { name: "Delete" }).click();
 
@@ -174,7 +170,7 @@ test.describe("Popups", () => {
     await expect(page.locator('[data-testid="recurring-row"][data-name="Gym"]')).toContainText("Skipped this month");
     await toast(page, "Skipped Gym").getByRole("button", { name: "Undo" }).click();
     await notices.getByRole("button", { name: "Record Gym" }).click();
-    await expect(toast(page, "Recorded Gym · ₹1,500")).toBeVisible();
+    await expect(toast(page, "Recorded Gym · ₹1,500.00")).toBeVisible();
     await expect(page.locator('[data-testid="recurring-row"][data-name="Gym"]')).toContainText("Recorded");
 
     await page.getByRole("button", { name: "Edit Gym", exact: true }).click();

@@ -83,7 +83,7 @@ test("the draft is checked before it can close", () => {
   assert.deepEqual(draftProblems([...before, cat("d", "rent ", "flexible", 0)]), [
     "There are two categories called rent.",
   ]);
-  assert.deepEqual(draftProblems([cat("e", "Phone", "fixed", 0)]), ["Phone needs a monthly amount above ₹0."]);
+  assert.deepEqual(draftProblems([cat("e", "Phone", "fixed", 0)]), ["Phone needs a monthly amount above ₹0.00."]);
   assert.deepEqual(draftProblems([cat("f", " ", "flexible", 0)]), ["Every category needs a name."]);
   assert.deepEqual(draftProblems([cat("g", "Old", "fixed", 0, null, false)]), [], "switched-off rows are not checked");
 });

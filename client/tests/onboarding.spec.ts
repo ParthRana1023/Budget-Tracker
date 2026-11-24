@@ -43,7 +43,7 @@ test.describe("Onboarding", () => {
 
     // Step 2: savings.
     await page.getByRole("button", { name: "20%" }).click();
-    await expect(page.getByText("₹20,000").first()).toBeVisible();
+    await expect(page.getByText("₹20,000.00").first()).toBeVisible();
     await page.getByRole("button", { name: "Raise savings target" }).click();
     await expect(page.getByText("21%")).toBeVisible();
     await page.getByRole("button", { name: "Lower savings target" }).click();
@@ -68,12 +68,12 @@ test.describe("Onboarding", () => {
     await onboardingNext(page).click();
 
     // Step 5: summary. 1,00,000 − 20% − (28,000 + 1,200) = 50,800.
-    await expect(summaryRow(page, "Take-home pay")).toContainText("₹1,00,000");
-    await expect(summaryRow(page, "Savings · 20%")).toContainText("−₹20,000");
-    await expect(summaryRow(page, "Fixed bills")).toContainText("−₹29,200");
-    await expect(summaryRow(page, "Safe to spend")).toContainText("₹50,800");
-    await expect(summaryRow(page, "Flexible limits you set")).toContainText("₹10,000");
-    await expect(page.getByRole("complementary")).toContainText("₹50,800");
+    await expect(summaryRow(page, "Take-home pay")).toContainText("₹1,00,000.00");
+    await expect(summaryRow(page, "Savings · 20%")).toContainText("−₹20,000.00");
+    await expect(summaryRow(page, "Fixed bills")).toContainText("−₹29,200.00");
+    await expect(summaryRow(page, "Safe to spend")).toContainText("₹50,800.00");
+    await expect(summaryRow(page, "Flexible limits you set")).toContainText("₹10,000.00");
+    await expect(page.getByRole("complementary")).toContainText("₹50,800.00");
 
     await page.getByRole("button", { name: "Open my dashboard" }).click();
     await page.waitForURL("**/dashboard", { timeout: 20_000 });
@@ -87,7 +87,7 @@ test.describe("Onboarding", () => {
     await onboardingNext(page).click();
     await onboardingNext(page).click();
     await page.getByLabel("Rent amount").fill("28000");
-    await expect(page.getByRole("complementary")).toContainText("Savings and bills are ₹14,000 more than your pay.");
+    await expect(page.getByRole("complementary")).toContainText("Savings and bills are ₹14,000.00 more than your pay.");
   });
 
   test("skipping onboarding still lands on a working dashboard", async ({ page }) => {
