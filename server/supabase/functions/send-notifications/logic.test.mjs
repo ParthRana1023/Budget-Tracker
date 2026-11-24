@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { addDays, billPush, billsDueOn, channels, isQuiet, localParts, money, weeklyPush } from "./logic.mjs";
+import { addDays, billPush, billsDueOn, channels, isQuiet, localParts, money, safeNow, weeklyPush } from "./logic.mjs";
 
 test("local date, hour and weekday in the user's time zone", () => {
   // 20:30 UTC Sunday 22 Nov = 02:00 Monday 23 Nov in India.
@@ -84,20 +84,64 @@ test("channels: email needs a sender and the switch, push needs a device and the
   );
 });
 
-test("push text for bills and the weekly summary", () => {
-  assert.deepEqual(billPush("Rent", 1200000, 1), {
+test("push text for bills and the weekly summary (design handoff v3)", () => {
+  const rent = { ref: "item:11111111-1111-1111-1111-111111111111:2026-11-25", name: "Rent", amount: 1200000 };
+  assert.deepEqual(billPush(rent, 1, "2026-11-25"), {
     title: "Rent is due tomorrow",
-    body: "₹12,000. Record it in SaveFirst when you pay.",
-    url: "/dashboard",
-    tag: "bill:Rent",
+    body: "₹12,000.00 · Tap to record it once it’s paid.",
+    url: "/dashboard?record=11111111-1111-1111-1111-111111111111",
+    tag: "bill-11111111-1111-1111-1111-111111111111-2026-11",
+    actions: [{ action: "record", title: "Record it" }],
   });
-  assert.equal(billPush("Rent", 1200000, 3).title, "Rent is due in 3 days");
-  assert.equal(weeklyPush(450000, 1).body, "You spent ₹4,500 across 1 entry last week.");
+  assert.equal(billPush(rent, 3, "2026-11-25").title, "Rent is due in 3 days");
+  assert.equal(billPush(rent, 7, "2026-11-25").title, "Rent is due on 25 Nov");
+  const bill = { ref: "bill:22222222-2222-2222-2222-222222222222:2026-12-01", name: "Insurance", amount: 300000 };
+  assert.equal(billPush(bill, 1, "2026-12-01").url, "/dashboard?pay=22222222-2222-2222-2222-222222222222");
+  assert.equal(weeklyPush(842000, 1430000, "2026-11-30").title, "Your week: ₹8,420.00 spent");
+  assert.equal(
+    weeklyPush(842000, 1430000, "2026-11-30").body,
+    "₹14,300.00 is safe to spend until 30 Nov. Savings are already set aside.",
+  );
+  assert.equal(
+    weeklyPush(842000, -5000, "2026-11-30").body,
+    "Nothing is left to spend until 30 Nov. Savings are already set aside.",
+  );
 });
 
 test("message amounts follow the user's base currency", () => {
-  assert.equal(money(1200000), "₹12,000");
-  assert.equal(money(150050, "USD"), "$1,501");
+  assert.equal(money(1200000), "₹12,000.00");
+  assert.equal(money(150050, "USD"), "$1,500.50");
   assert.equal(money(12000, "JPY"), "¥12,000", "yen have no minor unit");
-  assert.equal(billPush("Rent", 150000, 3, "USD").body, "$1,500. Record it in SaveFirst when you pay.");
+  assert.equal(
+    billPush({ ref: "bill:c1:2026-11-25", name: "Rent", amount: 150000 }, 3, "2026-11-25", "USD").body,
+    "$1,500.00 · Tap to record it once it’s paid.",
+  );
+});
+
+test("the weekly summary's safe to spend is the Dashboard's: pay minus savings, bills and spending", () => {
+  const settings = {
+    take_home_pay: 10000000,
+    savings_pct: 20,
+    month_start_day: 1,
+    plan_changes: [
+      { field: "payday", to_value: 1, applies: "start", effective_from: "2026-01-01" },
+      { field: "salary", to_value: 10000000, applies: "start", effective_from: "2026-01-01" },
+      { field: "save_pct", to_value: 20, applies: "start", effective_from: "2026-01-01" },
+    ],
+  };
+  const categories = [
+    { id: "rent", name: "Rent", type: "fixed", monthly_limit: 2800000, due_day: 3 },
+    { id: "food", name: "Groceries", type: "flexible", monthly_limit: 1000000 },
+  ];
+  const transactions = [
+    { id: "t1", type: "income", amount: 10000000, date: "2026-11-01" },
+    { id: "t2", type: "savings_transfer", amount: 2000000, date: "2026-11-01" },
+    { id: "t3", type: "expense", amount: 2800000, date: "2026-11-03", category_id: "rent" },
+    { id: "t4", type: "expense", amount: 500000, date: "2026-11-20", category_id: "food" },
+  ];
+  const r = safeNow({ settings, categories, transactions, recurringItems: [], today: "2026-11-23" });
+  assert.equal(r.cycleStart, "2026-11-01");
+  assert.equal(r.cycleEnd, "2026-11-30");
+  // 1,00,000 − 20,000 saved − 28,000 rent − 5,000 groceries
+  assert.equal(r.safe, 4700000);
 });

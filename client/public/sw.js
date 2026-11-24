@@ -61,7 +61,8 @@ self.addEventListener("fetch", (event) => {
 });
 
 // ---------------------------------------------------------------- Web Push
-// Payload from send-notifications: { title, body, url, tag }.
+// Payload from send-notifications or /api/push/test: { title, body, url, tag, actions? }.
+// The only action, "Record it" on bill reminders, opens the same page as tapping the notification.
 self.addEventListener("push", (event) => {
   let data = {};
   try {
@@ -75,6 +76,7 @@ self.addEventListener("push", (event) => {
       icon: "/android-chrome-192x192.png",
       badge: "/badge-96.png", // the mark in white, for the Android status bar
       tag: data.tag,
+      actions: Array.isArray(data.actions) ? data.actions.slice(0, 2) : [],
       data: { url: data.url || "/dashboard" },
     }),
   );

@@ -303,15 +303,27 @@ export function SwitchRow({
   );
 }
 
-export function Switch({ on, onToggle, label }: { on: boolean; onToggle: () => void; label: string }) {
+export function Switch({
+  on,
+  onToggle,
+  label,
+  disabled = false,
+}: {
+  on: boolean;
+  onToggle: () => void;
+  label: string;
+  /** Can't change right now: 45% opacity and aria-disabled; something nearby explains why. */
+  disabled?: boolean;
+}) {
   return (
     <button
       type="button"
       role="switch"
       aria-checked={on}
       aria-label={label}
-      onClick={onToggle}
-      className="relative h-[26px] w-11 flex-none cursor-pointer rounded-full border-0 transition-colors duration-200"
+      aria-disabled={disabled || undefined}
+      onClick={() => !disabled && onToggle()}
+      className="relative h-[26px] w-11 flex-none cursor-pointer rounded-full border-0 transition-[background-color,opacity] duration-200 aria-disabled:cursor-default aria-disabled:opacity-45"
       style={{ background: on ? "var(--lime)" : "var(--line-2)" }}
     >
       <span

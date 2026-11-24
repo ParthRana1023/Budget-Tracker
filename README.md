@@ -148,14 +148,15 @@ No env file is needed at the repo root.
 
 ### Client (`client/.env.example`)
 
-| Variable                               | Required    | Description                                                            |
-| -------------------------------------- | ----------- | ---------------------------------------------------------------------- |
-| `NEXT_PUBLIC_SUPABASE_URL`             | Yes         | Supabase project URL                                                   |
-| `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Yes         | Supabase anonymous / public API key                                    |
-| `SUPABASE_SECRET_KEY`                  | Server-only | Supabase secret key: records sign-in history and caches exchange rates |
-| `NEXT_PUBLIC_GOOGLE_AUTH`              | Optional    | Set to `1` to enable Google OAuth sign-in and account linking          |
-| `NEXT_PUBLIC_EMAIL_NOTIFICATIONS`      | Optional    | Set to `1` to display email notification controls in Settings          |
-| `NEXT_PUBLIC_VAPID_PUBLIC_KEY`         | Optional    | Public VAPID key for Web Push. Empty hides push in Settings            |
+| Variable                               | Required    | Description                                                             |
+| -------------------------------------- | ----------- | ----------------------------------------------------------------------- |
+| `NEXT_PUBLIC_SUPABASE_URL`             | Yes         | Supabase project URL                                                    |
+| `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Yes         | Supabase anonymous / public API key                                     |
+| `SUPABASE_SECRET_KEY`                  | Server-only | Supabase secret key: records sign-in history and caches exchange rates  |
+| `NEXT_PUBLIC_GOOGLE_AUTH`              | Optional    | Set to `1` to enable Google OAuth sign-in and account linking           |
+| `NEXT_PUBLIC_EMAIL_NOTIFICATIONS`      | Optional    | Set to `1` to display email notification controls in Settings           |
+| `NEXT_PUBLIC_VAPID_PUBLIC_KEY`         | Optional    | Public VAPID key for Web Push. Empty hides push in Settings             |
+| `VAPID_PRIVATE_KEY` / `VAPID_SUBJECT`  | Server-only | Same key pair's private half and `mailto:` contact; used by Send a test |
 
 ### Email job (`server/supabase/functions/.env.example`)
 
@@ -184,20 +185,20 @@ To initialize or completely reset your database schema:
 
 ### Setup Checklist
 
-| What                                       | Where                               | Why                                                                                                                            |
-| ------------------------------------------ | ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
-| **Vercel project**                         | Vercel › Settings › Build           | Framework Preset `Next.js`, Root Directory `client`, Output Directory empty. One project serves the app and its API routes.    |
-| **Run `savefirst_full_setup.sql`**         | Supabase SQL editor                 | Creates full schema, tables, views, RLS policies, and RPC functions.                                                           |
-| **`NEXT_PUBLIC_SUPABASE_URL`**             | Vercel / Client env                 | Connects application to the Supabase backend.                                                                                  |
-| **`NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`** | Vercel / Client env                 | Public client access token.                                                                                                    |
-| **`SUPABASE_SECRET_KEY`**                  | Vercel (Server-only env)            | Records sign-in audit logs and caches exchange rates via secure server routes. Without it, rates are fetched on every request. |
-| **VAPID keys (optional)**                  | Vercel + Edge Function secrets      | `NEXT_PUBLIC_VAPID_PUBLIC_KEY` in Vercel; `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` as function secrets.        |
-| **Raise sign-in rate limits**              | Supabase › Auth › Rate Limits       | Password and code sign-ins go through the app's server, so every user shares its IP's limit.                                   |
-| **`NEXT_PUBLIC_GOOGLE_AUTH=1`**            | Vercel / Client env                 | Enables Google Sign-In and identity linking UI.                                                                                |
-| **Redirect URLs**                          | Supabase › Auth › URL Configuration | Add `<APP_URL>/**` and `http://localhost:3000/**`. The wildcard is needed because the callback carries `?next=`.               |
-| **Deploy `send-notifications`**            | Supabase Edge Functions             | Deploy background email worker with `RESEND_API_KEY`, `EMAIL_FROM`, `CRON_SECRET`, `APP_URL`.                                  |
-| **Schedule Notifications Cron**            | Supabase SQL editor                 | Run [server/supabase/cron/send-notifications.sql](server/supabase/cron/send-notifications.sql) with your project URL and keys. |
-| **`NEXT_PUBLIC_EMAIL_NOTIFICATIONS=1`**    | Vercel / Client env                 | Reveals email notification toggles in Settings once the worker is active.                                                      |
+| What                                       | Where                               | Why                                                                                                                                                           |
+| ------------------------------------------ | ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Vercel project**                         | Vercel › Settings › Build           | Framework Preset `Next.js`, Root Directory `client`, Output Directory empty. One project serves the app and its API routes.                                   |
+| **Run `savefirst_full_setup.sql`**         | Supabase SQL editor                 | Creates full schema, tables, views, RLS policies, and RPC functions.                                                                                          |
+| **`NEXT_PUBLIC_SUPABASE_URL`**             | Vercel / Client env                 | Connects application to the Supabase backend.                                                                                                                 |
+| **`NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`** | Vercel / Client env                 | Public client access token.                                                                                                                                   |
+| **`SUPABASE_SECRET_KEY`**                  | Vercel (Server-only env)            | Records sign-in audit logs and caches exchange rates via secure server routes. Without it, rates are fetched on every request.                                |
+| **VAPID keys (optional)**                  | Vercel + Edge Function secrets      | `NEXT_PUBLIC_VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` in Vercel; `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` as function secrets. |
+| **Raise sign-in rate limits**              | Supabase › Auth › Rate Limits       | Password and code sign-ins go through the app's server, so every user shares its IP's limit.                                                                  |
+| **`NEXT_PUBLIC_GOOGLE_AUTH=1`**            | Vercel / Client env                 | Enables Google Sign-In and identity linking UI.                                                                                                               |
+| **Redirect URLs**                          | Supabase › Auth › URL Configuration | Add `<APP_URL>/**` and `http://localhost:3000/**`. The wildcard is needed because the callback carries `?next=`.                                              |
+| **Deploy `send-notifications`**            | Supabase Edge Functions             | Deploy background email worker with `RESEND_API_KEY`, `EMAIL_FROM`, `CRON_SECRET`, `APP_URL`.                                                                 |
+| **Schedule Notifications Cron**            | Supabase SQL editor                 | Run [server/supabase/cron/send-notifications.sql](server/supabase/cron/send-notifications.sql) with your project URL and keys.                                |
+| **`NEXT_PUBLIC_EMAIL_NOTIFICATIONS=1`**    | Vercel / Client env                 | Reveals email notification toggles in Settings once the worker is active.                                                                                     |
 
 ---
 

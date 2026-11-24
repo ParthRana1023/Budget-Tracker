@@ -19,6 +19,7 @@ import {
   isQuiet,
   localParts,
   money,
+  safeNow,
   WEEKLY_HOUR,
   weeklyPush,
 } from "./logic.mjs";
@@ -29,7 +30,7 @@ const pushReady = !!(env("VAPID_PUBLIC_KEY") && env("VAPID_PRIVATE_KEY") && env(
 if (pushReady) webpush.setVapidDetails(env("VAPID_SUBJECT"), env("VAPID_PUBLIC_KEY"), env("VAPID_PRIVATE_KEY"));
 
 type Sub = { id: string; user_id: string; endpoint: string; p256dh: string; auth: string };
-type Message = { title: string; body: string; url: string; tag: string };
+type Message = { title: string; body: string; url: string; tag: string; actions?: { action: string; title: string }[] };
 
 async function sendEmail(to: string, subject: string, text: string) {
   const res = await fetch("https://api.resend.com/emails", {
@@ -62,7 +63,8 @@ Deno.serve(async (req) => {
   const { data: people, error } = await db
     .from("user_settings")
     .select(
-      "user_id, currency, email_notifications, weekly_summary, notify_due, push_bills, push_weekly, bill_reminder_days, quiet_hours_on, quiet_from, quiet_to, timezone",
+      // The plan columns and history feed the weekly summary's safe to spend (same maths as the Dashboard).
+      "user_id, currency, email_notifications, weekly_summary, notify_due, push_bills, push_weekly, bill_reminder_days, quiet_hours_on, quiet_from, quiet_to, timezone, take_home_pay, savings_pct, month_start_day, plan_changes(field, from_value, to_value, applies, effective_from, superseded_at, created_at)",
     )
     .or(filters.join(","));
   if (error) return Response.json({ error: error.message }, { status: 500 });
@@ -123,7 +125,7 @@ Deno.serve(async (req) => {
             );
             sent++;
           }
-          if (on.bills.push) sent += await push(subs, billPush(bill.name, bill.amount, days, s.currency));
+          if (on.bills.push) sent += await push(subs, billPush(bill, days, due, s.currency));
         }
       }
 
@@ -147,7 +149,24 @@ Deno.serve(async (req) => {
             );
             sent++;
           }
-          if (on.weekly.push) sent += await push(subs, weeklyPush(total, count, s.currency));
+          if (on.weekly.push) {
+            // A cycle is at most about two months (pay-day changes), so this covers it and last week.
+            const [cats, items, txs] = await Promise.all([
+              db.from("categories").select("*").eq("user_id", s.user_id),
+              db.from("recurring_items").select("*").eq("user_id", s.user_id),
+              db.from("transactions").select("*").eq("user_id", s.user_id).gte("date", addDays(local.date, -70)),
+            ]);
+            const failedRead = [cats, items, txs].find((r) => r.error);
+            if (failedRead) throw failedRead.error;
+            const cycle = safeNow({
+              settings: s,
+              categories: cats.data ?? [],
+              transactions: txs.data ?? [],
+              recurringItems: items.data ?? [],
+              today: local.date,
+            });
+            sent += await push(subs, weeklyPush(total, cycle.safe, cycle.cycleEnd, s.currency));
+          }
         }
       }
     } catch (e) {

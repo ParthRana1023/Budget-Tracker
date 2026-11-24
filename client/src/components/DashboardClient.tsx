@@ -149,8 +149,22 @@ export default function DashboardClient(props: DashboardClientProps) {
       setNotesOff(JSON.parse(localStorage.getItem(NOTES_OFF_KEY) ?? "[]"));
     } catch {}
     // Opened after mount: the popup is a portal, which can't render on the server.
-    if (props.initialAdd) {
-      setExpense({});
+    // A tapped bill reminder: ?record=<recurring item> or ?pay=<fixed bill category>.
+    const q = new URLSearchParams(window.location.search);
+    const item = recurringItems.find((r) => r.id === q.get("record") && r.type === "expense");
+    const bill = categories.find((c) => c.id === q.get("pay") && c.type === "fixed");
+    if (props.initialAdd || item || bill) {
+      setExpense(
+        item
+          ? { itemId: item.id }
+          : bill
+            ? {
+                categoryId: bill.id,
+                amount: Math.max(0, Number(bill.monthly_limit) - (model.spentByCat.get(bill.id) ?? 0)),
+                note: bill.name,
+              }
+            : {},
+      );
       window.history.replaceState(null, "", "/dashboard"); // a reload shouldn't reopen it
     }
     setSyncedAt(new Date());

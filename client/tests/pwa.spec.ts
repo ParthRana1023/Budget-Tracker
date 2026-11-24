@@ -71,7 +71,12 @@ test.describe("PWA", () => {
 
     // Headless Chromium starts with notifications denied: the card explains how to unblock.
     await openNotifications();
-    await expect(page.getByText(/Notifications are blocked for this site/)).toBeVisible();
+    await expect(page.getByText("Blocked in this browser")).toBeVisible();
+    await expect(page.getByRole("button", { name: "Check again" })).toBeVisible();
+    await expect(page.getByRole("switch", { name: "Push notifications on this device" })).toHaveAttribute(
+      "aria-disabled",
+      "true",
+    );
 
     await page.evaluate(() => localStorage.setItem("e2e-permission", "default"));
     await openNotifications();
@@ -81,12 +86,58 @@ test.describe("PWA", () => {
     expect(await asks()).toBe(0);
 
     await toggle.click();
-    const sheet = page.getByRole("dialog", { name: "Get reminders on this device" });
+    const sheet = page.getByRole("dialog", { name: "Turn on push notifications" });
     await expect(sheet).toBeVisible();
+    await expect(sheet).toContainText("Rent is due tomorrow");
     expect(await asks()).toBe(0);
-    await sheet.getByRole("button", { name: "Close" }).click();
+    await sheet.getByRole("button", { name: "Not now" }).click();
     await expect(sheet).toBeHidden();
     await expect(toggle).toHaveAttribute("aria-checked", "false");
+  });
+
+  test("push: Continue asks the browser, then per-type switches and Send a test", async ({ page }) => {
+    // Headless Chromium can't really subscribe: stub the permission prompt and the push service.
+    await page.addInitScript(() => {
+      let granted = false;
+      let sub: object | null = null;
+      Object.defineProperty(Notification, "permission", { get: () => (granted ? "granted" : "default") });
+      Notification.requestPermission = async () => ((granted = true), "granted");
+      const fake = {
+        endpoint: "https://push.example.test/e2e-device",
+        toJSON: () => ({ endpoint: fake.endpoint, keys: { p256dh: "e2e-p256dh", auth: "e2e-auth" } }),
+        unsubscribe: async () => ((sub = null), true),
+      };
+      PushManager.prototype.getSubscription = async () => sub as PushSubscription | null;
+      PushManager.prototype.subscribe = async () => (sub = fake) as unknown as PushSubscription;
+    });
+    await setUpAccount(page);
+    await page.goto("/settings?s=notif");
+
+    const toggle = page.getByRole("switch", { name: "Push notifications on this device" });
+    await toggle.click();
+    await page
+      .getByRole("dialog", { name: "Turn on push notifications" })
+      .getByRole("button", { name: "Continue" })
+      .click();
+    await expect(page.getByRole("dialog")).toHaveCount(0);
+    await expect(toggle).toHaveAttribute("aria-checked", "true");
+    await expect(page.getByText("On here. Your other devices keep their own setting.")).toBeVisible();
+    await expect(page.getByRole("switch", { name: "Bill reminders" })).toHaveAttribute("aria-checked", "true");
+    await expect(page.getByText(/Push reminders that fall in this window arrive at 8:00 am\./)).toBeVisible();
+
+    // The test push goes through /api/push/test (stubbed: the E2E server has no private VAPID key).
+    let reply = { status: 200, json: { ok: true } as object };
+    await page.route("**/api/push/test", (route) => route.fulfill(reply));
+    await page.getByRole("button", { name: "Send a test" }).click();
+    await expect(page.getByText("Sent. It should arrive in a few seconds.")).toBeVisible();
+    reply = { status: 502, json: { error: { message: "Couldn’t send. Check your connection, then try again." } } };
+    await page.getByRole("button", { name: "Send a test" }).click();
+    await expect(page.getByText("Couldn’t send. Check your connection, then try again.")).toBeVisible();
+    await expect(page.getByRole("button", { name: "Try again" })).toBeVisible();
+
+    await toggle.click(); // off again: this device only
+    await expect(toggle).toHaveAttribute("aria-checked", "false");
+    await expect(page.getByRole("button", { name: /Send a test|Try again/ })).toHaveCount(0);
   });
 
   test("offline: amounts hide, Add explains itself, numbers return online", async ({ page, context }) => {

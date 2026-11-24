@@ -1,5 +1,10 @@
-// What the hourly email and push job sends, worked out from a user's settings and rows. No imports, so
-// both the Edge Function (Deno) and node:test (logic.test.mjs) can load it. Amounts are minor units of the user's base currency.
+// What the hourly email and push job sends, worked out from a user's settings and rows. Only plain
+// relative imports (the Dashboard's own budget maths, copied into ../_shared/budget), so both the
+// Edge Function (Deno) and node:test (logic.test.mjs) can load it. Amounts are minor units of the
+// user's base currency.
+
+import { buildCycleModel } from "../_shared/budget/cycleModel.mjs";
+import { cycleFor, paySchedule } from "../_shared/budget/periods.mjs";
 
 /**
  * The user's local date ('YYYY-MM-DD'), hour (0-23) and weekday (0 Sunday) at `now`.
@@ -69,18 +74,14 @@ export function billsDueOn(items, categories, due) {
 }
 
 /**
- * Whole units of the user's base currency, for message text ("₹12,000", "$1,500").
+ * An amount in the user's base currency with its own decimals, for message text (design handoff
+ * v3: "₹12,000.00", "$1,500.50", "¥3,200").
  * @param {number} minor amount in minor units (paise, cents; whole yen) @param {string} [currency]
  */
 export function money(minor, currency = "INR") {
   const f = new Intl.NumberFormat("en-IN", { style: "currency", currency, currencyDisplay: "narrowSymbol" });
   const digits = f.resolvedOptions().maximumFractionDigits ?? 2;
-  return new Intl.NumberFormat("en-IN", {
-    style: "currency",
-    currency,
-    currencyDisplay: "narrowSymbol",
-    maximumFractionDigits: 0,
-  }).format(Math.round(minor / 10 ** digits));
+  return f.format(minor / 10 ** digits);
 }
 
 /** The weekly summary goes out on Monday from this local hour. */
@@ -100,18 +101,55 @@ export function channels(s, { emailReady, pushReady, devices }) {
   };
 }
 
-/** Lock-screen text for a bill reminder. @param {string} name @param {number} minor @param {number} days @param {string} [currency] */
-export const billPush = (name, minor, days, currency = "INR") => ({
-  title: `${name} is due ${days === 1 ? "tomorrow" : `in ${days} days`}`,
-  body: `${money(minor, currency)}. Record it in SaveFirst when you pay.`,
-  url: "/dashboard",
-  tag: `bill:${name}`,
-});
+const MON = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
-/** Lock-screen text for the weekly summary. @param {number} minor @param {number} entries @param {string} [currency] */
-export const weeklyPush = (minor, entries, currency = "INR") => ({
-  title: "Your week in SaveFirst",
-  body: `You spent ${money(minor, currency)} across ${entries} ${entries === 1 ? "entry" : "entries"} last week.`,
+/**
+ * Lock-screen text for a bill reminder (design handoff v3, Push). Tapping opens Log expense filled
+ * in for that bill; Android also shows a "Record it" action. The tag makes a newer reminder for the
+ * same bill and month replace the older one.
+ * @param {{ ref: string, name: string, amount: number }} bill from billsDueOn
+ * @param {number} days how far ahead @param {string} due YYYY-MM-DD @param {string} [currency]
+ */
+export function billPush(bill, days, due, currency = "INR") {
+  const [kind, id] = bill.ref.split(":");
+  const when =
+    days === 1
+      ? "tomorrow"
+      : days === 3
+        ? "in 3 days"
+        : `on ${Number(due.slice(8))} ${MON[Number(due.slice(5, 7)) - 1]}`;
+  return {
+    title: `${bill.name} is due ${when}`,
+    body: `${money(bill.amount, currency)} · Tap to record it once it’s paid.`,
+    url: kind === "item" ? `/dashboard?record=${id}` : `/dashboard?pay=${id}`,
+    tag: `bill-${id}-${due.slice(0, 7)}`,
+    actions: [{ action: "record", title: "Record it" }],
+  };
+}
+
+/**
+ * This cycle's safe to spend for the weekly summary, the same way the Dashboard works it out.
+ * @param {{ settings: any, categories: any[], transactions: any[], recurringItems: any[], today: string }} input
+ * @returns {{ safe: number, cycleEnd: string, cycleStart: string }}
+ */
+export function safeNow({ settings, categories, transactions, recurringItems, today }) {
+  const [y, m, d] = today.split("-").map(Number);
+  const period = cycleFor(new Date(y, m - 1, d, 12), paySchedule(settings));
+  const model = buildCycleModel({ settings, categories, transactions, recurringItems, period, today });
+  return { safe: model.safe, cycleEnd: period.endStr, cycleStart: period.startStr };
+}
+
+/** "30 Nov" from 'YYYY-MM-DD'. @param {string} date */
+const dayMonth = (date) => `${Number(date.slice(8))} ${MON[Number(date.slice(5, 7)) - 1]}`;
+
+/**
+ * Lock-screen text for the weekly summary (design handoff v3, Push).
+ * @param {number} spent last week's spending @param {number} safe safe to spend now
+ * @param {string} cycleEnd 'YYYY-MM-DD' @param {string} [currency]
+ */
+export const weeklyPush = (spent, safe, cycleEnd, currency = "INR") => ({
+  title: `Your week: ${money(spent, currency)} spent`,
+  body: `${safe > 0 ? `${money(safe, currency)} is safe to spend` : "Nothing is left to spend"} until ${dayMonth(cycleEnd)}. Savings are already set aside.`,
   url: "/dashboard?view=reports",
   tag: "weekly",
 });

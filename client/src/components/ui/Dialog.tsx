@@ -29,6 +29,8 @@ export type DialogProps = {
   submitTone?: "primary" | "danger" | "ink";
   busy?: boolean;
   showCancel?: boolean;
+  /** A named second button (e.g. "Not now") that stays beside the primary on phones too. */
+  cancelLabel?: string;
   /** Footer hint on wide screens. */
   hint?: string;
   /** Bottom sheet only: replaces the eyebrow and title (kept for screen readers), e.g. Expense | Income. */
@@ -54,6 +56,7 @@ export default function Dialog({
   submitTone = "primary",
   busy = false,
   showCancel = true,
+  cancelLabel,
   hint = "Enter to save · Esc to close",
   sheetHeader,
   children,
@@ -174,8 +177,15 @@ export default function Dialog({
           )}
           <span className="flex-[1_1_120px] text-xs text-muted max-[640px]:hidden">{hint}</span>
           {showCancel && (
-            <Button size="xl" className="border-line-2 px-5 text-sm max-[640px]:hidden" onClick={requestClose}>
-              Cancel
+            <Button
+              size="xl"
+              className={clsx(
+                "border-line-2 px-5 text-sm",
+                cancelLabel ? "max-[640px]:h-12 max-[640px]:flex-[1_1_0]" : "max-[640px]:hidden",
+              )}
+              onClick={requestClose}
+            >
+              {cancelLabel ?? "Cancel"}
             </Button>
           )}
           <Button
@@ -184,7 +194,12 @@ export default function Dialog({
             size="xl"
             disabled={busy}
             aria-busy={busy}
-            className="min-w-40 max-[640px]:h-[52px] max-[640px]:flex-[1_1_100%]"
+            className={clsx(
+              "min-w-40",
+              cancelLabel && showCancel
+                ? "max-[640px]:h-12 max-[640px]:min-w-0 max-[640px]:flex-[1_1_0]"
+                : "max-[640px]:h-[52px] max-[640px]:flex-[1_1_100%]",
+            )}
           >
             {busy ? (
               <span

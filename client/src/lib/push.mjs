@@ -100,3 +100,24 @@ export async function clearDeviceOnSignOut(db) {
     await Promise.all(keys.map((k) => caches.delete(k).catch(() => false)));
   }
 }
+
+/**
+ * Settings › Send a test: one push to this device now (app/api/push/test).
+ * @returns {Promise<{ ok: true } | { ok: false, message: string, gone?: boolean }>}
+ */
+export async function sendTestPush() {
+  const sub = await currentSubscription();
+  if (!sub) return { ok: false, message: "Turn push on for this device first.", gone: true };
+  const res = await fetch("/api/push/test", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ endpoint: sub.endpoint }),
+  }).catch(() => null);
+  if (res?.ok) return { ok: true };
+  const body = await res?.json().catch(() => null);
+  return {
+    ok: false,
+    message: body?.error?.message ?? "Couldn’t send. Check your connection, then try again.",
+    gone: res?.status === 410 || res?.status === 404,
+  };
+}

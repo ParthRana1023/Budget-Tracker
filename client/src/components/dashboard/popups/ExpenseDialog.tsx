@@ -38,6 +38,8 @@ export type ExpensePrefill = {
   fromReserve?: boolean;
   /** The amount as typed, carried over from the Income tab. */
   typed?: string;
+  /** A recurring item to record (a tapped bill reminder): fills amount, category, note and method. */
+  itemId?: string;
 };
 const QUICK = [100, 250, 500, 1000, 2000];
 
@@ -56,17 +58,18 @@ export default function ExpenseDialog({
   const { model, today, period } = ctx;
   const keyboardOpen = useKeyboardInset() > 0;
   const dragScroll = useDragScroll<HTMLDivElement>();
+  const item = prefill.itemId ? ctx.recurringItems.find((r) => r.id === prefill.itemId) : undefined;
   const { form, set, dirty, error, setError, busy, save } = usePopupForm({
-    amount: prefill.typed ?? (prefill.amount ? toField(prefill.amount) : ""),
-    categoryId: prefill.categoryId ?? "",
+    amount: item ? toField(Number(item.amount)) : (prefill.typed ?? (prefill.amount ? toField(prefill.amount) : "")),
+    categoryId: item?.category_id ?? prefill.categoryId ?? "",
     date: today,
-    note: prefill.note ?? "",
+    note: item?.name ?? prefill.note ?? "",
     payee: "",
-    method: null as PaymentMethod | null,
+    method: (item?.payment_method ?? null) as PaymentMethod | null,
     fromReserve: !!prefill.fromReserve,
     repeat: false,
     day: "",
-    itemId: null as string | null,
+    itemId: (item?.id ?? null) as string | null,
   });
   // Typed in any supported currency; saved in the base currency at this cycle's rate.
   const fx = useForeign(period.startStr);
