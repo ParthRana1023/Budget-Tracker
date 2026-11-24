@@ -12,7 +12,28 @@ export const PAYMENT_METHODS = [
   ["other", "Other"],
 ];
 const LABELS = new Map(PAYMENT_METHODS);
-export const NOT_RECORDED = "Not recorded";
+/** Short names for the picker and ledger chips (design handoff v3, Payment). */
+const SHORT = new Map([
+  ["upi", "UPI"],
+  ["debit_card", "Debit"],
+  ["credit_card", "Credit"],
+  ["cash", "Cash"],
+  ["other", "Other"],
+]);
+/** An expense with no method (older entries, or cleared). */
+export const NOT_SET = "Not set";
+
+/** "Debit" for "debit_card"; "" when there is none. @param {string | null | undefined} key */
+export const methodShort = (key) => (key && SHORT.get(key)) || "";
+
+/**
+ * A ledger filter from the URL (?method=cash,none): known keys and "none", in picker order.
+ * @param {string | null | undefined} param @returns {string[]}
+ */
+export const parseMethodFilter = (param) => {
+  const want = new Set((param ?? "").split(",").map((s) => s.trim()));
+  return [...PAYMENT_METHODS.map(([k]) => k), "none"].filter((k) => want.has(k));
+};
 
 /** "Debit card" for "debit_card"; "" when there is none. @param {string | null | undefined} key */
 export const methodLabel = (key) => (key && LABELS.get(/** @type {PaymentMethod} */ (key))) || "";
@@ -31,7 +52,7 @@ export function parseMethod(text) {
 }
 
 /**
- * Expense totals per method, biggest first; entries without one are grouped as "Not recorded".
+ * Expense totals per method, biggest first; entries without one are grouped as "Not set", always last.
  * @template {{ type: string, amount: number | string, payment_method?: string | null }} T
  * @param {T[]} entries
  */
@@ -41,11 +62,11 @@ export function spendByMethod(entries) {
   for (const t of entries) {
     if (t.type !== "expense") continue;
     const key = t.payment_method || null;
-    const row = g.get(key ?? "") ?? { key, label: methodLabel(key) || NOT_RECORDED, amount: 0, count: 0, entries: [] };
+    const row = g.get(key ?? "") ?? { key, label: methodLabel(key) || NOT_SET, amount: 0, count: 0, entries: [] };
     row.amount += Number(t.amount);
     row.count++;
     row.entries.push(t);
     g.set(key ?? "", row);
   }
-  return [...g.values()].sort((a, b) => b.amount - a.amount);
+  return [...g.values()].sort((a, b) => Number(!a.key) - Number(!b.key) || b.amount - a.amount);
 }

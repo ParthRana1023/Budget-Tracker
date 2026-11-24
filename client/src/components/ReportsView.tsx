@@ -20,9 +20,20 @@ import {
   type Grouping,
 } from "@/lib/reports.mjs";
 import { spendByMethod } from "@/lib/paymentMethods.mjs";
+import { Info } from "lucide-react";
 import Drawer from "./ui/Drawer";
 import { useToast } from "./ui/Toast";
 import { CARD_H2, type Category, type RecurringItem, type Settings, type Tx } from "./dashboard/types";
+
+/** Spend by payment method colours (design handoff v3): Not set is striped and always last. */
+const METHOD_COLOR: Record<string, string> = {
+  upi: "var(--lime)",
+  debit_card: "var(--flex)",
+  credit_card: "var(--ink-2)",
+  cash: "var(--fixed)",
+  other: "var(--muted)",
+  none: "repeating-linear-gradient(135deg, var(--line-2) 0 3px, transparent 3px 6px)",
+};
 
 type Cycle = ReturnType<typeof cycleHistory>[number];
 type Tab = "overview" | "habits" | "categories" | "plan";
@@ -534,8 +545,7 @@ export default function ReportsView({
     const payees = topPayees(cur, prev),
       payMax = Math.max(1, ...payees.map((p) => Math.max(p.amount, p.previous ?? 0)));
     const methods = spendByMethod(cur.entries),
-      methodMax = Math.max(1, ...methods.map((m) => m.amount)),
-      methodTotal = methods.reduce((s, m) => s + m.amount, 0);
+      methodTotal = methods.reduce((s, m) => s + m.amount, 0) || 1;
     const dayRows = (cy: Cycle, k: number) =>
       rowsOf(flexEntries(cy, (t) => t.date === addDaysStr(cy.period.startStr, k - 1)));
 
@@ -766,41 +776,83 @@ export default function ReportsView({
           )}
         </section>
 
-        <section className={CARD}>
-          <Head title="Paid with" sub={`Every expense in ${cur.labelLong}, by how it was paid`} />
-          {methods.map((m) => (
-            <button
-              key={m.label}
-              type="button"
-              onClick={() => open(m.label, `${m.count} ${m.count === 1 ? "expense" : "expenses"}`, rowsOf(m.entries))}
-              aria-label={`${m.label}: ${inr(m.amount)}`}
-              className={ROW_BTN}
-            >
-              <span className="flex min-w-[140px] flex-col">
-                <span className="font-semibold" style={{ color: m.key ? undefined : "var(--muted)" }}>
-                  {m.label}
-                </span>
-                <span className="text-xs text-muted">
-                  {m.count} {m.count === 1 ? "expense" : "expenses"}
-                </span>
+        <section id="pm-card" className={CARD}>
+          <Head
+            title="Spend by payment method"
+            sub={`${cur.partial ? `${cur.labelLong} so far` : cur.labelLong} · every expense, bills included · ${inr(methodTotal)}`}
+          />
+          {methods.some((m) => m.key) ? (
+            <>
+              <div
+                role="img"
+                aria-label={methods.map((m) => `${m.label} ${Math.round((m.amount / methodTotal) * 100)}%`).join(", ")}
+                className="flex h-3.5 gap-[3px]"
+              >
+                {methods.map((m) => (
+                  <span
+                    key={m.label}
+                    className="sf-grow rounded-md"
+                    style={{
+                      width: `${((m.amount / methodTotal) * 100).toFixed(2)}%`,
+                      background: METHOD_COLOR[m.key ?? "none"],
+                    }}
+                  />
+                ))}
+              </div>
+              <div className="flex flex-col">
+                {methods.map((m) => {
+                  const pct = Math.round((m.amount / methodTotal) * 100);
+                  return (
+                    <button
+                      key={m.label}
+                      type="button"
+                      onClick={() => open(m.label, `${cur.labelLong} · ${inr(m.amount)}`, rowsOf(m.entries))}
+                      aria-label={`${m.label}: ${inr(m.amount)}, ${pct}%`}
+                      className="-mx-2 flex cursor-pointer items-center gap-3 rounded-[10px] border-0 border-b border-line bg-transparent px-2 py-3 text-left transition-colors duration-150 hover:bg-tile-2"
+                    >
+                      <span
+                        aria-hidden
+                        className="h-2.5 w-2.5 flex-none rounded-full border"
+                        style={{
+                          background: METHOD_COLOR[m.key ?? "none"],
+                          borderColor: m.key ? "transparent" : "var(--line-2)",
+                        }}
+                      />
+                      <span className="flex min-w-0 flex-auto flex-col">
+                        <span className="font-semibold">{m.label}</span>
+                        <span className="text-xs text-muted">
+                          {m.count} {m.count === 1 ? "entry" : "entries"}
+                          {m.key ? "" : " · edit an entry to add one"}
+                        </span>
+                      </span>
+                      <span className="tabular font-serif text-2xl leading-none whitespace-nowrap">
+                        {inr(m.amount)}
+                      </span>
+                      <span className="tabular w-12 flex-none text-right text-[13px] font-semibold text-ink-2">
+                        {pct}%
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+              <span className="flex items-center gap-2 text-xs text-muted">
+                <Info size={13} aria-hidden className="flex-none" />
+                Tracking only. Payment method never changes safe to spend or any total.
               </span>
-              <span className="relative h-2.5 min-w-[120px] flex-1 rounded-full bg-track">
-                <span
-                  className="absolute inset-y-0 left-0 rounded-full"
-                  style={{
-                    width: `${(m.amount / methodMax) * 100}%`,
-                    background: m.key ? "var(--lime)" : "var(--line-2)",
-                  }}
-                />
+            </>
+          ) : (
+            <>
+              <div aria-hidden className="flex h-3.5 gap-[3px]">
+                {[46, 24, 18, 12].map((w) => (
+                  <span key={w} className="rounded-md bg-track" style={{ width: `${w}%` }} />
+                ))}
+              </div>
+              <p className="m-0 mt-1.5 font-serif text-xl text-pretty text-ink-2 italic">No payment methods yet.</p>
+              <span className="text-sm text-pretty text-ink-2">
+                Pick UPI, card or cash when you log an expense and this fills in. Older entries stay “Not set” until you
+                edit them.
               </span>
-              <span className="tabular w-20 text-right font-semibold">{inr(m.amount)}</span>
-              <span className="w-[150px] text-right text-xs text-muted">
-                {methodTotal ? `${Math.round((m.amount / methodTotal) * 100)}% of spending` : ""}
-              </span>
-            </button>
-          ))}
-          {!methods.length && (
-            <p className="m-0 font-serif text-xl text-ink-2 italic">No expenses logged this cycle yet.</p>
+            </>
           )}
         </section>
       </>

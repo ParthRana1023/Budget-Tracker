@@ -3,7 +3,16 @@
 // Building blocks shared by the dashboard popups (design handoff, Popups).
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { Repeat, Trash2, TriangleAlert } from "lucide-react";
+import {
+  Banknote,
+  CircleEllipsis,
+  CreditCard,
+  Repeat,
+  Smartphone,
+  Trash2,
+  TriangleAlert,
+  type LucideIcon,
+} from "lucide-react";
 import {
   baseCurrency,
   cleanTyped,
@@ -17,7 +26,7 @@ import {
 import { convert, fetchRate } from "@/lib/fx.mjs";
 import { shortDate } from "@/lib/cycle.mjs";
 import { errorFields, reportClientError } from "@/lib/log.mjs";
-import { PAYMENT_METHODS, type PaymentMethod } from "@/lib/paymentMethods.mjs";
+import { methodShort, PAYMENT_METHODS, type PaymentMethod } from "@/lib/paymentMethods.mjs";
 
 export const FIELD =
   "h-12 w-full min-w-0 rounded-xl border border-line-2 bg-tile-2 px-3.5 text-[15px] text-ink outline-none transition-[border-color,box-shadow] duration-200 focus:border-lime focus:shadow-[0_0_0_3px_var(--lime-soft)] focus-visible:outline-none";
@@ -238,34 +247,94 @@ export function CurrencyFields({
   );
 }
 
-/** "Paid with" picker for expenses (tracking only). Empty = not recorded. */
-export function MethodSelect({
+/** Picker icons (lucide), as in the handoff. */
+const METHOD_ICONS: Record<PaymentMethod, LucideIcon> = {
+  upi: Smartphone,
+  debit_card: CreditCard,
+  credit_card: CreditCard,
+  cash: Banknote,
+  other: CircleEllipsis,
+};
+
+/**
+ * "Paid with" (design handoff v3, Payment): five equal options in one pill with a sliding
+ * indicator; 36px with icons on wide screens, 40px text-only on phones (fits 360px). Clear sets
+ * Not set. Tracking only: no amount anywhere reads it.
+ */
+export function MethodPicker({
   id,
   value,
   onChange,
   label = "Paid with",
+  hint,
 }: {
   id: string;
   value: PaymentMethod | null | undefined;
   onChange: (v: PaymentMethod | null) => void;
   label?: string;
+  hint?: string;
 }) {
+  const idx = PAYMENT_METHODS.findIndex(([k]) => k === value);
+  // Cleared: the indicator fades where it was, so the next pick slides from there.
+  const last = useRef(0);
+  if (idx >= 0) last.current = idx;
+  const pos = idx >= 0 ? idx : last.current;
   return (
-    <Labeled id={id} label={label} optional>
-      <select
-        id={id}
-        value={value ?? ""}
-        onChange={(e) => onChange((e.target.value || null) as PaymentMethod | null)}
-        className={FIELD}
+    <div className="flex flex-col gap-2.5">
+      <div className="flex min-h-6 flex-wrap items-center justify-between gap-x-3 gap-y-1">
+        <span id={`${id}-l`} className="eyebrow">
+          {label} <span className="font-normal tracking-normal normal-case">· optional</span>
+        </span>
+        {value ? (
+          <button
+            type="button"
+            onClick={() => onChange(null)}
+            aria-label="Clear payment method"
+            className="relative cursor-pointer border-0 bg-transparent p-0 text-[13px] font-semibold text-ink-2 after:absolute after:-inset-x-2 after:-inset-y-3 after:content-[''] hover:text-ink"
+          >
+            Clear
+          </button>
+        ) : (
+          <span className="text-[13px] text-muted">Not set</span>
+        )}
+      </div>
+      <div
+        role="radiogroup"
+        aria-labelledby={`${id}-l`}
+        className="relative flex gap-0.5 rounded-full border border-line p-[3px]"
       >
-        <option value="">Not recorded</option>
-        {PAYMENT_METHODS.map(([k, l]) => (
-          <option key={k} value={k}>
-            {l}
-          </option>
-        ))}
-      </select>
-    </Labeled>
+        <span
+          aria-hidden
+          className="absolute top-[3px] bottom-[3px] rounded-full bg-ink transition-[left,opacity,transform] duration-[320ms] ease-[cubic-bezier(.3,.8,.25,1)]"
+          style={{
+            left: `calc(3px + ${pos} * ((100% - 14px) / 5 + 2px))`,
+            width: "calc((100% - 14px) / 5)",
+            opacity: idx >= 0 ? 1 : 0,
+            transform: `scale(${idx >= 0 ? 1 : 0.85})`,
+          }}
+        />
+        {PAYMENT_METHODS.map(([k, full]) => {
+          const on = value === k;
+          const Icon = METHOD_ICONS[k];
+          return (
+            <button
+              key={k}
+              type="button"
+              role="radio"
+              aria-checked={on}
+              aria-label={full}
+              onClick={() => onChange(k)}
+              className="relative z-[1] flex h-9 min-w-0 flex-[1_1_0] cursor-pointer items-center justify-center gap-1.5 rounded-full border-0 bg-transparent px-1 text-[13px] font-semibold whitespace-nowrap transition-colors duration-[250ms] active:scale-95 max-[720px]:h-10"
+              style={{ color: on ? "var(--bg)" : "var(--muted)" }}
+            >
+              <Icon size={14} aria-hidden className="flex-none max-[720px]:hidden" />
+              {methodShort(k)}
+            </button>
+          );
+        })}
+      </div>
+      {hint && <span className="text-xs text-pretty text-muted">{hint}</span>}
+    </div>
   );
 }
 

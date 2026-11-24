@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { methodLabel, parseMethod, spendByMethod } from "./paymentMethods.mjs";
+import { methodLabel, methodShort, parseMethod, parseMethodFilter, spendByMethod } from "./paymentMethods.mjs";
 
 test("labels and CSV parsing", () => {
   assert.equal(methodLabel("credit_card"), "Credit card");
@@ -13,7 +13,7 @@ test("labels and CSV parsing", () => {
   assert.equal(parseMethod("cheque"), undefined, "unknown");
 });
 
-test("spend by method: expenses only, not recorded grouped, biggest first", () => {
+test("spend by method: expenses only, Not set grouped and last, the rest biggest first", () => {
   const rows = spendByMethod([
     { type: "expense", amount: 50000, payment_method: "upi" },
     { type: "expense", amount: "20000", payment_method: "upi" },
@@ -24,10 +24,18 @@ test("spend by method: expenses only, not recorded grouped, biggest first", () =
   assert.deepEqual(
     rows.map((r) => [r.label, r.amount, r.count]),
     [
-      ["Not recorded", 90000, 1],
       ["UPI", 70000, 2],
       ["Cash", 10000, 1],
+      ["Not set", 90000, 1],
     ],
   );
-  assert.equal(rows[1].key, "upi");
+  assert.equal(rows[0].key, "upi");
+});
+
+test("short names and the ledger filter in the URL", () => {
+  assert.equal(methodShort("debit_card"), "Debit");
+  assert.equal(methodShort(null), "");
+  assert.deepEqual(parseMethodFilter("none,cash"), ["cash", "none"], "picker order, Not set last");
+  assert.deepEqual(parseMethodFilter("cash,cheque,,"), ["cash"], "unknown keys dropped");
+  assert.deepEqual(parseMethodFilter(null), []);
 });

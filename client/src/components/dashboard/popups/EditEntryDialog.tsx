@@ -15,7 +15,7 @@ import {
   AmountField,
   FIELD,
   Labeled,
-  MethodSelect,
+  MethodPicker,
   Preview,
   SAVE_FAILED,
   paise,
@@ -206,8 +206,15 @@ export default function EditEntryDialog({
             />
           </Labeled>
         )}
-        {isExpense && <MethodSelect id="ed-method" value={form.method} onChange={(method) => set({ method })} />}
       </div>
+      {isExpense && (
+        <MethodPicker
+          id="ed-method"
+          value={form.method}
+          onChange={(method) => set({ method })}
+          hint="Tracking only: it doesn’t change any numbers."
+        />
+      )}
       {confirming ? (
         <div
           role="alertdialog"

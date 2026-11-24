@@ -19,7 +19,7 @@ import {
   DueDayField,
   FIELD,
   Labeled,
-  MethodSelect,
+  MethodPicker,
   Preview,
   SAVE_FAILED,
   SwitchRow,
@@ -42,6 +42,24 @@ export type ExpensePrefill = {
   itemId?: string;
 };
 const QUICK = [100, 250, 500, 1000, 2000];
+const LAST_METHOD_KEY = "sf-last-method";
+
+/**
+ * "Paid with" starts on the last one used (design handoff v3, Payment): what this device logged
+ * last, else the newest saved expense's method (rows come newest first).
+ */
+function lastMethod(transactions: { type: string; payment_method?: string | null }[]): string | null {
+  try {
+    const here = localStorage.getItem(LAST_METHOD_KEY);
+    if (here !== null) return here || null;
+  } catch {}
+  return transactions.find((t) => t.type === "expense")?.payment_method ?? null;
+}
+const rememberMethod = (method: string | null) => {
+  try {
+    localStorage.setItem(LAST_METHOD_KEY, method ?? "");
+  } catch {}
+};
 
 export default function ExpenseDialog({
   ctx,
@@ -65,7 +83,7 @@ export default function ExpenseDialog({
     date: today,
     note: item?.name ?? prefill.note ?? "",
     payee: "",
-    method: (item?.payment_method ?? null) as PaymentMethod | null,
+    method: (item ? (item.payment_method ?? null) : lastMethod(ctx.transactions)) as PaymentMethod | null,
     fromReserve: !!prefill.fromReserve,
     repeat: false,
     day: "",
@@ -221,6 +239,7 @@ export default function ExpenseDialog({
         return r;
       },
       async (txId) => {
+        rememberMethod(form.method);
         onClose();
         const madeRule = form.repeat && !form.itemId;
         await ctx.saved(
@@ -377,6 +396,13 @@ export default function ExpenseDialog({
         </div>
       </div>
 
+      <MethodPicker
+        id="ex-method"
+        value={form.method}
+        onChange={(method) => set({ method })}
+        hint="Defaults to the last one you used. Tracking only: it doesn’t change any numbers."
+      />
+
       <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,180px),1fr))] gap-3.5">
         <Labeled id="ex-date" label="Date">
           <input
@@ -410,7 +436,6 @@ export default function ExpenseDialog({
             className={FIELD}
           />
         </Labeled>
-        <MethodSelect id="ex-method" value={form.method} onChange={(method) => set({ method })} />
         <CurrencyFields id="ex" fx={fx} />
       </div>
 

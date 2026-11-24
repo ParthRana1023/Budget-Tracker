@@ -11,7 +11,7 @@ import {
   CurrencyFields,
   FIELD,
   Labeled,
-  MethodSelect,
+  MethodPicker,
   SAVE_FAILED,
   cleanDay,
   toField,
@@ -130,16 +130,17 @@ export default function RecurringDialog({
             className={FIELD}
           />
         </Labeled>
-        {isExpense && (
-          <MethodSelect
-            id="ru-method"
-            label="Usually paid with"
-            value={form.method}
-            onChange={(method) => set({ method })}
-          />
-        )}
         <CurrencyFields id="ru" fx={fx} />
       </div>
+      {isExpense && (
+        <MethodPicker
+          id="ru-method"
+          label="Usually paid with"
+          value={form.method}
+          onChange={(method) => set({ method })}
+          hint="Entries recorded from this item use it: Due notices, Record buttons and suggestions."
+        />
+      )}
       {fx.foreign && (
         <span className="tabular text-[13px] text-muted">
           ≈ {inr(fx.toBase(form.amount).amount)} this cycle. It’s repriced at each new cycle’s rate.
