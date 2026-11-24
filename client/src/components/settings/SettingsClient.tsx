@@ -376,7 +376,13 @@ export default function SettingsClient({
             )}
 
             {section === "prefs" && (
-              <PrefsSection settings={settings} onSaved={(patch) => setSettings((s) => ({ ...s, ...patch }))} />
+              <PrefsSection
+                settings={settings}
+                schedule={schedule}
+                today={today}
+                onSaved={(patch) => setSettings((s) => ({ ...s, ...patch }))}
+                onBaseChanged={refresh}
+              />
             )}
 
             {section === "notif" && (

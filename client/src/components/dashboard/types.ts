@@ -37,6 +37,11 @@ export interface Tx {
   fx_date?: string | null;
   /** Early income counted toward the cycle starting on this date ('YYYY-MM-DD'). */
   counts_from?: string | null;
+  /** The base currency the entry was made in (a base switch keeps older entries as made). */
+  base_currency?: string;
+  /** Set on a copy converted into today's base (lib/baseSwitch.mjs): the amount as stored. */
+  recorded_amount?: number;
+  recorded_currency?: string;
   category?: { name: string; type: string } | null;
 }
 
@@ -78,6 +83,9 @@ export interface Settings {
   number_format?: "indian" | "international" | "european";
   /** Base currency (ISO code, lib/money.mjs CURRENCIES): every stored amount is in its minor units. */
   currency?: string;
+  /** A new base chosen after the first entry: switches on currency_from (the next cycle start). */
+  currency_next?: string | null;
+  currency_from?: string | null;
   /** 0 = Sunday, 1 = Monday. */
   week_start?: 0 | 1;
   /** Theme saved to the account; null = not chosen yet. */

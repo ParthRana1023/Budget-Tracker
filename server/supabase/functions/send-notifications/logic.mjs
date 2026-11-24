@@ -84,6 +84,38 @@ export function money(minor, currency = "INR") {
   return f.format(minor / 10 ** digits);
 }
 
+const digitsOf = (/** @type {string} */ currency) =>
+  new Intl.NumberFormat("en", { style: "currency", currency }).resolvedOptions().maximumFractionDigits ?? 2;
+
+/**
+ * Entries in today's base (like the Dashboard, lib/baseSwitch.mjs). A week or the reserve can
+ * straddle a base switch: entries from an older base convert at today's rate, which bills, limits
+ * and goals set in that base carry (re-priced each cycle). Entries in a base with no known rate
+ * are left out rather than mixed in.
+ * @template {{ amount: number, base_currency?: string | null }} T
+ * @param {T[]} entries @param {string} base
+ * @param {Array<{ original_currency?: string | null, fx_rate?: number | null, fx_date?: string | null }>} rateRows
+ * @returns {T[]}
+ */
+export function inTodaysBase(entries, base, rateRows) {
+  /** @type {Map<string, { rate: number, date: string }>} */
+  const rates = new Map();
+  for (const r of rateRows) {
+    const c = r.original_currency,
+      rate = Number(r.fx_rate);
+    if (c && rate > 0 && (!rates.has(c) || (r.fx_date ?? "") > /** @type {any} */ (rates.get(c)).date))
+      rates.set(c, { rate, date: r.fx_date ?? "" });
+  }
+  return entries.flatMap((t) => {
+    const c = t.base_currency ?? base;
+    if (c === base) return [t];
+    const r = rates.get(c);
+    return r
+      ? [{ ...t, amount: Math.round((Number(t.amount) / 10 ** digitsOf(c)) * r.rate * 10 ** digitsOf(base)) }]
+      : [];
+  });
+}
+
 /** The weekly summary goes out on Monday from this local hour. */
 export const WEEKLY_HOUR = 9;
 

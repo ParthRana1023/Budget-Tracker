@@ -74,8 +74,8 @@ const MIN_TRANSITION_DAYS = 15;
  */
 
 /**
- * @typedef {{ field: "salary" | "payday" | "save_pct", from_value?: number | null, to_value: number,
- *   applies: "start" | "now" | "next", effective_from: string, superseded_at?: string | null, created_at?: string }} PlanChange
+ * @typedef {{ field: "salary" | "payday" | "save_pct" | "currency", from_value?: number | null, to_value: number,
+ *   from_text?: string | null, to_text?: string | null, applies: "start" | "now" | "next", effective_from: string, superseded_at?: string | null, created_at?: string }} PlanChange
  */
 
 /**

@@ -7,7 +7,7 @@ import { useState } from "react";
 import { Minus, Plus } from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
 import { currencySymbol, formatMoney, NUMBER_LOCALES, toMajor, toMinor } from "@/lib/money.mjs";
-import { shortDate } from "@/lib/cycle.mjs";
+import { addDaysStr, shortDate } from "@/lib/cycle.mjs";
 import {
   applyPlan,
   nextCycleStart,
@@ -147,6 +147,17 @@ export default function PlanSection({
     if (err) {
       reportClientError("plan_apply_failed", { ...errorFields(err) });
       return setError(SAVE_ERROR);
+    }
+    // A new payday this cycle moves the next cycle start, and a pending base switch with it.
+    if (paydayPreview && applies === "now" && settings.currency_next) {
+      const from = addDaysStr(paydayPreview.now.endStr, 1);
+      if (from !== settings.currency_from) {
+        const moved = await createClient().rpc("set_base_currency", {
+          p_currency: settings.currency_next,
+          p_from: from,
+        });
+        if (moved.error) reportClientError("base_switch_move_failed", { ...errorFields(moved.error) });
+      }
     }
     setJustSaved({ fields: edited, from: applies === "next" ? nextFrom : null });
     await onApplied(applies === "next" ? `Plan updated · from ${shortDate(nextFrom)}` : "Plan updated for this cycle");

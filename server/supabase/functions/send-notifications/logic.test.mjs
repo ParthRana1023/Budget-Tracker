@@ -1,6 +1,17 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { addDays, billPush, billsDueOn, channels, isQuiet, localParts, money, safeNow, weeklyPush } from "./logic.mjs";
+import {
+  addDays,
+  billPush,
+  billsDueOn,
+  channels,
+  inTodaysBase,
+  isQuiet,
+  localParts,
+  money,
+  safeNow,
+  weeklyPush,
+} from "./logic.mjs";
 
 test("local date, hour and weekday in the user's time zone", () => {
   // 20:30 UTC Sunday 22 Nov = 02:00 Monday 23 Nov in India.
@@ -144,4 +155,20 @@ test("the weekly summary's safe to spend is the Dashboard's: pay minus savings, 
   assert.equal(r.cycleEnd, "2026-11-30");
   // 1,00,000 − 20,000 saved − 28,000 rent − 5,000 groceries
   assert.equal(r.safe, 4700000);
+});
+
+test("a week across a base switch: older entries in today's base, at the rate rows set in it carry", () => {
+  const entries = [
+    { amount: 200000, base_currency: "INR" }, // ₹2,000.00
+    { amount: 2500, base_currency: "USD" },
+    { amount: 9999, base_currency: "EUR" }, // no rate known: left out
+  ];
+  const rows = [
+    { original_currency: "INR", fx_rate: 0.0125, fx_date: "2026-11-01" },
+    { original_currency: "INR", fx_rate: 0.012, fx_date: "2026-12-01" },
+  ];
+  assert.deepEqual(
+    inTodaysBase(entries, "USD", rows).map((t) => t.amount),
+    [2400, 2500],
+  );
 });

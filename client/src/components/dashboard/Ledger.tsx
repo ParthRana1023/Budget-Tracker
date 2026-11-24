@@ -229,6 +229,11 @@ export default function Ledger({
                                 {formatExact(Number(t.original_amount), t.original_currency)}
                               </span>
                             )}
+                            {!t.original_currency && t.recorded_currency && (
+                              <span className="tabular text-xs whitespace-nowrap text-muted">
+                                {formatExact(Number(t.recorded_amount), t.recorded_currency)}
+                              </span>
+                            )}
                           </span>
                         </button>
                       );

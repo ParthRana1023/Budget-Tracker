@@ -103,3 +103,17 @@ test("amounts are read in the base currency: no decimals for yen", () => {
   assert.equal(r.rows[0].amount, 1200);
   assert.deepEqual(r.skipped, [{ line: 3, reason: "Amount must be above ¥0" }]);
 });
+
+test("Currency column: today's base goes in, an older base is listed with the reason", () => {
+  const csv = [
+    "Date,Type,Category,Amount,Currency,Note",
+    "2026-11-02,expense,Groceries,100,INR,today's base",
+    "2026-11-03,expense,Groceries,25,USD,older base",
+  ].join("\n");
+  const r = checkImport(csv, { categories });
+  assert.deepEqual(
+    r.rows.map((x) => x.note),
+    ["today's base"],
+  );
+  assert.deepEqual(r.skipped, [{ line: 3, reason: "In USD; only INR amounts can be imported" }]);
+});

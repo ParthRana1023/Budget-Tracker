@@ -29,7 +29,7 @@ test("exports transactions as escaped CSV with amounts in rupees", () => {
 
   assert.equal(
     csv,
-    'Date,Type,Category,Amount (INR),Note,Payment method,Original amount\r\n2026-11-03,expense,Food & Dining Out,1234.56,"Lunch, ""team""",UPI,\r\n2026-11-04,expense,Food,165.00,Netflix,,$1.99',
+    'Date,Type,Category,Amount,Currency,Note,Payment method,Original amount\r\n2026-11-03,expense,Food & Dining Out,1234.56,INR,"Lunch, ""team""",UPI,\r\n2026-11-04,expense,Food,165.00,INR,Netflix,,$1.99',
   );
 });
 
@@ -39,6 +39,28 @@ test("exports in the base currency's units: yen have no decimals", () => {
   setCurrency("INR");
   assert.equal(
     csv,
-    "Date,Type,Category,Amount (JPY),Note,Payment method,Original amount\r\n2026-11-03,expense,,1200,Ramen,,",
+    "Date,Type,Category,Amount,Currency,Note,Payment method,Original amount\r\n2026-11-03,expense,,1200,JPY,Ramen,,",
+  );
+});
+
+test("each entry in the base it was recorded in: a base switch keeps older entries as made", () => {
+  setCurrency("USD");
+  const csv = transactionsToCsv([
+    { amount: 2500, type: "expense", date: "2026-12-04", note: "Lunch", base_currency: "USD" },
+    { amount: 200000, type: "expense", date: "2026-11-10", note: "Groceries", base_currency: "INR" },
+    // a copy converted for Reports still exports what was recorded
+    {
+      amount: 2400,
+      recorded_amount: 200000,
+      recorded_currency: "INR",
+      type: "expense",
+      date: "2026-11-11",
+      note: "Rice",
+    },
+  ]);
+  setCurrency("INR");
+  assert.equal(
+    csv.split("\r\n").slice(1).join("|"),
+    "2026-12-04,expense,,25.00,USD,Lunch,,|2026-11-10,expense,,2000.00,INR,Groceries,,|2026-11-11,expense,,2000.00,INR,Rice,,",
   );
 });

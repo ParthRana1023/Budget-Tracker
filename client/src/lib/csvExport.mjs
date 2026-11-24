@@ -6,23 +6,20 @@ function escapeCsv(value) {
   return /[",\r\n]/.test(text) ? `"${text.replaceAll('"', '""')}"` : text;
 }
 
-/** Amounts in the base currency; a foreign entry also shows what was typed ("$19.99"). */
+/**
+ * Each amount in the base it was recorded in (Currency column: a base switch keeps older entries
+ * as made); a foreign entry also shows what was typed ("$19.99").
+ */
 export function transactionsToCsv(transactions) {
-  const columns = [
-    "Date",
-    "Type",
-    "Category",
-    `Amount (${baseCurrency()})`,
-    "Note",
-    "Payment method",
-    "Original amount",
-  ];
-  const rows = transactions.map((transaction) =>
-    [
+  const columns = ["Date", "Type", "Category", "Amount", "Currency", "Note", "Payment method", "Original amount"];
+  const rows = transactions.map((transaction) => {
+    const currency = transaction.recorded_currency ?? transaction.base_currency ?? baseCurrency();
+    return [
       transaction.date,
       transaction.type,
       transaction.category?.name,
-      toMajor(Number(transaction.amount)).toFixed(minorDigits()),
+      toMajor(Number(transaction.recorded_amount ?? transaction.amount), currency).toFixed(minorDigits(currency)),
+      currency,
       transaction.note,
       methodLabel(transaction.payment_method),
       transaction.original_currency
@@ -30,8 +27,8 @@ export function transactionsToCsv(transactions) {
         : "",
     ]
       .map(escapeCsv)
-      .join(","),
-  );
+      .join(",");
+  });
 
   return [columns.join(","), ...rows].join("\r\n");
 }

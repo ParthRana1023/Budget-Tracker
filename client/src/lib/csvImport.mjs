@@ -1,5 +1,5 @@
 // CSV import (Settings › Data): reads the same format lib/csvExport.mjs writes
-// (Date, Type, Category, Amount (INR), Note, Payment method; the last is optional) and checks every row before anything is saved.
+// (Date, Type, Category, Amount, Currency, Note, Payment method; Currency and Payment method are optional) and checks every row before anything is saved.
 // The database repeats the checks and skips exact duplicates (import_transactions).
 
 /**
@@ -33,7 +33,7 @@ export function parseCsv(text) {
 }
 
 import { parseMethod } from "./paymentMethods.mjs";
-import { currencySymbol, inr, minorDigits, toMinor } from "./money.mjs";
+import { baseCurrency, currencySymbol, inr, minorDigits, toMinor } from "./money.mjs";
 
 /** @typedef {{ date: string, type: "expense" | "income", category: string, amount: number, note: string, payment_method?: import("./paymentMethods.mjs").PaymentMethod }} ImportRow */
 
@@ -56,6 +56,7 @@ export function checkImport(text, { categories, existing = [] }) {
     amount: col(/^amount/i),
     note: col(/^note$/i),
     method: col(/^payment method$/i),
+    currency: col(/^currency$/i),
   };
   if (at.date < 0 || at.amount < 0) {
     return { ...out, error: "This file needs Date and Amount columns, like a SaveFirst export." };
@@ -88,6 +89,9 @@ export function checkImport(text, { categories, existing = [] }) {
     if (type === "savings_transfer" || type === "reserve_transfer")
       return skip("Savings and reserve moves aren’t imported");
     if (type !== "expense" && type !== "income") return skip(`Unknown type “${get(at.type)}”`);
+    // Optional column (exports since the base currency could change): only today's base goes in.
+    const cur = get(at.currency).toUpperCase();
+    if (cur && cur !== baseCurrency()) return skip(`In ${cur}; only ${baseCurrency()} amounts can be imported`);
     // Amounts are in the base currency, as exported; a symbol or thousands commas are fine.
     const raw = get(at.amount)
       .replaceAll(currencySymbol(), "")

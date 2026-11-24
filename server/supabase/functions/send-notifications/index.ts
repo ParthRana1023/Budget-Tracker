@@ -19,6 +19,7 @@ import {
   isQuiet,
   localParts,
   money,
+  inTodaysBase,
   safeNow,
   WEEKLY_HOUR,
   weeklyPush,
@@ -132,15 +133,21 @@ Deno.serve(async (req) => {
       const weeklyEmail = on.weekly.email && !!to;
       if ((weeklyEmail || on.weekly.push) && local.weekday === 1 && local.hour >= WEEKLY_HOUR) {
         if (await claim("weekly", local.date)) {
-          const { data: spent } = await db
-            .from("transactions")
-            .select("amount")
-            .eq("user_id", s.user_id)
-            .eq("type", "expense")
-            .gte("date", addDays(local.date, -7))
-            .lt("date", local.date);
-          const total = (spent ?? []).reduce((a, t) => a + Number(t.amount), 0);
-          const count = spent?.length ?? 0;
+          // A cycle is at most about two months (pay-day changes), so this covers it and last week.
+          const [cats, items, txs] = await Promise.all([
+            db.from("categories").select("*").eq("user_id", s.user_id),
+            db.from("recurring_items").select("*").eq("user_id", s.user_id),
+            db.from("transactions").select("*").eq("user_id", s.user_id).gte("date", addDays(local.date, -70)),
+          ]);
+          const failedRead = [cats, items, txs].find((r) => r.error);
+          if (failedRead) throw failedRead.error;
+          // Entries from before a base switch, in today's base.
+          const entries = inTodaysBase(txs.data ?? [], s.currency, [...(cats.data ?? []), ...(items.data ?? [])]);
+          const spent = entries.filter(
+            (t) => t.type === "expense" && t.date >= addDays(local.date, -7) && t.date < local.date,
+          );
+          const total = spent.reduce((a, t) => a + Number(t.amount), 0);
+          const count = spent.length;
           if (weeklyEmail) {
             await sendEmail(
               to,
@@ -150,18 +157,10 @@ Deno.serve(async (req) => {
             sent++;
           }
           if (on.weekly.push) {
-            // A cycle is at most about two months (pay-day changes), so this covers it and last week.
-            const [cats, items, txs] = await Promise.all([
-              db.from("categories").select("*").eq("user_id", s.user_id),
-              db.from("recurring_items").select("*").eq("user_id", s.user_id),
-              db.from("transactions").select("*").eq("user_id", s.user_id).gte("date", addDays(local.date, -70)),
-            ]);
-            const failedRead = [cats, items, txs].find((r) => r.error);
-            if (failedRead) throw failedRead.error;
             const cycle = safeNow({
               settings: s,
               categories: cats.data ?? [],
-              transactions: txs.data ?? [],
+              transactions: entries,
               recurringItems: items.data ?? [],
               today: local.date,
             });

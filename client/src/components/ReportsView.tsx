@@ -114,6 +114,7 @@ export default function ReportsView({
   today,
   onChanged,
   grouping = "cycle",
+  convertedNote = null,
 }: {
   transactions: Tx[];
   categories: Category[];
@@ -123,6 +124,8 @@ export default function ReportsView({
   onChanged: () => Promise<unknown>;
   /** Group every tab by pay-day cycle or by calendar month (no toggle yet: designed later). */
   grouping?: Grouping;
+  /** After a base switch: how older cycles were converted ("Before 1 Dec, amounts are converted…"). */
+  convertedNote?: string | null;
 }) {
   const toast = useToast();
   const [tab, setTab] = useState<Tab>("overview");
@@ -161,7 +164,7 @@ export default function ReportsView({
         a: t.note || t.payee || catName(t) || "Entry",
         b: `${shortDate(t.date)} · ${catName(t) ?? (t.type === "income" ? "Income" : "Savings")}${
           t.original_currency ? ` · ${formatExact(Number(t.original_amount), t.original_currency)}` : ""
-        }`,
+        }${t.recorded_currency ? ` · ${formatExact(Number(t.recorded_amount), t.recorded_currency)}` : ""}`,
         amt: Number(t.amount),
       }));
   const flexEntries = (cy: Cycle, filter: (t: Tx) => boolean = () => true) =>
@@ -1392,6 +1395,7 @@ export default function ReportsView({
           plan()
         )}
       </div>
+      {convertedNote && <p className="m-0 px-1 text-[13px] text-pretty text-muted">{convertedNote}</p>}
 
       <Drawer
         open={!!drill}

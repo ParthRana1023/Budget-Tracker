@@ -271,6 +271,7 @@ export default function BillsRecurring({
               <span className="font-semibold">{c.name}</span>
               <span className="text-[13px] text-muted">
                 Fixed bill · {due ? `due ${shortDate(due)}` : "no due day"}
+                {c.original_currency ? " · rate changes each cycle" : ""}
               </span>
             </span>
             <span
@@ -282,7 +283,14 @@ export default function BillsRecurring({
             >
               {label}
             </span>
-            <span className="tabular min-w-[90px] text-right font-semibold">− {inr(limit)}</span>
+            <span className="flex min-w-[90px] flex-col items-end">
+              <span className="tabular font-semibold">− {inr(limit)}</span>
+              {c.original_currency && (
+                <span className="tabular text-xs text-muted">
+                  {formatExact(Number(c.original_amount), c.original_currency)}
+                </span>
+              )}
+            </span>
             <span className="flex gap-1.5">
               {!paid && (
                 <button

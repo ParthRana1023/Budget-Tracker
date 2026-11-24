@@ -12,8 +12,9 @@ import { payDayLabel, payDayStatus } from "@/lib/settings.mjs";
 import { buildCycleModel } from "@/lib/cycleModel.mjs";
 import { recurringStatus } from "@/lib/recurringStatus.mjs";
 import { budgetWarnings } from "@/lib/notices.mjs";
-import { baseCurrency, formatExact, inr, setCurrency, setNumberFormat, toMinor } from "@/lib/money.mjs";
+import { baseCurrency, currencySymbol, formatExact, inr, setCurrency, setNumberFormat, toMinor } from "@/lib/money.mjs";
 import { fetchRate, repricePatches, staleCurrencies } from "@/lib/fx.mjs";
+import { baseOn, inTodaysBase, lastSwitch, otherBases, ratesFromRows } from "@/lib/baseSwitch.mjs";
 import { transactionsToCsv } from "@/lib/csvExport.mjs";
 import { syncSavedTheme } from "@/lib/theme";
 import { errorFields, reportClientError } from "@/lib/log.mjs";
@@ -215,9 +216,73 @@ export default function DashboardClient(props: DashboardClientProps) {
   const period = useMemo(() => cycleFor(new Date(), schedule), [schedule]);
   const pendingPayDay = payDayStatus(schedule, today).pending;
   const activeCategories = useMemo(() => categories.filter((c) => c.is_active !== false), [categories]);
+
+  // Base currency switch: entries and goal savings from an older base, in today's base at the
+  // current cycle's rate (lib/baseSwitch.mjs). Rows set in the old base carry that rate; any
+  // other currency is fetched once.
+  const [fetchedRates, setFetchedRates] = useState<Map<string, number>>(new Map());
+  const rates = useMemo(
+    () => new Map([...ratesFromRows([...recurringItems, ...categories, ...goals]), ...fetchedRates]),
+    [recurringItems, categories, goals, fetchedRates],
+  );
+  const txBase = (t: Tx) => t.base_currency;
+  const contributionBase = (c: Contribution) => baseOn(settings, c.date ?? today);
+  const missingRates = [
+    ...new Set([...otherBases(transactions, txBase), ...otherBases(contributions, contributionBase)]),
+  ].filter((c) => !rates.has(c));
+  useEffect(() => {
+    if (!missingRates.length) return;
+    void Promise.all(
+      missingRates.map((c) =>
+        fetchRate(c, period.startStr)
+          .then((r) => [c, r.rate] as [string, number])
+          .catch(() => null),
+      ),
+    ).then((got) => {
+      const ok = got.filter((r): r is [string, number] => !!r);
+      if (ok.length) setFetchedRates((m) => new Map([...m, ...ok]));
+    });
+  }, [missingRates.join(), period.startStr]);
+  const txs = useMemo(() => inTodaysBase(transactions, txBase, rates) as Tx[], [transactions, rates]);
+  const contribs = useMemo(
+    () => inTodaysBase(contributions, contributionBase, rates),
+    [contributions, rates, settings, today],
+  );
+  /** "$1 = ₹83.70", or "₹100 = $1.20" for rates under 1. */
+  const rateEquation = (c: string, r: number) =>
+    r >= 1
+      ? `${formatExact(toMinor(1, c), c)} = ${rateText(r, c)}`
+      : `${formatExact(toMinor(100, c), c)} = ${formatExact(toMinor(r * 100), baseCurrency())}`;
+  const switched = lastSwitch(settings, today);
+  const switchRate = switched ? rates.get(switched.from) : undefined;
+  const pendingBase =
+    settings?.currency_next && settings.currency_from && settings.currency_from > today
+      ? { to: settings.currency_next, from: settings.currency_from }
+      : null;
+
+  // The switch itself, once the new cycle has started: at that cycle's rate (old -> new). A
+  // fallback (stale) rate is never used; until a rate loads everything stays in the old base.
+  const switchDue = !!settings?.currency_next && !!settings.currency_from && settings.currency_from <= today;
+  const [switchFailed, setSwitchFailed] = useState(false);
+  useEffect(() => {
+    if (!switchDue || !navigator.onLine) return;
+    void (async () => {
+      const r = await fetchRate(settings!.currency ?? "INR", settings!.currency_from!, settings!.currency_next!).catch(
+        () => null,
+      );
+      if (!r || r.stale) return setSwitchFailed(true);
+      const { error } = await createClient().rpc("apply_base_switch", { p_rate: r.rate });
+      if (error) {
+        reportClientError("base_switch_failed", { ...errorFields(error), userId });
+        return setSwitchFailed(true);
+      }
+      window.location.reload(); // every amount and the base itself changed
+    })();
+  }, [switchDue]);
+
   const model = useMemo(
-    () => buildCycleModel({ settings, categories, transactions, recurringItems, period, today }),
-    [settings, categories, transactions, recurringItems, period, today],
+    () => buildCycleModel({ settings, categories, transactions: txs, recurringItems, period, today }),
+    [settings, categories, txs, recurringItems, period, today],
   );
   const statusCtx = { cycleTransactions: model.cycleTransactions, period, today };
   const due = recurringItems
@@ -229,8 +294,30 @@ export default function DashboardClient(props: DashboardClientProps) {
     (w) => (w.level === "80" ? settings?.notify_warn : settings?.notify_over) !== false,
   );
   const fxKey = fxNote ? `fx-${fxNote.kind}-${period.startStr}` : "";
-  const notes: Note[] =
-    fxNote && !notesOff.includes(fxKey)
+  const baseNotes: Note[] = [
+    pendingBase && {
+      key: `base-next-${pendingBase.from}`,
+      label: `From ${shortDate(pendingBase.from)}`,
+      tone: "var(--lime-text)",
+      text: `Your base currency switches to ${pendingBase.to} (${currencySymbol(pendingBase.to)}) on ${shortDate(pendingBase.from)}. This cycle stays in ${baseCurrency()}, so nothing here changes.`,
+    },
+    switchFailed && {
+      key: `base-wait-${today}`,
+      label: "Base currency",
+      tone: "var(--warn)",
+      text: `Couldn’t get the exchange rate to switch to ${settings?.currency_next}. Everything stays in ${baseCurrency()} until it loads; SaveFirst tries again next time you open it.`,
+    },
+    switched &&
+      switched.on >= period.startStr && {
+        key: `base-new-${switched.on}`,
+        label: "New base",
+        tone: "var(--lime-text)",
+        text: `Everything now shows in ${switched.to}. Salary, rent, budgets and goals you set in ${switched.from} are converted at each cycle’s rate${switchRate ? ` (${rateEquation(switched.from, switchRate)} this cycle)` : ""}.`,
+      },
+  ].filter((n): n is Note => !!n && !notesOff.includes(n.key));
+  const notes: Note[] = [
+    ...baseNotes,
+    ...(fxNote && !notesOff.includes(fxKey)
       ? [
           fxNote.kind === "stale"
             ? {
@@ -244,15 +331,12 @@ export default function DashboardClient(props: DashboardClientProps) {
                 label: "New cycle",
                 tone: "var(--lime-text)",
                 text: `Exchange rates updated for this cycle: ${fxNote.rates
-                  .map(([c, r]) =>
-                    r >= 1
-                      ? `${formatExact(toMinor(1, c), c)} = ${rateText(r, c)}`
-                      : `${formatExact(toMinor(100, c), c)} = ${formatExact(toMinor(r * 100), baseCurrency())}`,
-                  )
+                  .map(([c, r]) => rateEquation(c, r))
                   .join(", ")}. Foreign bills, budgets and goals moved with them.`,
               },
         ]
-      : [];
+      : []),
+  ];
   const held = incomeSources.filter((i) => i.status === "expected");
   const holdTotal = held.reduce((s, i) => s + Number(i.amount), 0);
 
@@ -270,7 +354,7 @@ export default function DashboardClient(props: DashboardClientProps) {
     (s, g) =>
       s +
       Number(g.saved_before ?? 0) +
-      contributions.filter((c) => c.goal_id === g.id).reduce((t, c) => t + Number(c.amount), 0),
+      contribs.filter((c) => c.goal_id === g.id).reduce((t, c) => t + Number(c.amount), 0),
     0,
   );
   const morePlan = {
@@ -448,7 +532,7 @@ export default function DashboardClient(props: DashboardClientProps) {
     schedule,
     model,
     categories,
-    transactions,
+    transactions: txs,
     recurringItems,
     goals,
     held,
@@ -459,7 +543,7 @@ export default function DashboardClient(props: DashboardClientProps) {
         recurringItems,
         period,
         today,
-        transactions: [...transactions.filter((t) => t.id !== removeId), ...(extra as Tx[])],
+        transactions: [...txs.filter((t) => t.id !== removeId), ...(extra as Tx[])],
       }).safe,
     saved: async (message, undo) => {
       await refreshData();
@@ -522,12 +606,17 @@ export default function DashboardClient(props: DashboardClientProps) {
           <OfflineShell eyebrow={OFFLINE_EYEBROW[view]} syncedAt={syncedAt} tiles={view === "dashboard"} />
         ) : view === "reports" ? (
           <ReportsView
-            transactions={transactions}
+            transactions={txs}
             categories={categories}
             settings={settings}
             recurringItems={recurringItems}
             today={today}
             onChanged={refreshData}
+            convertedNote={
+              switched && switchRate && txs.some((t) => t.recorded_currency)
+                ? `Before ${shortDate(switched.on)}, amounts are converted from ${switched.from} at today’s rate (${rateEquation(switched.from, switchRate)}).`
+                : null
+            }
           />
         ) : view === "more" ? (
           <More
@@ -579,6 +668,7 @@ export default function DashboardClient(props: DashboardClientProps) {
                     {cycleLabel(period)}
                     {pendingPayDay &&
                       ` · Payday moves to the ${payDayLabel(pendingPayDay.payDay)} from ${shortDate(pendingPayDay.from)}`}
+                    {pendingBase && ` · in ${pendingBase.to} from ${shortDate(pendingBase.from)}`}
                   </span>
                 </div>
 
@@ -601,7 +691,7 @@ export default function DashboardClient(props: DashboardClientProps) {
                     model={model}
                     period={period}
                     today={today}
-                    transactions={transactions}
+                    transactions={txs}
                     recurringItems={recurringItems}
                   />
                 </div>
@@ -681,7 +771,7 @@ export default function DashboardClient(props: DashboardClientProps) {
                 {view !== "budgets" && (
                   <Goals
                     goals={goals}
-                    contributions={contributions}
+                    contributions={contribs}
                     userId={userId}
                     today={today}
                     cycleStart={period.startStr}
@@ -724,7 +814,7 @@ export default function DashboardClient(props: DashboardClientProps) {
                   entries={model.cycleTransactions as Tx[]}
                   byId={model.byId}
                   today={today}
-                  onEdit={setEditing}
+                  onEdit={(t) => setEditing(transactions.find((x) => x.id === t.id) ?? t)}
                   onExport={exportCsv}
                   onIncome={() => openIncome()}
                   onExpense={() => openExpense()}

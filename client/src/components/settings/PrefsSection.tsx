@@ -5,8 +5,12 @@
 
 import { useEffect, useState } from "react";
 import { createClient } from "@/utils/supabase/client";
-import { CURRENCIES, currencySymbol, minorDigits, NUMBER_LOCALES } from "@/lib/money.mjs";
-import { savePreferences } from "@/lib/settings.mjs";
+import { ChevronDown } from "lucide-react";
+import { currencySymbol, minorDigits, NUMBER_LOCALES } from "@/lib/money.mjs";
+import { nextCycleStart, savePreferences } from "@/lib/settings.mjs";
+import { shortDate } from "@/lib/cycle.mjs";
+import type { PayDayEntry } from "@/lib/periods.mjs";
+import { CurrencyList, currencyName } from "../dashboard/popups/currency";
 import { syncSavedTheme, THEME_EVENT, THEME_KEY, type Theme } from "@/lib/theme";
 import type { Settings } from "../dashboard/types";
 import { Card, Row, SaveState, SELECT, SectionHead, useSave } from "./parts";
@@ -20,11 +24,18 @@ const SAMPLES: [string, number, number][] = [
 
 export default function PrefsSection({
   settings,
+  schedule,
+  today,
   onSaved,
+  onBaseChanged,
 }: {
   settings: Settings;
+  schedule: PayDayEntry[];
+  today: string;
   /** Keeps the page's copy in step (number format shows straight away). */
   onSaved: (patch: Partial<Settings>) => void;
+  /** A base switch was scheduled or cancelled: reload settings (and plan history). */
+  onBaseChanged: () => Promise<unknown>;
 }) {
   const db = createClient();
   const theme = useSave(),
@@ -44,16 +55,34 @@ export default function PrefsSection({
     return () => window.removeEventListener(THEME_EVENT, read);
   }, []);
 
-  // Base currency: changeable until the first entry (set_base_currency checks too).
+  // Base currency (design handoff v3, Currency): no entries yet -> applies now; with entries ->
+  // pending until the next cycle starts (set_base_currency checks too). Picking the current base
+  // again cancels a pending switch.
   const currencySave = useSave();
   const currency = settings.currency ?? "INR";
-  const names = new Intl.DisplayNames(["en"], { type: "currency" });
-  const [locked, setLocked] = useState<boolean | null>(null);
+  const next = settings.currency_next ?? null;
+  const [curOpen, setCurOpen] = useState(false);
+  const [hasEntries, setHasEntries] = useState<boolean | null>(null);
   useEffect(() => {
     db.from("transactions")
       .select("id", { count: "exact", head: true })
-      .then(({ count, error }) => setLocked(error ? true : (count ?? 0) > 0));
+      .then(({ count, error }) => setHasEntries(error ? true : (count ?? 0) > 0));
   }, []);
+  const pickBase = (code: string) => {
+    setCurOpen(false);
+    if (code === (next ?? currency)) return;
+    void currencySave.run(async () => {
+      const r = await db.rpc(
+        "set_base_currency",
+        hasEntries ? { p_currency: code, p_from: nextCycleStart(schedule, today) } : { p_currency: code },
+      );
+      if (r.error) return r;
+      // No entries: stored amounts were rescaled on the server, so load them fresh.
+      if (!hasEntries) window.location.reload();
+      else await onBaseChanged();
+      return r;
+    });
+  };
 
   const format: Format = settings.number_format ?? "indian";
   const loc = NUMBER_LOCALES[format];
@@ -96,36 +125,61 @@ export default function PrefsSection({
         </Row>
         <Row
           label="Base currency"
-          htmlFor="f-cur"
           help={
-            locked
-              ? "Locked after your first entry. Log foreign spending in its own currency instead."
-              : "Every amount is kept in this currency. You can change it until your first entry."
+            hasEntries
+              ? "A change starts with your next cycle. Past cycles stay in the currency they were tracked in."
+              : "Every total, budget and goal is shown in this. No entries yet, so a change applies straight away."
           }
         >
-          <SaveState status={currencySave.status} />
-          <select
-            id="f-cur"
-            value={currency}
-            disabled={locked !== false}
-            onChange={(e) => {
-              const v = e.target.value;
-              void currencySave.run(async () => {
-                const r = await db.rpc("set_base_currency", { p_currency: v });
-                // Stored amounts were rescaled on the server; load them fresh.
-                if (!r.error) window.location.reload();
-                return r;
-              });
-            }}
-            className={`${SELECT} h-11 flex-[0_1_260px] text-[15px] disabled:opacity-60`}
+          {!currencySave.status && next && settings.currency_from ? (
+            <span className="text-xs font-semibold text-muted">From {shortDate(settings.currency_from)}</span>
+          ) : (
+            <SaveState status={currencySave.status} />
+          )}
+          <button
+            type="button"
+            aria-label={`Base currency: ${currency}`}
+            aria-expanded={curOpen}
+            disabled={hasEntries === null}
+            onClick={() => setCurOpen((o) => !o)}
+            className={`${SELECT} flex h-11 flex-[0_1_260px] items-center gap-2 text-left text-[15px] disabled:opacity-60`}
+            style={curOpen ? { borderColor: "var(--lime)" } : undefined}
           >
-            {CURRENCIES.map((c) => (
-              <option key={c} value={c}>
-                {currencySymbol(c)} {c} · {names.of(c)}
-              </option>
-            ))}
-          </select>
+            <span className="font-bold">{currency}</span>
+            <span className="min-w-0 flex-1 truncate text-ink-2">{currencyName(currency)}</span>
+            <span className="text-muted">{currencySymbol(currency)}</span>
+            <ChevronDown size={16} aria-hidden className={curOpen ? "rotate-180" : ""} />
+          </button>
         </Row>
+        {(curOpen || next) && (
+          <div className="-mt-2 flex flex-col gap-3 px-6 pb-5 max-[480px]:px-[18px]">
+            {curOpen && <CurrencyList value={next ?? currency} onPick={pickBase} onClose={() => setCurOpen(false)} />}
+            {next && settings.currency_from && (
+              <div
+                role="status"
+                className="flex flex-wrap items-center gap-3 rounded-2xl border border-line bg-lime-soft p-4"
+              >
+                <span className="flex min-w-0 flex-[1_1_220px] flex-col gap-0.5">
+                  <span className="text-sm font-bold">
+                    Switches to {next} on {shortDate(settings.currency_from)}
+                  </span>
+                  <span className="text-[13px] text-pretty text-ink-2">
+                    When your next cycle starts. This cycle stays in {currency} so its totals don’t change. Your salary,
+                    budgets and bills will show in {next} from then; anything set in {currency} is converted at that
+                    cycle’s rate.
+                  </span>
+                </span>
+                <button
+                  type="button"
+                  onClick={() => pickBase(currency)}
+                  className="h-10 cursor-pointer rounded-full border border-line-2 bg-tile px-3.5 text-[13px] font-semibold hover:border-ink-2"
+                >
+                  Keep {currency}
+                </button>
+              </div>
+            )}
+          </div>
+        )}
         <div className="flex flex-col gap-3 px-6 py-5 max-[480px]:px-[18px]">
           <div className="flex flex-wrap items-center gap-x-5 gap-y-2.5">
             <label htmlFor="f-num" className="flex-[1_1_200px] text-sm font-semibold">

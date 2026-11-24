@@ -66,7 +66,7 @@ test.describe("Settings", () => {
     await expect(page.getByRole("radio", { name: "Light" })).toHaveAttribute("aria-checked", "true");
     await expect(page.getByLabel("Number format")).toHaveValue("international");
     await expect(page.getByLabel("Week starts on")).toHaveValue("0");
-    await expect(page.getByLabel("Base currency")).toHaveValue("INR");
+    await expect(page.getByRole("button", { name: "Base currency: INR" })).toBeVisible();
   });
 
   test("Recurring items: add and delete apply on close; Undo brings a deleted item back", async ({ page }) => {

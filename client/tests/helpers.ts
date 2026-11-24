@@ -101,6 +101,21 @@ export async function setUpAccount(page: Page): Promise<string> {
   return email;
 }
 
+/**
+ * The local stack's service client (bypasses RLS) and an account's user id: for seeding states the
+ * UI can't reach on a given day, such as a base switch that has already started.
+ */
+export async function asAdmin(email: string) {
+  const admin = createClient(env("NEXT_PUBLIC_SUPABASE_URL"), env("SUPABASE_SECRET_KEY"), {
+    auth: { persistSession: false },
+  });
+  const { data, error } = await admin.auth.admin.listUsers({ perPage: 1000 });
+  if (error) throw error;
+  const user = data.users.find((u) => u.email === email);
+  if (!user) throw new Error(`No user ${email}`);
+  return { admin, userId: user.id };
+}
+
 /** Under 720px the app uses the bottom nav and phone pages (design handoff v3, Mobile). */
 export const isPhone = (page: Page) => (page.viewportSize()?.width ?? 1280) < 720;
 
