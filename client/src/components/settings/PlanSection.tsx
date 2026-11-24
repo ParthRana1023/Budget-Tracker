@@ -30,7 +30,7 @@ const cycleRuns = (d: number) =>
   d === 1 ? "1st – last day" : d === 31 ? "last day – day before" : `${ordinal(d)} – ${ordinal(d - 1)}`;
 const longDate = (s: string) =>
   new Date(`${s}T12:00:00`).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
-const LABEL = { salary: "Salary", payday: "Payday", save_pct: "Save first" } as const;
+const LABEL = { salary: "Salary", payday: "Payday", save_pct: "Save first", currency: "Base currency" } as const;
 const MIN_PCT = 5,
   MAX_PCT = 60;
 
@@ -154,8 +154,19 @@ export default function PlanSection({
 
   const history = planHistory(settings);
   const shown = allHistory ? history : history.slice(0, 4);
-  const value = (field: Field, v: number | null) =>
-    v === null ? "—" : field === "salary" ? money(v) : field === "payday" ? payDayLabel(v) : `${v}%`;
+  // A salary row from a base switch shows each side in its own currency (₹1,00,000 → $1,200).
+  const value = (field: Field | "currency", v: number | null, code: string | null) =>
+    field === "currency"
+      ? (code ?? "—")
+      : v === null
+        ? "—"
+        : field === "salary"
+          ? code
+            ? formatMoney(v, format, code)
+            : money(v)
+          : field === "payday"
+            ? payDayLabel(v)
+            : `${v}%`;
   const statusCell = (k: Field) => {
     const [text, color] = status(k);
     return (
@@ -243,8 +254,8 @@ export default function PlanSection({
                   <span className="text-sm font-semibold">Apply from when?</span>
                   {edited.map((k) => (
                     <span key={k} className="tabular text-[13px] text-ink-2">
-                      {LABEL[k]}: {value(k, k === "salary" ? toMinor(+base.salary) : +base[k])} →{" "}
-                      <strong className="text-ink">{value(k, k === "salary" ? toMinor(sal) : +form[k])}</strong>
+                      {LABEL[k]}: {value(k, k === "salary" ? toMinor(+base.salary) : +base[k], null)} →{" "}
+                      <strong className="text-ink">{value(k, k === "salary" ? toMinor(sal) : +form[k], null)}</strong>
                     </span>
                   ))}
                 </div>
@@ -321,8 +332,8 @@ export default function PlanSection({
                   "Plan created during onboarding"
                 ) : (
                   <>
-                    {LABEL[h.field]} <span className="text-muted">{value(h.field, h.from)} →</span>{" "}
-                    <strong>{value(h.field, h.to)}</strong>
+                    {LABEL[h.field]} <span className="text-muted">{value(h.field, h.from, h.fromText)} →</span>{" "}
+                    <strong>{value(h.field, h.to, h.toText)}</strong>
                   </>
                 )}
               </span>

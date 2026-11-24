@@ -28,10 +28,13 @@ export function parseFrankfurter(json, base) {
  * The rate for `currency` -> the base currency on `cycleStart`, from the app's /api/rates.
  * `stale` = the rates service was down and this is the newest cached rate (dated `date`).
  * @param {string} currency @param {string} cycleStart
+ * @param {string} [base] price in this currency instead of the user's base (a base switch: old -> new)
  * @returns {Promise<{ rate: number, date: string, stale: boolean }>}
  */
-export async function fetchRate(currency, cycleStart) {
-  const res = await fetch(`/api/rates?currency=${encodeURIComponent(currency)}&date=${encodeURIComponent(cycleStart)}`);
+export async function fetchRate(currency, cycleStart, base) {
+  const res = await fetch(
+    `/api/rates?currency=${encodeURIComponent(currency)}&date=${encodeURIComponent(cycleStart)}${base ? `&base=${encodeURIComponent(base)}` : ""}`,
+  );
   const body = await res.json().catch(() => null);
   if (!res.ok || !(body?.rate > 0)) throw new Error(body?.error ?? "Couldn’t get an exchange rate.");
   return body;

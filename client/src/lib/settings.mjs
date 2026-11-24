@@ -8,7 +8,7 @@ import { baseCurrency } from "./money.mjs";
 
 /** @typedef {import("./periods.mjs").PayDayEntry} PayDayEntry */
 /** @typedef {import("./periods.mjs").PlanChange} PlanChange */
-/** @typedef {"salary" | "payday" | "save_pct"} PlanField */
+/** @typedef {"salary" | "payday" | "save_pct" | "currency"} PlanField */
 
 /** 1 -> "1st", 22 -> "22nd". @param {number} d */
 export const ordinal = (d) =>
@@ -23,7 +23,7 @@ export const PAYDAY_OPTIONS = [
 
 /** user_settings with its plan history (Dashboard, Settings). */
 export const SETTINGS_SELECT =
-  "*, plan_changes(field, from_value, to_value, applies, effective_from, superseded_at, created_at)";
+  "*, plan_changes(field, from_value, to_value, from_text, to_text, applies, effective_from, superseded_at, created_at)";
 
 /**
  * Start date of the cycle after the one containing `today`: when a new pay day takes effect.
@@ -122,7 +122,7 @@ export function pendingPlan(settings, today) {
  * `date` is the day the change was made.
  * @param {{ plan_changes?: PlanChange[] | null } | null} settings
  * @returns {{ key: string, date: string, field: PlanField | "created", from: number | null, to: number | null,
- *   applies: "start" | "now" | "next", superseded: boolean }[]}
+ *   fromText: string | null, toText: string | null, applies: "start" | "now" | "next", superseded: boolean }[]}
  */
 export function planHistory(settings) {
   const rows = settings?.plan_changes ?? [];
@@ -137,7 +137,10 @@ export function planHistory(settings) {
       date: made(r),
       field: /** @type {PlanField} */ (r.field),
       from: r.from_value ?? null,
-      to: r.to_value,
+      to: r.to_value ?? null,
+      // Currency rows (and the salary row a base switch writes): the currencies on each side.
+      fromText: r.from_text ?? null,
+      toText: r.to_text ?? null,
       applies: /** @type {"now" | "next"} */ (r.applies),
       superseded: !!r.superseded_at,
     }))
@@ -149,7 +152,17 @@ export function planHistory(settings) {
   );
   return [
     ...changes,
-    { key: "created", date: made(first), field: "created", from: null, to: null, applies: "start", superseded: false },
+    {
+      key: "created",
+      date: made(first),
+      field: "created",
+      from: null,
+      to: null,
+      fromText: null,
+      toText: null,
+      applies: "start",
+      superseded: false,
+    },
   ];
 }
 

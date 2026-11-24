@@ -43,9 +43,9 @@ select '22222222-2222-2222-2222-222222222222', 'expense', 3000, '2026-11-25', 'N
 select is((select original_amount || ' ' || original_currency || ' @' || fx_rate::float8 from public.transactions where note = 'Netflix'),
   '1999 USD @150', 'a posted entry keeps the item''s original amount and rate');
 
--- ================================================================ lock
-select throws_ok($$select public.set_base_currency('USD')$$, 'P0001', 'The base currency is locked after your first entry',
-  'locked after the first entry');
+-- ================================================================ after the first entry (20261126000000_base_currency_switch)
+select throws_ok($$select public.set_base_currency('USD')$$, 'P0001', 'Choose when the new base currency starts',
+  'after the first entry a change needs a start date');
 select lives_ok($$select public.set_base_currency('JPY')$$, 'choosing the same currency is a no-op');
 
 -- ================================================================ rate cache

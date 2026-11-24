@@ -199,3 +199,35 @@ test("device names from a user agent", async () => {
   assert.equal(quietLength(22, 8), 10);
   assert.equal(quietLength(9, 9), 24);
 });
+
+test("plan history: a base currency switch and its salary row carry their currencies", () => {
+  const rows = planHistory({
+    plan_changes: [
+      {
+        field: "currency",
+        from_text: "INR",
+        to_text: "USD",
+        applies: "next",
+        effective_from: "2026-12-01",
+        created_at: "2026-11-24T10:00:00Z",
+      },
+      {
+        field: "salary",
+        from_value: 10000000,
+        to_value: 120000,
+        from_text: "INR",
+        to_text: "USD",
+        applies: "now",
+        effective_from: "2026-12-01",
+        created_at: "2026-12-01T05:00:00Z",
+      },
+    ],
+  });
+  assert.deepEqual(
+    rows.map((r) => [r.field, r.from, r.to, r.fromText, r.toText]),
+    [
+      ["salary", 10000000, 120000, "INR", "USD"],
+      ["currency", null, null, "INR", "USD"],
+    ],
+  );
+});

@@ -30,7 +30,11 @@ export async function GET(request: NextRequest) {
     .select("currency")
     .eq("user_id", user.id)
     .maybeSingle();
-  const base = settings?.currency ?? "INR";
+  // ?base= prices against another currency (a base switch needs old -> new); default: the user's base.
+  const asked = q.get("base");
+  if (asked && !CURRENCIES.includes(asked))
+    return NextResponse.json({ error: "Unsupported currency." }, { status: 400 });
+  const base = asked || settings?.currency || "INR";
   if (currency === base) return NextResponse.json({ rate: 1, date, stale: false });
 
   const { data: cached } = await supabase
