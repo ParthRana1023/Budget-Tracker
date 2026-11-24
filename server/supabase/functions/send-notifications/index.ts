@@ -15,6 +15,8 @@ import {
   addDays,
   billPush,
   billsDueOn,
+  cardPush,
+  cardReminder,
   channels,
   isQuiet,
   localParts,
@@ -65,7 +67,7 @@ Deno.serve(async (req) => {
     .from("user_settings")
     .select(
       // The plan columns and history feed the weekly summary's safe to spend (same maths as the Dashboard).
-      "user_id, currency, email_notifications, weekly_summary, notify_due, push_bills, push_weekly, bill_reminder_days, quiet_hours_on, quiet_from, quiet_to, timezone, take_home_pay, savings_pct, month_start_day, plan_changes(field, from_value, to_value, applies, effective_from, superseded_at, created_at)",
+      "user_id, currency, email_notifications, weekly_summary, notify_due, push_bills, push_weekly, bill_reminder_days, quiet_hours_on, quiet_from, quiet_to, timezone, take_home_pay, savings_pct, month_start_day, card_statement_day, card_due_day, card_tracking_since, card_opening_balance, card_remind_days, plan_changes(field, from_value, to_value, applies, effective_from, superseded_at, created_at)",
     )
     .or(filters.join(","));
   if (error) return Response.json({ error: error.message }, { status: 500 });
@@ -127,6 +129,30 @@ Deno.serve(async (req) => {
             sent++;
           }
           if (on.bills.push) sent += await push(subs, billPush(bill, days, due, s.currency));
+        }
+
+        // Credit card bill: goes out with bill reminders, card_remind_days before the due day.
+        if (s.card_remind_days && s.card_tracking_since) {
+          const { data: card, error: cardError } = await db
+            .from("transactions")
+            .select("type, amount, date, payment_method, base_currency")
+            .eq("user_id", s.user_id)
+            .gte("date", s.card_tracking_since)
+            .or("type.eq.card_payment,payment_method.eq.credit_card");
+          if (cardError) throw cardError;
+          const entries = inTodaysBase(card ?? [], s.currency, [...(cats.data ?? []), ...(items.data ?? [])]);
+          const r = cardReminder(s, entries, local.date);
+          if (r && (await claim("bill", r.ref))) {
+            if (billEmail) {
+              await sendEmail(
+                to,
+                `Card bill due on ${r.due}`,
+                `${money(r.amount, s.currency)} is on this card statement, due on ${r.due}. Record the payment on your dashboard when you pay: ${env("APP_URL")}/dashboard`,
+              );
+              sent++;
+            }
+            if (on.bills.push) sent += await push(subs, cardPush(r, s.currency));
+          }
         }
       }
 

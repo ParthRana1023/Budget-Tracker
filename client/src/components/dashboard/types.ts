@@ -19,7 +19,8 @@ export interface Category {
 
 export interface Tx {
   id: string;
-  type: "expense" | "income" | "savings_transfer" | "reserve_transfer";
+  /** card_payment: paying the credit card bill, a transfer (never spending; lib/cardBalance.mjs). */
+  type: "expense" | "income" | "savings_transfer" | "reserve_transfer" | "card_payment";
   amount: number;
   date: string;
   note: string | null;
@@ -109,6 +110,14 @@ export interface Settings {
   quiet_from?: number;
   quiet_to?: number;
   timezone?: string;
+  /** Credit card tracker (lib/cardBalance.mjs): statement, due day and tracking date set together, or none (off). */
+  card_statement_day?: number | null;
+  card_due_day?: number | null;
+  card_tracking_since?: string | null;
+  /** Owed on card_tracking_since, in the base currency. */
+  card_opening_balance?: number;
+  /** Push/email this many days before the due day; null = no reminder. */
+  card_remind_days?: number | null;
 }
 
 /** Small pill buttons used across the dashboard cards. */

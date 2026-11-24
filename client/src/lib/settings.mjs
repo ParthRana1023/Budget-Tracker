@@ -65,6 +65,22 @@ export const thisCycleStart = (schedule, today) => cycleFor(parseLocalDate(today
 export const savePreferences = (supabase, changes) => supabase.rpc("update_preferences", { p_changes: changes });
 
 /**
+ * Settings › Credit card (lib/cardBalance.mjs). `null` turns the tracker off.
+ * @param {any} supabase
+ * @param {{ statementDay: number, dueDay: number, since: string, opening?: number, remindDays?: number | null } | null} card
+ *   days 1-31; since 'YYYY-MM-DD'; opening in minor units; remindDays 1-10 or null
+ * @returns {Promise<{ error: any }>}
+ */
+export const saveCardTracker = (supabase, card) =>
+  supabase.rpc("set_card_tracker", {
+    p_statement_day: card?.statementDay ?? null,
+    p_due_day: card?.dueDay ?? null,
+    p_tracking_since: card?.since ?? null,
+    p_opening_balance: card?.opening ?? 0,
+    p_remind_days: card?.remindDays ?? null,
+  });
+
+/**
  * "Apply from when?": save salary, payday and save-first % together, from this cycle or the
  * next one. Leave a field out to keep it. The database records each change in the plan history.
  * @param {any} supabase

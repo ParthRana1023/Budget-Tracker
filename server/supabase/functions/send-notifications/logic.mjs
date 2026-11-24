@@ -4,6 +4,7 @@
 // user's base currency.
 
 import { buildCycleModel } from "../_shared/budget/cycleModel.mjs";
+import { cardBalance } from "../_shared/budget/cardBalance.mjs";
 import { cycleFor, paySchedule } from "../_shared/budget/periods.mjs";
 
 /**
@@ -158,6 +159,34 @@ export function billPush(bill, days, due, currency = "INR") {
     actions: [{ action: "record", title: "Record it" }],
   };
 }
+
+/**
+ * The credit card reminder due today, or null: the tracker and its reminder are on, something is
+ * owed on the statement, and the due date is exactly `card_remind_days` away. `ref` makes it one
+ * per statement (notification_log, kind "bill").
+ * @param {any} settings user_settings row (card_* columns)
+ * @param {Array<{ type: string, amount: number | string, date: string, payment_method?: string | null }>} entries in today's base
+ * @param {string} today 'YYYY-MM-DD' (user's local date)
+ * @returns {{ ref: string, amount: number, due: string } | null}
+ */
+export function cardReminder(settings, entries, today) {
+  const days = settings?.card_remind_days;
+  if (!days) return null;
+  const b = cardBalance({ transactions: entries, settings, today });
+  if (!b || b.statement <= 0 || b.dueDate !== addDays(today, days)) return null;
+  return { ref: `card:${b.dueDate}`, amount: b.statement, due: b.dueDate };
+}
+
+/**
+ * Lock-screen text for the card reminder (plans/v4 design prompt).
+ * @param {{ amount: number, due: string }} r from cardReminder @param {string} [currency]
+ */
+export const cardPush = (r, currency = "INR") => ({
+  title: `Card bill due ${dayMonth(r.due)}`,
+  body: `${money(r.amount, currency)} on this statement. Tap to record the payment.`,
+  url: "/dashboard",
+  tag: `card-${r.due.slice(0, 7)}`,
+});
 
 /**
  * This cycle's safe to spend for the weekly summary, the same way the Dashboard works it out.

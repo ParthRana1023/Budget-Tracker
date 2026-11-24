@@ -4,6 +4,8 @@ import {
   addDays,
   billPush,
   billsDueOn,
+  cardPush,
+  cardReminder,
   channels,
   inTodaysBase,
   isQuiet,
@@ -171,4 +173,27 @@ test("a week across a base switch: older entries in today's base, at the rate ro
     inTodaysBase(entries, "USD", rows).map((t) => t.amount),
     [2400, 2500],
   );
+});
+
+test("card reminder: card_remind_days before the due day, only when the statement is unpaid", () => {
+  const s = {
+    card_statement_day: 20,
+    card_due_day: 5,
+    card_tracking_since: "2026-10-01",
+    card_opening_balance: 0,
+    card_remind_days: 3,
+  };
+  const spend = [{ type: "expense", payment_method: "credit_card", amount: 1800000, date: "2026-11-10" }];
+  const r = cardReminder(s, spend, "2026-12-02");
+  assert.deepEqual(r, { ref: "card:2026-12-05", amount: 1800000, due: "2026-12-05" });
+  assert.equal(cardReminder(s, spend, "2026-12-01"), null, "not 3 days before");
+  assert.equal(cardReminder({ ...s, card_remind_days: null }, spend, "2026-12-02"), null, "reminder off");
+  const paid = [...spend, { type: "card_payment", amount: 1800000, date: "2026-11-30" }];
+  assert.equal(cardReminder(s, paid, "2026-12-02"), null, "already paid");
+  assert.deepEqual(cardPush(r, "INR"), {
+    title: "Card bill due 5 Dec",
+    body: "₹18,000.00 on this statement. Tap to record the payment.",
+    url: "/dashboard",
+    tag: "card-2026-12",
+  });
 });

@@ -53,6 +53,19 @@ test("bad rows are listed with a reason; duplicates are counted", () => {
   assert.equal(r.duplicates, 2, "one repeated in the file, one already saved");
 });
 
+test("card bill payments import with no category or method", () => {
+  const csv = transactionsToCsv([
+    { date: "2026-11-05", type: "card_payment", category: null, amount: 1800000, note: "Card bill" },
+  ]);
+  assert.deepEqual(checkImport(csv, { categories }).rows, [
+    { date: "2026-11-05", type: "card_payment", category: "", amount: 1800000, note: "Card bill" },
+  ]);
+  const odd = "Date,Type,Category,Amount (INR),Note,Payment method\n2026-11-05,card_payment,Groceries,500,x,UPI";
+  assert.deepEqual(checkImport(odd, { categories }).rows, [
+    { date: "2026-11-05", type: "card_payment", category: "", amount: 50000, note: "x" },
+  ]);
+});
+
 test("a file without the needed columns, or empty, is refused", () => {
   assert.match(checkImport("Name,Value\nx,1", { categories }).error, /Date and Amount/);
   assert.match(checkImport("Date,Amount\n", { categories }).error, /no entries/);

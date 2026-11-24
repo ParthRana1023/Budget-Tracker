@@ -38,4 +38,5 @@ test("short names and the ledger filter in the URL", () => {
   assert.deepEqual(parseMethodFilter("none,cash"), ["cash", "none"], "picker order, Not set last");
   assert.deepEqual(parseMethodFilter("cash,cheque,,"), ["cash"], "unknown keys dropped");
   assert.deepEqual(parseMethodFilter(null), []);
+  assert.deepEqual(parseMethodFilter("card_payment,credit_card"), ["credit_card", "card_payment"], "card payments last");
 });

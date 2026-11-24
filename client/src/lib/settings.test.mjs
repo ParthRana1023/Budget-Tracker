@@ -10,6 +10,7 @@ import {
   payDayStatus,
   pendingPlan,
   planHistory,
+  saveCardTracker,
   savePreferences,
 } from "./settings.mjs";
 
@@ -66,6 +67,22 @@ test("applyPlan starts at this cycle or the next one; savePreferences sends only
       { p_salary: 8500000, p_payday: 31, p_save_pct: null, p_applies: "next", p_effective_from: "2026-12-25" },
     ],
     ["update_preferences", { p_changes: { theme: "system" } }],
+  ]);
+});
+
+test("saveCardTracker sends every field; null turns the tracker off", async () => {
+  const sb = fakeSupabase();
+  await saveCardTracker(sb, { statementDay: 20, dueDay: 5, since: "2026-11-01", opening: 1250000, remindDays: 3 });
+  await saveCardTracker(sb, { statementDay: 31, dueDay: 28, since: "2026-11-01" });
+  await saveCardTracker(sb, null);
+  const call = (s, d, since, o, r) => [
+    "set_card_tracker",
+    { p_statement_day: s, p_due_day: d, p_tracking_since: since, p_opening_balance: o, p_remind_days: r },
+  ];
+  assert.deepEqual(sb.calls, [
+    call(20, 5, "2026-11-01", 1250000, 3),
+    call(31, 28, "2026-11-01", 0, null),
+    call(null, null, null, 0, null),
   ]);
 });
 

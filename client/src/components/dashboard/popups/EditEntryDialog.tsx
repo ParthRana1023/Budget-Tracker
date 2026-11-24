@@ -25,7 +25,12 @@ import {
 } from "./parts";
 import { rateText } from "./currency";
 
-const KIND = { income: "Income", savings_transfer: "Savings transfer", reserve_transfer: "Reserve" } as const;
+const KIND = {
+  income: "Income",
+  savings_transfer: "Savings transfer",
+  reserve_transfer: "Reserve",
+  card_payment: "Card bill paid",
+} as const;
 
 export default function EditEntryDialog({
   ctx,

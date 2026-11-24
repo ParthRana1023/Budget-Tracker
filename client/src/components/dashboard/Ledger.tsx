@@ -8,7 +8,14 @@ import { useEffect, useState } from "react";
 import { Banknote, Check, ChevronDown, CircleEllipsis, CreditCard, ListFilter, Smartphone } from "lucide-react";
 import { formatExact, inr } from "@/lib/money.mjs";
 import { dayLabel, shortDate } from "@/lib/cycle.mjs";
-import { methodLabel, methodShort, NOT_SET, parseMethodFilter, PAYMENT_METHODS } from "@/lib/paymentMethods.mjs";
+import {
+  CARD_PAYMENTS,
+  methodLabel,
+  methodShort,
+  NOT_SET,
+  parseMethodFilter,
+  PAYMENT_METHODS,
+} from "@/lib/paymentMethods.mjs";
 import Reveal from "../ui/Reveal";
 import { rateText } from "./popups/currency";
 import { useDragScroll } from "../ui/useDragScroll";
@@ -70,9 +77,12 @@ export default function Ledger({
   };
   const dragScroll = useDragScroll<HTMLDivElement>();
   const expenses = entries.filter((t) => t.type === "expense");
-  const methodOf = (t: Tx) => t.payment_method ?? "none";
+  // Card payments filter as their own key (CARD_PAYMENTS), next to the expense methods.
+  const methodOf = (t: Tx) => (t.type === "card_payment" ? CARD_PAYMENTS : (t.payment_method ?? "none"));
   const filtering = filter.length > 0;
-  const shown = filtering ? expenses.filter((t) => filter.includes(methodOf(t))) : entries;
+  const shown = filtering
+    ? entries.filter((t) => (t.type === "expense" || t.type === "card_payment") && filter.includes(methodOf(t)))
+    : entries;
   const spent = shown.filter((t) => t.type === "expense").reduce((s, t) => s + Number(t.amount), 0);
   const n = shown.length,
     word = n === 1 ? "entry" : "entries";
@@ -89,6 +99,7 @@ export default function Ledger({
         color: "var(--lime-text)",
       };
     if (t.type === "savings_transfer") return { cat: "Savings", amt: `→ ${inr(t.amount)}`, color: "var(--lime-text)" };
+    if (t.type === "card_payment") return { cat: "Card bill paid", amt: `→ ${inr(t.amount)}`, color: "var(--muted)" };
     return { cat: "Reserved", amt: `→ ${inr(t.amount)}`, color: "var(--muted)" };
   };
 

@@ -6,7 +6,7 @@ import { copyFileSync, mkdirSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-export const SHARED = ["cycleModel.mjs", "recurringStatus.mjs", "cycle.mjs", "periods.mjs", "plan.mjs"];
+export const SHARED = ["cycleModel.mjs", "recurringStatus.mjs", "cycle.mjs", "periods.mjs", "plan.mjs", "cardBalance.mjs"];
 
 const here = dirname(fileURLToPath(import.meta.url));
 const from = join(here, "..", "src", "lib");

@@ -3000,6 +3000,47 @@ alter table public.user_settings add constraint user_settings_card_check
      and (card_statement_day is null) = (card_tracking_since is null)
      and (card_remind_days is null or card_statement_day is not null));
 
+-- Settings › Credit card save. p_statement_day null turns the tracker off (clears everything).
+-- The opening balance is in minor units of the base currency.
+create or replace function public.set_card_tracker(
+  p_statement_day smallint,
+  p_due_day smallint default null,
+  p_tracking_since date default null,
+  p_opening_balance bigint default 0,
+  p_remind_days smallint default null
+)
+returns void
+language plpgsql
+security invoker
+set search_path = public
+as $$
+begin
+  if auth.uid() is null then raise exception 'Not authenticated'; end if;
+  if p_statement_day is not null then
+    if p_statement_day not between 1 and 31 then raise exception 'Statement day must be between 1 and 31'; end if;
+    if p_due_day is null or p_due_day not between 1 and 31 then raise exception 'Due day must be between 1 and 31'; end if;
+    if p_tracking_since is null then raise exception 'Choose the date to track card spend from'; end if;
+    -- current_date is UTC: one day of slack for the user's own today.
+    if p_tracking_since > current_date + 1 then raise exception 'Tracking can''t start in the future'; end if;
+    if coalesce(p_opening_balance, 0) < 0 then raise exception 'Opening balance must be zero or more'; end if;
+    if p_remind_days is not null and p_remind_days not between 1 and 10 then
+      raise exception 'Reminders are 1 to 10 days before the due day';
+    end if;
+  end if;
+
+  update public.user_settings
+     set card_statement_day = p_statement_day,
+         card_due_day = case when p_statement_day is not null then p_due_day end,
+         card_tracking_since = case when p_statement_day is not null then p_tracking_since end,
+         card_opening_balance = case when p_statement_day is not null then coalesce(p_opening_balance, 0) else 0 end,
+         card_remind_days = case when p_statement_day is not null then p_remind_days end,
+         updated_at = now()
+   where user_id = auth.uid();
+  if not found then raise exception 'Settings not found'; end if;
+end;
+$$;
+grant execute on function public.set_card_tracker(smallint, smallint, date, bigint, smallint) to authenticated;
+
 -- ---------------------------------------------------------------- CSV import
 -- Same as 20261124000000_payment_methods, plus card_payment rows (a bank statement's card bill
 -- line). A card payment has no category and no payment method.

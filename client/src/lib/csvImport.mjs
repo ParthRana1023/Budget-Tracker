@@ -35,7 +35,7 @@ export function parseCsv(text) {
 import { parseMethod } from "./paymentMethods.mjs";
 import { baseCurrency, currencySymbol, inr, minorDigits, toMinor } from "./money.mjs";
 
-/** @typedef {{ date: string, type: "expense" | "income", category: string, amount: number, note: string, payment_method?: import("./paymentMethods.mjs").PaymentMethod }} ImportRow */
+/** @typedef {{ date: string, type: "expense" | "income" | "card_payment", category: string, amount: number, note: string, payment_method?: import("./paymentMethods.mjs").PaymentMethod }} ImportRow */
 
 /**
  * Checks a CSV for import. Rows that can't go in are listed with the reason (line numbers
@@ -88,7 +88,7 @@ export function checkImport(text, { categories, existing = [] }) {
       return skip("Date isn’t YYYY-MM-DD");
     if (type === "savings_transfer" || type === "reserve_transfer")
       return skip("Savings and reserve moves aren’t imported");
-    if (type !== "expense" && type !== "income") return skip(`Unknown type “${get(at.type)}”`);
+    if (type !== "expense" && type !== "income" && type !== "card_payment") return skip(`Unknown type “${get(at.type)}”`);
     // Optional column (exports since the base currency could change): only today's base goes in.
     const cur = get(at.currency).toUpperCase();
     if (cur && cur !== baseCurrency()) return skip(`In ${cur}; only ${baseCurrency()} amounts can be imported`);
@@ -106,7 +106,7 @@ export function checkImport(text, { categories, existing = [] }) {
       if (!known) return skip(`No category called “${category}”`);
       category = known;
     }
-    // Optional column; income never carries a method.
+    // Optional column; income and card payments never carry a method.
     const method = type === "expense" ? parseMethod(get(at.method)) : null;
     if (method === undefined) return skip(`Unknown payment method “${get(at.method)}”`);
     const row = {

@@ -26,13 +26,16 @@ export const NOT_SET = "Not set";
 /** "Debit" for "debit_card"; "" when there is none. @param {string | null | undefined} key */
 export const methodShort = (key) => (key && SHORT.get(key)) || "";
 
+/** Ledger filter key for card bill payments (entries of type card_payment, not expenses). */
+export const CARD_PAYMENTS = "card_payment";
+
 /**
- * A ledger filter from the URL (?method=cash,none): known keys and "none", in picker order.
+ * A ledger filter from the URL (?method=cash,none): known keys, "none" and card payments, in picker order.
  * @param {string | null | undefined} param @returns {string[]}
  */
 export const parseMethodFilter = (param) => {
   const want = new Set((param ?? "").split(",").map((s) => s.trim()));
-  return [...PAYMENT_METHODS.map(([k]) => k), "none"].filter((k) => want.has(k));
+  return [...PAYMENT_METHODS.map(([k]) => k), "none", CARD_PAYMENTS].filter((k) => want.has(k));
 };
 
 /** "Debit card" for "debit_card"; "" when there is none. @param {string | null | undefined} key */
