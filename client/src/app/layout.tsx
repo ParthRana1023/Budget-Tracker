@@ -2,6 +2,10 @@ import type { Metadata, Viewport } from "next";
 
 /** iPhone screens with launch images in public/splash: CSS width, height, pixel ratio. */
 const SPLASH: Array<[number, number, number]> = [
+  [440, 956, 3],
+  [402, 874, 3],
+  [420, 912, 3],
+  [360, 780, 3],
   [430, 932, 3],
   [393, 852, 3],
   [428, 926, 3],

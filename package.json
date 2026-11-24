@@ -1,6 +1,6 @@
 {
   "name": "personal-budget-tracker",
-  "version": "1.12.0",
+  "version": "1.13.0",
   "description": "Savings-first personal budget tracker with live Safe-to-Spend calculations, variable pay isolation, and fast 3-tap expense logging.",
   "private": true,
   "author": "Parth Rana",
