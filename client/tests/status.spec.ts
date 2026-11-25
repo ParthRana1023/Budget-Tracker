@@ -11,6 +11,15 @@ test.describe("Status pages", () => {
     await expect(page.getByRole("link", { name: "Back to dashboard" })).toHaveAttribute("href", "/dashboard");
   });
 
+  test("cookie policy opens signed out and lists what the app stores", async ({ page }) => {
+    await page.goto("/cookies");
+    await expect(page).toHaveURL(/\/cookies$/);
+    await expect(page.getByRole("heading", { name: "What SaveFirst keeps in your browser" })).toBeVisible();
+    for (const name of ["Necessary", "Your settings", "Analytics"])
+      await expect(page.getByRole("heading", { name, exact: true })).toBeVisible();
+    await expect(page.getByRole("cell", { name: "sf_consent", exact: true })).toBeVisible();
+  });
+
   test("offline page offers a retry", async ({ page }) => {
     await page.goto("/offline");
     await expect(page.getByRole("heading", { name: /You’re offline\./ })).toBeVisible();

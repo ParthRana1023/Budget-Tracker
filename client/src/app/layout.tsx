@@ -15,8 +15,7 @@ const SPLASH: Array<[number, number, number]> = [
   [375, 667, 2],
 ];
 import localFont from "next/font/local";
-import { Analytics } from "@vercel/analytics/next";
-import { SpeedInsights } from "@vercel/speed-insights/next";
+import ConsentedAnalytics from "@/components/ConsentedAnalytics";
 import PwaRegister from "@/components/PwaRegister";
 import ErrorReporter from "@/components/ErrorReporter";
 import { ToastProvider } from "@/components/ui/Toast";
@@ -96,12 +95,7 @@ export default function RootLayout({
           {children}
         </ToastProvider>
         {/* Their scripts live at /_vercel/*, which only exists on Vercel. */}
-        {process.env.VERCEL && (
-          <>
-            <Analytics />
-            <SpeedInsights />
-          </>
-        )}
+        {process.env.VERCEL && <ConsentedAnalytics />}
       </body>
     </html>
   );

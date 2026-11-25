@@ -42,6 +42,7 @@ export const updateSession = async (request: NextRequest) => {
     path.startsWith("/api") ||
     path.startsWith("/auth/") ||
     path === "/offline" ||
+    path === "/cookies" ||
     path === "/session-expired";
 
   // Not signed in on a protected route: a stale sign-in cookie means the session ended
