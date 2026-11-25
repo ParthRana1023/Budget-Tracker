@@ -7,7 +7,7 @@ import { Pencil, Trash2 } from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
 import { cleanTyped, currencySymbol, formatExact, inr, showTyped, toMajor, toMinor } from "@/lib/money.mjs";
 import { monthLabel } from "@/lib/cycle.mjs";
-import { analyzeGoal, goalTrack } from "@/lib/goalAnalytics.mjs";
+import { analyzeGoal, goalInputs, goalTrack } from "@/lib/goalAnalytics.mjs";
 import Dialog from "../ui/Dialog";
 import Reveal from "../ui/Reveal";
 import { useToast } from "../ui/Toast";
@@ -73,13 +73,8 @@ export default function Goals({
   const ref = new Date(`${today}T12:00:00`);
 
   const rows = goals.map((g) => {
-    const a = analyzeGoal({
-      targetAmount: Number(g.target_amount),
-      targetDate: g.target_date,
-      startingAmount: Number(g.saved_before ?? 0),
-      contributions: contributions.filter((c) => c.goal_id === g.id),
-      referenceDate: ref,
-    });
+    // A main goal adds up its sub-goals (lib/goalAnalytics.mjs goalInputs).
+    const a = analyzeGoal({ ...goalInputs(g, goals, contributions), referenceDate: ref });
     return { g, a, track: goalTrack(a) };
   });
 

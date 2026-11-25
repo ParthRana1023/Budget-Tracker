@@ -372,7 +372,7 @@ export default function DashboardClient(props: DashboardClientProps) {
       supabase.from("transactions").select(TX_SELECT).eq("user_id", userId).order("date", { ascending: false }),
       supabase.from("income_sources").select("*").eq("user_id", userId),
       supabase.from("savings_goals").select("*").eq("user_id", userId),
-      supabase.from("goal_contributions").select("goal_id, amount, date").eq("user_id", userId),
+      supabase.from("goal_contributions").select("id, goal_id, amount, date").eq("user_id", userId),
       supabase.from("recurring_items").select("*").eq("user_id", userId),
     ]);
     const failedQuery = [cat, tx, inc, goal, contrib, rec].find((r) => r.error);

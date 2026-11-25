@@ -104,3 +104,29 @@ export function goalTrack(goal) {
   if (!(pace > 0)) return { projected, tag: "nothing_yet", monthsLate: 0 };
   return { projected, tag: "late", monthsLate: Math.max(1, Math.ceil(goal.remaining / pace) - months) };
 }
+
+/**
+ * A goal with sub-goals holds no money itself (split_goal moves it into them).
+ * @param {{ id: string }} goal @param {Array<{ parent_id?: string | null }>} goals
+ */
+export const canTakeMoney = (goal, goals) => !goals.some((g) => g.parent_id === goal.id);
+
+/**
+ * analyzeGoal's inputs for a goal. A main goal adds up its sub-goals: their targets, "already saved"
+ * and contributions; its date is its own, or else the latest sub-goal date (null if none has one).
+ * @template {{ id: string, target_amount: number | string, target_date: string | null, saved_before?: number | string | null, parent_id?: string | null }} G
+ * @template {{ goal_id: string }} C
+ * @param {G} goal @param {G[]} goals @param {C[]} contributions
+ */
+export function goalInputs(goal, goals, contributions) {
+  const subs = goals.filter((g) => g.parent_id === goal.id);
+  const own = subs.length ? subs : [goal];
+  const ids = new Set(own.map((g) => g.id));
+  const latest = own.reduce((/** @type {string | null} */ d, g) => (g.target_date && (!d || g.target_date > d) ? g.target_date : d), null);
+  return {
+    targetAmount: own.reduce((s, g) => s + Number(g.target_amount), 0),
+    targetDate: goal.target_date ?? latest,
+    startingAmount: own.reduce((s, g) => s + Number(g.saved_before ?? 0), 0),
+    contributions: contributions.filter((c) => ids.has(c.goal_id)),
+  };
+}

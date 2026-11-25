@@ -94,7 +94,7 @@ export async function renderDashboard({ searchParams }: DashboardPageProps, page
   // Fetch goal contributions
   const { data: contributions, error: contributionsError } = await supabase
     .from("goal_contributions")
-    .select("goal_id, amount, date")
+    .select("id, goal_id, amount, date")
     .eq("user_id", user.id);
   if (contributionsError) throw new Error(`Could not load your savings contributions: ${contributionsError.message}`);
   const { data: recurringItems, error: recurringError } = await supabase

@@ -6,6 +6,7 @@
 import { createClient } from "@/utils/supabase/client";
 import { currencySymbol, inr, showTyped } from "@/lib/money.mjs";
 import { dayLabel } from "@/lib/cycle.mjs";
+import { canTakeMoney } from "@/lib/goalAnalytics.mjs";
 import Dialog from "../../ui/Dialog";
 import type { PopupContext } from "./context";
 import { Preview, SAVE_FAILED, cleanAmount, paise, toField, usePopupForm } from "./parts";
@@ -28,7 +29,8 @@ export default function WindfallDialog({
   onClose: () => void;
 }) {
   const { model, today, period } = ctx;
-  const openGoals = ctx.goals; // the select lists every goal; finished ones are marked
+  // Every goal that can take money (not a main goal with sub-goals); finished ones are marked.
+  const openGoals = ctx.goals.filter((g) => canTakeMoney(g, ctx.goals));
   const split = (total: number, [a, b]: [number, number]) => {
     const s = Math.round(total * a),
       r = Math.round(total * b);

@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { analyzeGoal, goalTrack, simulateGoalCompletion } from "./goalAnalytics.mjs";
+import { analyzeGoal, canTakeMoney, goalInputs, goalTrack, simulateGoalCompletion } from "./goalAnalytics.mjs";
 
 const ref = new Date(2026, 10, 16, 12); // 16 Nov 2026
 
@@ -147,4 +147,47 @@ test("an opening balance counts towards progress but not the pace", () => {
   assert.equal(g.current, 40_000);
   assert.equal(g.remaining, 60_000);
   assert.equal(g.monthlyPace, 0);
+});
+
+test("goalInputs: a main goal adds up its sub-goals; others use their own", () => {
+  const goals = [
+    { id: "trip", target_amount: 999, target_date: null, saved_before: 0, parent_id: null },
+    { id: "flights", target_amount: 60_000, target_date: "2027-06-01", saved_before: 10_000, parent_id: "trip" },
+    { id: "stay", target_amount: 40_000, target_date: "2027-09-01", saved_before: 5_000, parent_id: "trip" },
+    { id: "car", target_amount: 500_000, target_date: "2028-01-01", saved_before: 1_000, parent_id: null },
+  ];
+  const contributions = [
+    { goal_id: "flights", amount: 2_000, date: "2026-11-01" },
+    { goal_id: "stay", amount: 3_000, date: "2026-11-02" },
+    { goal_id: "car", amount: 7_000, date: "2026-11-03" },
+  ];
+  assert.deepEqual(goalInputs(goals[0], goals, contributions), {
+    targetAmount: 100_000,
+    targetDate: "2027-09-01",
+    startingAmount: 15_000,
+    contributions: contributions.slice(0, 2),
+  });
+  assert.equal(goalInputs({ ...goals[0], target_date: "2027-03-01" }, goals, contributions).targetDate, "2027-03-01", "its own date first");
+  assert.deepEqual(goalInputs(goals[1], goals, contributions), {
+    targetAmount: 60_000,
+    targetDate: "2027-06-01",
+    startingAmount: 10_000,
+    contributions: [contributions[0]],
+  });
+  assert.deepEqual(goalInputs(goals[3], goals, contributions).contributions, [contributions[2]]);
+  // Sub-goals without dates: the main goal has none either.
+  const open = goals.map((g) => ({ ...g, target_date: null }));
+  assert.equal(goalInputs(open[0], open, contributions).targetDate, null);
+
+  const a = analyzeGoal({ ...goalInputs(goals[0], goals, contributions), referenceDate: ref });
+  assert.equal(a.current, 20_000);
+  assert.equal(a.remaining, 80_000);
+});
+
+test("canTakeMoney: not a main goal with sub-goals", () => {
+  const goals = [{ id: "trip" }, { id: "flights", parent_id: "trip" }, { id: "car", parent_id: null }];
+  assert.deepEqual(
+    goals.filter((g) => canTakeMoney(g, goals)).map((g) => g.id),
+    ["flights", "car"],
+  );
 });

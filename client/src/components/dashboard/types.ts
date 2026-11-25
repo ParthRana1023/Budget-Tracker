@@ -57,9 +57,13 @@ export interface Goal {
   fx_date?: string | null;
   target_date: string | null;
   saved_before?: number;
+  /** A sub-goal's main goal (one level). A main goal's target is the sum of its sub-goals'. */
+  parent_id?: string | null;
 }
 
 export interface Contribution {
+  /** Needed to split a goal's contributions into its sub-goals (lib/goalSplit.mjs planSplit). */
+  id?: string;
   goal_id: string;
   amount: number;
   date?: string | null;
