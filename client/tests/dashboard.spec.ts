@@ -41,6 +41,9 @@ test.describe("Dashboard", () => {
     const goal = page.locator('[data-testid="goal-row"][data-name="Emergency fund"]');
     await expect(goal).toContainText("₹25,000.00 of ₹1,00,000.00");
     await expect(goal).toContainText("25%");
+    // No target month chosen: an open-ended goal, with no monthly figure or on-track bar.
+    await expect(goal).toContainText("No target date");
+    await expect(goal).not.toContainText("a month");
 
     await goal.getByRole("button", { name: "Add money to Emergency fund" }).click();
     await page.getByRole("dialog").getByLabel("Amount").fill("5000");

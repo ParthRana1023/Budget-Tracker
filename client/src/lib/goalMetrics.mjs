@@ -8,13 +8,9 @@ export function calculateNeededPerMonth(targetAmount, currentAmount, targetDateS
     return { neededPerMonth: 0, monthsRemaining: 0, isPastDeadline: false, isCompleted: true };
   }
 
+  // No end date: there's no deadline, so nothing is needed per month and the goal is never behind.
   if (!targetDateStr) {
-    return {
-      neededPerMonth: Math.round(remaining / 12),
-      monthsRemaining: 12,
-      isPastDeadline: false,
-      isCompleted: false,
-    };
+    return { neededPerMonth: 0, monthsRemaining: 0, isPastDeadline: false, isCompleted: false };
   }
 
   const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(targetDateStr);

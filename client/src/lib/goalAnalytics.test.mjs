@@ -56,6 +56,33 @@ test("a recent first contribution is not diluted over 90 days", () => {
   assert.equal(g2.monthlyPace, Math.round((46_000 / 46) * (365.25 / 12)));
 });
 
+test("no end date: nothing needed per month, never behind, no on-track bar; pace still gives an estimate", () => {
+  const idle = analyzeGoal({ targetAmount: 100_000, targetDate: null, contributions: [], referenceDate: ref });
+  assert.equal(idle.hasTargetDate, false);
+  assert.equal(idle.requiredMonthly, 0);
+  assert.equal(idle.monthsRemaining, 0);
+  assert.equal(idle.isPastDeadline, false);
+  assert.equal(idle.status, "on_track");
+  assert.equal(idle.estimatedCompletion, null);
+  assert.equal(goalTrack(idle), null);
+
+  const saving = analyzeGoal({
+    targetAmount: 100_000,
+    targetDate: null,
+    contributions: [{ amount: 10_000, date: "2026-11-01" }],
+    startingAmount: 20_000,
+    referenceDate: ref,
+  });
+  assert.equal(saving.current, 30_000);
+  assert.equal(saving.requiredMonthly, 0);
+  assert.equal(saving.status, "on_track");
+  assert.equal(saving.estimatedCompletion.monthsToGo, Math.ceil(70_000 / saving.monthlyPace));
+  assert.equal(goalTrack(saving), null);
+
+  const done = analyzeGoal({ targetAmount: 100_000, targetDate: null, contributions: [], startingAmount: 100_000, referenceDate: ref });
+  assert.equal(done.status, "completed");
+});
+
 test("no contributions means no estimate and behind", () => {
   const g = analyzeGoal({ targetAmount: 100_000, targetDate: "2027-11-16", contributions: [], referenceDate: ref });
   assert.equal(g.monthlyPace, 0);

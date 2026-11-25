@@ -21,6 +21,18 @@ test("date-only deadline parsing is stable in local timezones", () => {
   assert.equal(result.monthsRemaining, 1);
 });
 
+test("no target date: no deadline, so nothing is needed per month", () => {
+  for (const none of [null, undefined, ""]) {
+    assert.deepEqual(calculateNeededPerMonth(12000, 2000, none, new Date(2026, 10, 8, 12)), {
+      neededPerMonth: 0,
+      monthsRemaining: 0,
+      isPastDeadline: false,
+      isCompleted: false,
+    });
+  }
+  assert.equal(calculateNeededPerMonth(12000, 12000, null).isCompleted, true);
+});
+
 test("invalid calendar dates are rejected", () => {
   assert.throws(() => calculateNeededPerMonth(1000, 0, "2026-02-30", new Date(2026, 1, 1)));
 });
