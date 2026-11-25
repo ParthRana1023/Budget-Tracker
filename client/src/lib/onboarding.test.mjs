@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { clampDay, onboardingPayload } from "./onboarding.mjs";
+import { clampDay, monthsToGoal, onboardingPayload } from "./onboarding.mjs";
 
 const base = { salary: "", payDay: "", pct: 30, bills: [], cats: [] };
 
@@ -69,4 +69,28 @@ test("day inputs clamp to 1-28", () => {
   assert.equal(clampDay("0"), "1");
   assert.equal(clampDay("07"), "7");
   assert.equal(clampDay("a"), "");
+});
+
+test("first goal: sent only when named with a target; rupees become paise; month becomes its 1st", () => {
+  assert.equal("p_goal" in onboardingPayload(base), false, "step skipped");
+  assert.equal("p_goal" in onboardingPayload({ ...base, goal: { name: "  ", target: "5000", by: "" } }), false);
+  assert.equal("p_goal" in onboardingPayload({ ...base, goal: { name: "Trip", target: "", by: "" } }), false);
+  assert.deepEqual(onboardingPayload({ ...base, goal: { name: " Emergency fund ", target: "300000", by: "" } }).p_goal, {
+    name: "Emergency fund",
+    target: 30000000,
+    target_date: null,
+  });
+  assert.deepEqual(onboardingPayload({ ...base, goal: { name: "Trip", target: "60000.5", by: "2027-06" } }).p_goal, {
+    name: "Trip",
+    target: 6000050,
+    target_date: "2027-06-01",
+  });
+});
+
+test("months to a goal at the chosen save %", () => {
+  assert.equal(monthsToGoal(68000, 85000, 20), 4, "₹17,000 a cycle: 4 cycles for ₹68,000");
+  assert.equal(monthsToGoal(68001, 85000, 20), 5, "a part month counts as a month");
+  assert.equal(monthsToGoal(68000, 85000, 0), null, "nothing saved: no estimate");
+  assert.equal(monthsToGoal(68000, 0, 20), null, "no salary yet");
+  assert.equal(monthsToGoal(0, 85000, 20), null, "no target");
 });

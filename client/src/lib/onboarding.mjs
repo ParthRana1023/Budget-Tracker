@@ -38,11 +38,13 @@ export const keptBills = (/** @type {Array<{ name: string, amt: string, due: str
  * @param {{
  *   salary: string, payDay: string, pct: number,
  *   bills: Array<{ name: string, amt: string, due: string }>,
- *   cats: Array<{ name: string, limit: string, on: boolean }>
+ *   cats: Array<{ name: string, limit: string, on: boolean }>,
+ *   goal?: { name: string, target: string, by: string }
  * }} s
  * @returns {{ p_take_home_pay: number | null, p_pay_day: number, p_savings_pct: number,
  *   p_bills: Array<{ name: string, amount: number, due_day: number | null }>,
- *   p_categories: Array<{ name: string, limit: number | null }> }}
+ *   p_categories: Array<{ name: string, limit: number | null }>,
+ *   p_goal?: { name: string, target: number, target_date: string | null } }}
  */
 export function onboardingPayload(s) {
   const used = new Set();
@@ -63,6 +65,13 @@ export function onboardingPayload(s) {
     due_day: b.due ? +clampDay(b.due) : null,
   }));
   const salary = +s.salary || 0;
+  // The optional first goal (step 3): only with a name and a target; "by" is a month, YYYY-MM.
+  const goalName = s.goal?.name.trim() ?? "";
+  const goalTarget = +(s.goal?.target ?? 0);
+  const goal =
+    goalName && goalTarget > 0
+      ? { name: goalName, target: toMinor(goalTarget), target_date: s.goal?.by ? `${s.goal.by}-01` : null }
+      : null;
   return {
     p_take_home_pay: salary > 0 ? toMinor(salary) : null,
     // 31 = the last day of the month; otherwise 1-28.
@@ -70,5 +79,16 @@ export function onboardingPayload(s) {
     p_savings_pct: s.pct,
     p_bills: bills,
     p_categories: categories,
+    ...(goal && { p_goal: goal }),
   };
+}
+
+/**
+ * About how many cycles the first goal takes at the chosen save %: the "about 4 months" line.
+ * Whole units of one currency throughout. Null when nothing would be saved or there's no target.
+ * @param {number} target @param {number} salary @param {number} pct
+ */
+export function monthsToGoal(target, salary, pct) {
+  const perCycle = (salary * pct) / 100;
+  return target > 0 && perCycle > 0 ? Math.ceil(target / perCycle) : null;
 }
