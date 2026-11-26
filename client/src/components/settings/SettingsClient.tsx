@@ -19,12 +19,13 @@ import { useToast } from "../ui/Toast";
 import CategoriesDialog from "../dashboard/popups/CategoriesDialog";
 import RecurringListDialog from "../dashboard/popups/RecurringListDialog";
 import type { PopupContext } from "../dashboard/popups/context";
-import type { Category, RecurringItem, Settings, Tx } from "../dashboard/types";
+import type { Category, CreditCard, RecurringItem, Settings, Tx } from "../dashboard/types";
 import PlanSection from "./PlanSection";
 import PrefsSection from "./PrefsSection";
 import ProfileSection, { type AccountUser } from "./ProfileSection";
 import DataSection, { downloadAllData } from "./DataSection";
 import NotifSection from "./NotifSection";
+import CardsSection from "./CardsSection";
 import SecuritySection from "./SecuritySection";
 import { GOOGLE_ON, GoogleSection, PasswordSection, VerifyBanner } from "./AccountSections";
 import { BTN_LINE, Card, INPUT, Row, SectionHead } from "./parts";
@@ -35,6 +36,7 @@ export type SettingsPageData = {
   categories: Category[];
   recurringItems: RecurringItem[];
   transactions: Tx[];
+  cards: CreditCard[];
 };
 
 type View = "settings" | "account";
@@ -42,6 +44,7 @@ const SECTIONS = {
   settings: [
     ["plan", "Budget plan"],
     ["cats", "Categories & fixed bills"],
+    ["card", "Credit cards"],
     ["notif", "Notifications"],
     ["prefs", "Preferences"],
     ["data", "Data"],
@@ -58,6 +61,7 @@ type Section = (typeof SECTIONS)[View][number][0];
 const WHERE: Record<Section, string> = {
   plan: "Budget plan",
   cats: "Categories & fixed bills",
+  card: "Credit cards",
   notif: "Notifications",
   prefs: "Preferences",
   data: "Data",
@@ -76,6 +80,8 @@ const INDEX: [string, Section, string | null, string][] = [
   ["Categories", "cats", null, "limits budget flexible"],
   ["Fixed bills", "cats", null, "rent due"],
   ["Recurring items", "cats", null, "subscriptions repeat"],
+  ["Credit cards", "card", null, "card bill owed due statement credit"],
+  ["Card bill reminders", "card", null, "credit card due reminder push"],
   ["Bill reminders", "notif", null, "notifications due notices alerts"],
   ["Category 80% warning", "notif", null, "alerts limit notices"],
   ["Over a limit", "notif", null, "alerts overspent notices"],
@@ -122,6 +128,7 @@ export default function SettingsClient({
   setCurrency(settings.currency);
   const [categories, setCategories] = useState(data.categories);
   const [recurringItems, setRecurringItems] = useState(data.recurringItems);
+  const [cards, setCards] = useState(data.cards);
   const [q, setQ] = useState("");
   const [dialog, setDialog] = useState<"cats" | "rec" | null>(null);
   const [exporting, setExporting] = useState(false);
@@ -165,12 +172,13 @@ export default function SettingsClient({
 
   const refresh = async () => {
     const db = createClient();
-    const [s, c, r] = await Promise.all([
+    const [s, c, r, k] = await Promise.all([
       db.from("user_settings").select(SETTINGS_SELECT).eq("user_id", userId).single(),
       db.from("categories").select("*").eq("user_id", userId).order("name"),
       db.from("recurring_items").select("*").eq("user_id", userId).order("created_at"),
+      db.from("credit_cards").select("*").eq("user_id", userId).order("created_at"),
     ]);
-    const failedQuery = [s, c, r].find((res) => res.error);
+    const failedQuery = [s, c, r, k].find((res) => res.error);
     if (failedQuery) {
       reportClientError("settings_refresh_failed", { userId, ...errorFields(failedQuery.error) });
       return toast("Saved, but couldn’t refresh. Reload the page.", { error: true });
@@ -178,6 +186,7 @@ export default function SettingsClient({
     setSettings(s.data as Settings);
     setCategories(c.data as Category[]);
     setRecurringItems(r.data as RecurringItem[]);
+    setCards(k.data as CreditCard[]);
   };
   const withUndo = (undo: () => PromiseLike<{ error: unknown }>) => ({
     undo: async () => {
@@ -196,6 +205,7 @@ export default function SettingsClient({
     categories,
     transactions: data.transactions,
     recurringItems,
+    cards,
     goals: [],
     held: [],
     previewSafe: () => model.safe,
@@ -375,6 +385,8 @@ export default function SettingsClient({
               </>
             )}
 
+            {section === "card" && <CardsSection cards={cards} onChanged={refresh} />}
+
             {section === "prefs" && (
               <PrefsSection
                 settings={settings}
@@ -386,7 +398,11 @@ export default function SettingsClient({
             )}
 
             {section === "notif" && (
-              <NotifSection settings={settings} onSaved={(patch) => setSettings((s) => ({ ...s, ...patch }))} />
+              <NotifSection
+                settings={settings}
+                cards={cards}
+                onSaved={(patch) => setSettings((s) => ({ ...s, ...patch }))}
+              />
             )}
 
             {section === "data" && <DataSection categories={categories} onImported={refresh} />}

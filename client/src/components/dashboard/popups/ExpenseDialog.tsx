@@ -16,6 +16,7 @@ import { useDragScroll } from "../../ui/useDragScroll";
 import {
   AddTabs,
   AmountField,
+  CardPicker,
   DueDayField,
   FIELD,
   Labeled,
@@ -60,6 +61,15 @@ const rememberMethod = (method: string | null) => {
     localStorage.setItem(LAST_METHOD_KEY, method ?? "");
   } catch {}
 };
+/** "Which card" starts on the card this user picked last on this device (handoff v4 §1). */
+const lastCardKey = (userId: string) => `sf-last-card:${userId}`;
+function lastCard(userId: string) {
+  try {
+    return localStorage.getItem(lastCardKey(userId));
+  } catch {
+    return null;
+  }
+}
 
 export default function ExpenseDialog({
   ctx,
@@ -77,6 +87,8 @@ export default function ExpenseDialog({
   const keyboardOpen = useKeyboardInset() > 0;
   const dragScroll = useDragScroll<HTMLDivElement>();
   const item = prefill.itemId ? ctx.recurringItems.find((r) => r.id === prefill.itemId) : undefined;
+  const liveCards = ctx.cards.filter((c) => !c.archived_at);
+  const startCard = [item?.card_id, lastCard(ctx.userId)].find((id) => liveCards.some((c) => c.id === id));
   const { form, set, dirty, error, setError, busy, save } = usePopupForm({
     amount: item ? toField(Number(item.amount)) : (prefill.typed ?? (prefill.amount ? toField(prefill.amount) : "")),
     categoryId: item?.category_id ?? prefill.categoryId ?? "",
@@ -88,6 +100,7 @@ export default function ExpenseDialog({
     repeat: false,
     day: "",
     itemId: (item?.id ?? null) as string | null,
+    cardId: startCard ?? liveCards[0]?.id ?? null,
   });
   // Typed in any supported currency; saved in the base currency at this cycle's rate.
   const fx = useForeign(period.startStr);
@@ -118,6 +131,7 @@ export default function ExpenseDialog({
       categoryId: r.category_id ?? "",
       note: r.name,
       method: r.payment_method ?? null,
+      ...(r.card_id && liveCards.some((c) => c.id === r.card_id) ? { cardId: r.card_id } : {}),
       repeat: false,
     });
   };
@@ -189,6 +203,8 @@ export default function ExpenseDialog({
     const payee = form.payee.trim() || null;
     const supabase = createClient();
     const viaRecurring = !!form.itemId || form.repeat;
+    // Card spend is tagged with its card; with one card the database picks it (set_entry_card).
+    const card_id = form.method === "credit_card" ? form.cardId : null;
 
     save(
       async () => {
@@ -204,6 +220,7 @@ export default function ExpenseDialog({
               note,
               payee,
               payment_method: form.method,
+              card_id,
               ...typed.original,
               from_reserve: form.fromReserve,
             })
@@ -231,15 +248,32 @@ export default function ExpenseDialog({
               payee,
               from_reserve: form.fromReserve,
               payment_method: form.method,
+              card_id,
               ...(fx.foreign && typed.original),
             })
             .eq("id", r.data);
           if (u.error) return { error: u.error, data: r.data };
         }
+        // A new repeating item keeps how it was paid, so later entries post the same way.
+        if (!r.error && !form.itemId && form.method) {
+          const { data: row } = await supabase.from("transactions").select("external_id").eq("id", r.data).single();
+          const newItem = row?.external_id?.split(":")[1];
+          if (newItem) {
+            const u = await supabase
+              .from("recurring_items")
+              .update({ payment_method: form.method, card_id })
+              .eq("id", newItem);
+            if (u.error) return { error: u.error, data: r.data };
+          }
+        }
         return r;
       },
       async (txId) => {
         rememberMethod(form.method);
+        if (card_id)
+          try {
+            localStorage.setItem(lastCardKey(ctx.userId), card_id);
+          } catch {}
         onClose();
         const madeRule = form.repeat && !form.itemId;
         await ctx.saved(
@@ -417,6 +451,15 @@ export default function ExpenseDialog({
         onChange={(method) => set({ method })}
         hint="Defaults to the last one you used. Tracking only: it doesn’t change any numbers."
       />
+      {form.method === "credit_card" && (
+        <CardPicker
+          id="ex-card"
+          cards={liveCards}
+          value={form.cardId}
+          onChange={(cardId) => set({ cardId })}
+          hint="Counts toward this card’s bill. Defaults to the card you used last."
+        />
+      )}
 
       <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,180px),1fr))] gap-3.5">
         <Labeled id="ex-date" label="Date">

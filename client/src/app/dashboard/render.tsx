@@ -102,6 +102,12 @@ export async function renderDashboard({ searchParams }: DashboardPageProps, page
     .select("*")
     .eq("user_id", user.id);
   if (recurringError) throw new Error(`Could not load your recurring items: ${recurringError.message}`);
+  const { data: cards, error: cardsError } = await supabase
+    .from("credit_cards")
+    .select("*")
+    .eq("user_id", user.id)
+    .order("created_at");
+  if (cardsError) throw new Error(`Could not load your cards: ${cardsError.message}`);
 
   return (
     <DashboardClient
@@ -113,6 +119,7 @@ export async function renderDashboard({ searchParams }: DashboardPageProps, page
       initialSavingsGoals={savingsGoals || []}
       initialContributions={contributions || []}
       initialRecurringItems={recurringItems || []}
+      initialCards={cards || []}
       initialView={page ?? (view === "reports" ? "reports" : "dashboard")}
       initialAdd={add === "expense"}
     />

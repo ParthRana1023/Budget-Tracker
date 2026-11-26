@@ -23,7 +23,8 @@ import { spendByMethod } from "@/lib/paymentMethods.mjs";
 import { Info } from "lucide-react";
 import Drawer from "./ui/Drawer";
 import { useToast } from "./ui/Toast";
-import { CARD_H2, type Category, type RecurringItem, type Settings, type Tx } from "./dashboard/types";
+import { CARD_H2, type Category, type CreditCard, type RecurringItem, type Settings, type Tx } from "./dashboard/types";
+import CardsReport from "./CardsReport";
 
 /** Spend by payment method colours (design handoff v3): Not set is striped and always last. */
 const METHOD_COLOR: Record<string, string> = {
@@ -115,6 +116,7 @@ export default function ReportsView({
   onChanged,
   grouping = "cycle",
   convertedNote = null,
+  cards = [],
 }: {
   transactions: Tx[];
   categories: Category[];
@@ -126,6 +128,8 @@ export default function ReportsView({
   grouping?: Grouping;
   /** After a base switch: how older cycles were converted ("Before 1 Dec, amounts are converted…"). */
   convertedNote?: string | null;
+  /** Credit cards, for the Credit cards panel (Habits tab). */
+  cards?: CreditCard[];
 }) {
   const toast = useToast();
   const [tab, setTab] = useState<Tab>("overview");
@@ -867,6 +871,7 @@ export default function ReportsView({
             </>
           )}
         </section>
+        <CardsReport cards={cards} entries={transactions} today={today} />
       </>
     );
   };

@@ -7,7 +7,17 @@ import { cleanTyped, inr, showTyped, toMajor } from "@/lib/money.mjs";
 import Dialog from "../../ui/Dialog";
 import type { RecurringItem } from "../types";
 import type { PopupContext } from "./context";
-import { FIELD, Labeled, MethodPicker, SAVE_FAILED, cleanDay, toField, useForeign, usePopupForm } from "./parts";
+import {
+  CardPicker,
+  FIELD,
+  Labeled,
+  MethodPicker,
+  SAVE_FAILED,
+  cleanDay,
+  toField,
+  useForeign,
+  usePopupForm,
+} from "./parts";
 import { CurrencyChip, CurrencyList, RateLine } from "./currency";
 
 export default function RecurringDialog({
@@ -27,7 +37,9 @@ export default function RecurringDialog({
       : toField(Number(item.amount)),
     day: item.day_of_month ? String(item.day_of_month) : "",
     method: item.payment_method ?? null,
+    cardId: item.card_id ?? ctx.cards.find((c) => !c.archived_at)?.id ?? null,
   });
+  const liveCards = ctx.cards.filter((c) => !c.archived_at || c.id === item.card_id);
   const isExpense = item.type === "expense";
   const fx = useForeign(
     ctx.period.startStr,
@@ -54,7 +66,10 @@ export default function RecurringDialog({
             amount,
             day_of_month: day,
             ...original,
-            ...(isExpense && { payment_method: form.method }),
+            ...(isExpense && {
+              payment_method: form.method,
+              card_id: form.method === "credit_card" ? form.cardId : null,
+            }),
           })
           .eq("id", item.id),
       async () => {
@@ -67,6 +82,7 @@ export default function RecurringDialog({
               amount: item.amount,
               day_of_month: item.day_of_month,
               payment_method: item.payment_method ?? null,
+              card_id: item.card_id ?? null,
               original_amount: item.original_amount ?? null,
               original_currency: item.original_currency ?? null,
               fx_rate: item.fx_rate ?? null,
@@ -152,6 +168,9 @@ export default function RecurringDialog({
           onChange={(method) => set({ method })}
           hint="Entries recorded from this item use it: Due notices, Record buttons and suggestions."
         />
+      )}
+      {isExpense && form.method === "credit_card" && (
+        <CardPicker id="ru-card" cards={liveCards} value={form.cardId} onChange={(cardId) => set({ cardId })} />
       )}
       <span className="text-[13px] text-pretty text-muted">
         Changes apply from the next time it’s recorded. Past entries stay as they are.

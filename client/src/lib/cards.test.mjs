@@ -98,11 +98,11 @@ test("bill history: on time, late, and the open bill left out", () => {
   ];
   const h = cardHistory(CARD, entries, "2026-11-25");
   assert.deepEqual(
-    h.map((b) => [b.statementDate, b.dueDate, b.amount / R, b.onTime]),
+    h.map((b) => [b.statementDate, b.dueDate, b.amount / R, b.onTime, b.state]),
     [
-      ["2026-08-20", "2026-09-05", 400, true],
-      ["2026-09-20", "2026-10-05", 300, false],
-      ["2026-10-20", "2026-11-05", 200, false],
+      ["2026-08-20", "2026-09-05", 400, true, "on_time"],
+      ["2026-09-20", "2026-10-05", 300, false, "late"],
+      ["2026-10-20", "2026-11-05", 200, false, "none"],
     ],
   );
   assert.equal(cardHistory(CARD, entries, "2026-11-25", 2).length, 2, "the last 2");
@@ -144,9 +144,13 @@ test("a card payment never touches safe to spend, category totals, the until-pay
   };
   assert.deepEqual(line({ ...withPay, model: b }), line({ ...demo, model: a }));
   const hist = (transactions) =>
-    cycleHistory({ transactions, categories: demo.categories, schedule: [{ payDay: 1 }], today: demo.today, count: 2 }).map(
-      ({ entries, ...rest }) => ({ ...rest, byCat: [...rest.byCat] }),
-    );
+    cycleHistory({
+      transactions,
+      categories: demo.categories,
+      schedule: [{ payDay: 1 }],
+      today: demo.today,
+      count: 2,
+    }).map(({ entries, ...rest }) => ({ ...rest, byCat: [...rest.byCat] }));
   assert.deepEqual(hist(withPay.transactions), hist(demo.transactions));
   assert.deepEqual(spendByMethod(withPay.transactions), spendByMethod(demo.transactions));
 });

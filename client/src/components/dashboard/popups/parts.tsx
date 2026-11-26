@@ -333,6 +333,56 @@ export function MethodPicker({
   );
 }
 
+/**
+ * "Which card" (handoff v4 §1): chips for each card in use, shown under Paid with once Credit card
+ * is picked. Hidden with one card or none (the database tags the entry with the only card).
+ */
+export function CardPicker({
+  id,
+  cards,
+  value,
+  onChange,
+  hint,
+}: {
+  id: string;
+  cards: { id: string; name: string }[];
+  value: string | null;
+  onChange: (id: string) => void;
+  hint?: string;
+}) {
+  if (cards.length < 2) return null;
+  return (
+    <div className="flex flex-col gap-2 rounded-[14px] bg-tile-2 p-3.5">
+      <span id={`${id}-l`} className="eyebrow">
+        Which card
+      </span>
+      <div role="radiogroup" aria-labelledby={`${id}-l`} className="flex flex-wrap gap-1.5">
+        {cards.map((c) => {
+          const on = c.id === value;
+          return (
+            <button
+              key={c.id}
+              type="button"
+              role="radio"
+              aria-checked={on}
+              onClick={() => onChange(c.id)}
+              className="h-10 max-w-full cursor-pointer truncate rounded-full border px-3.5 text-sm font-semibold transition-[border-color,background] duration-200"
+              style={{
+                borderColor: on ? "var(--lime)" : "var(--line-2)",
+                background: on ? "var(--lime-soft)" : "transparent",
+                color: on ? "var(--lime-text)" : "var(--ink)",
+              }}
+            >
+              {c.name}
+            </button>
+          );
+        })}
+      </div>
+      {hint && <span className="text-xs text-pretty text-muted">{hint}</span>}
+    </div>
+  );
+}
+
 export function SwitchRow({
   title,
   sub,

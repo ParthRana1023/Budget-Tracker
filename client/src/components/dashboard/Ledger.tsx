@@ -5,7 +5,16 @@
 // kept in the URL (?method=cash,none) so it survives a refresh and can be shared.
 
 import { useEffect, useState } from "react";
-import { Banknote, Check, ChevronDown, CircleEllipsis, CreditCard, ListFilter, Smartphone } from "lucide-react";
+import {
+  ArrowLeftRight,
+  Banknote,
+  Check,
+  ChevronDown,
+  CircleEllipsis,
+  CreditCard,
+  ListFilter,
+  Smartphone,
+} from "lucide-react";
 import { formatExact, inr } from "@/lib/money.mjs";
 import { dayLabel, shortDate } from "@/lib/cycle.mjs";
 import {
@@ -19,7 +28,7 @@ import {
 import Reveal from "../ui/Reveal";
 import { rateText } from "./popups/currency";
 import { useDragScroll } from "../ui/useDragScroll";
-import { CARD_H2, LINK_BUTTON, PILL_LIME, PILL_LINE, type Category, type Tx } from "./types";
+import { CARD_H2, LINK_BUTTON, PILL_LIME, PILL_LINE, type Category, type CreditCard as Card, type Tx } from "./types";
 
 const OPEN_KEY = "sf-ledger-open";
 const METHOD_ICON = {
@@ -29,11 +38,12 @@ const METHOD_ICON = {
   cash: Banknote,
   other: CircleEllipsis,
 };
-const nameOf = (k: string) => (k === "none" ? NOT_SET : methodLabel(k));
+const nameOf = (k: string) => (k === "none" ? NOT_SET : k === CARD_PAYMENTS ? "Card payments" : methodLabel(k));
 
 export default function Ledger({
   entries,
   byId,
+  cards = [],
   today,
   onEdit,
   onExport,
@@ -43,6 +53,8 @@ export default function Ledger({
 }: {
   entries: Tx[];
   byId: Map<string, Category>;
+  /** Credit cards (archived too): names on card payments and, with two or more, on card spend. */
+  cards?: Card[];
   today: string;
   onEdit: (t: Tx) => void;
   onExport: () => void;
@@ -77,6 +89,9 @@ export default function Ledger({
   };
   const dragScroll = useDragScroll<HTMLDivElement>();
   const expenses = entries.filter((t) => t.type === "expense");
+  const payments = entries.filter((t) => t.type === "card_payment");
+  const cardName = new Map(cards.map((c) => [c.id, c.name]));
+  const namedCards = cards.filter((c) => !c.archived_at).length > 1;
   // Card payments filter as their own key (CARD_PAYMENTS), next to the expense methods.
   const methodOf = (t: Tx) => (t.type === "card_payment" ? CARD_PAYMENTS : (t.payment_method ?? "none"));
   const filtering = filter.length > 0;
@@ -99,7 +114,15 @@ export default function Ledger({
         color: "var(--lime-text)",
       };
     if (t.type === "savings_transfer") return { cat: "Savings", amt: `→ ${inr(t.amount)}`, color: "var(--lime-text)" };
-    if (t.type === "card_payment") return { cat: "Card bill paid", amt: `→ ${inr(t.amount)}`, color: "var(--muted)" };
+    if (t.type === "card_payment") {
+      const card = cardName.get(t.card_id ?? "");
+      return {
+        title: "Card bill paid",
+        cat: [card, "Transfer", t.note].filter(Boolean).join(" · "),
+        amt: `⇄ ${inr(t.amount)}`,
+        color: "var(--ink-2)",
+      };
+    }
     return { cat: "Reserved", amt: `→ ${inr(t.amount)}`, color: "var(--muted)" };
   };
 
@@ -143,7 +166,7 @@ export default function Ledger({
       </div>
       {open && (
         <div id="ledger-body" className="flex flex-col">
-          {expenses.length > 0 && (
+          {(expenses.length > 0 || payments.length > 0) && (
             <div
               role="group"
               aria-label="Filter by payment method"
@@ -151,9 +174,16 @@ export default function Ledger({
               className="-mx-0.5 flex items-center gap-1.5 overflow-x-auto px-0.5 pt-3 pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
             >
               <ListFilter size={16} aria-hidden className="flex-none text-muted" />
-              {[["", "All"] as const, ...PAYMENT_METHODS, ["none", NOT_SET] as const].map(([k, label]) => {
+              {[
+                ["", "All"] as const,
+                ...PAYMENT_METHODS,
+                ["none", NOT_SET] as const,
+                ...(cards.length || payments.length ? [[CARD_PAYMENTS, "Card payments"] as const] : []),
+              ].map(([k, label]) => {
                 const on = k ? filter.includes(k) : !filtering;
-                const count = k ? expenses.filter((t) => methodOf(t) === k).length : 0;
+                const count = k
+                  ? (k === CARD_PAYMENTS ? payments : expenses).filter((t) => methodOf(t) === k).length
+                  : 0;
                 return (
                   <button
                     key={k || "all"}
@@ -214,7 +244,7 @@ export default function Ledger({
                     .filter((t) => t.date === date)
                     .map((t) => {
                       const r = row(t);
-                      const note = t.note || r.cat;
+                      const note = ("title" in r && r.title) || t.note || r.cat;
                       return (
                         <button
                           key={t.id}
@@ -223,11 +253,21 @@ export default function Ledger({
                           aria-label={`Edit ${note}, ${r.amt}`}
                           className="-mx-2.5 flex w-[calc(100%+20px)] cursor-pointer flex-wrap items-center gap-x-3 gap-y-1.5 rounded-[10px] border-0 bg-transparent p-2.5 text-left text-[15px] transition-colors duration-150 hover:bg-tile-2"
                         >
-                          <span className="flex min-w-0 flex-[1_1_120px] items-center gap-2">{note}</span>
+                          <span className="flex min-w-0 flex-[1_1_120px] items-center gap-2">
+                            {t.type === "card_payment" && (
+                              <ArrowLeftRight size={14} aria-hidden className="flex-none text-ink-2" />
+                            )}
+                            {note}
+                          </span>
                           <span className="rounded-full bg-tile-2 px-2 py-0.5 text-[11px] font-semibold whitespace-nowrap text-ink-2">
                             {r.cat}
                           </span>
-                          {t.payment_method && <MethodChip method={t.payment_method} />}
+                          {t.payment_method && (
+                            <MethodChip
+                              method={t.payment_method}
+                              card={namedCards ? cardName.get(t.card_id ?? "") : undefined}
+                            />
+                          )}
                           {/* The base amount leads; what was paid sits under it, with the rate on hover. */}
                           <span className="ml-auto flex min-w-20 flex-col items-end">
                             <span className="tabular font-semibold whitespace-nowrap" style={{ color: r.color }}>
@@ -280,16 +320,19 @@ export default function Ledger({
   );
 }
 
-/** Outlined chip after the category chip: icon and short name (UPI, Debit, Credit, Cash, Other). */
-function MethodChip({ method }: { method: keyof typeof METHOD_ICON }) {
+/**
+ * Outlined chip after the category chip: icon and short name (UPI, Debit, Credit, Cash, Other),
+ * or the card's name on card spend when there are two or more cards.
+ */
+function MethodChip({ method, card }: { method: keyof typeof METHOD_ICON; card?: string }) {
   const Icon = METHOD_ICON[method];
   return (
     <span
-      title={`Paid with ${methodLabel(method)}`}
+      title={`Paid with ${card ?? methodLabel(method)}`}
       className="inline-flex items-center gap-1 rounded-full border border-line-2 px-2 py-0.5 text-[11px] font-semibold whitespace-nowrap text-muted"
     >
       <Icon size={11} aria-hidden />
-      {methodShort(method)}
+      {card ?? methodShort(method)}
     </span>
   );
 }

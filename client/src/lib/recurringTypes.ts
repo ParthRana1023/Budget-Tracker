@@ -11,6 +11,8 @@ export interface RecurringItem {
   skip_month?: string | null;
   /** Default method for entries posted from this item (expenses only). */
   payment_method?: import("./paymentMethods.mjs").PaymentMethod | null;
+  /** The card for an item paid by credit card (credit_cards.id). */
+  card_id?: string | null;
   /** A foreign bill: its own amount and currency; `amount` is re-priced at each cycle's rate (fx_date). */
   original_amount?: number | null;
   original_currency?: string | null;

@@ -33,7 +33,7 @@ import {
 import Dialog from "../ui/Dialog";
 import { Switch } from "../dashboard/popups/parts";
 import { AppIcon } from "../dashboard/InstallCard";
-import type { Settings } from "../dashboard/types";
+import type { CreditCard, Settings } from "../dashboard/types";
 import { Card, Row, SaveState, SELECT, SectionHead, useSave } from "./parts";
 
 const EMAIL_ON = process.env.NEXT_PUBLIC_EMAIL_NOTIFICATIONS === "1";
@@ -48,9 +48,12 @@ const Eyebrow = ({ children }: { children: ReactNode }) => <span className="eyeb
 
 export default function NotifSection({
   settings,
+  cards = [],
   onSaved,
 }: {
   settings: Settings;
+  /** Card bills push: how many cards in use have reminders on. */
+  cards?: CreditCard[];
   onSaved: (patch: Partial<Settings>) => void;
 }) {
   const save = useSave();
@@ -87,6 +90,8 @@ export default function NotifSection({
   const qFrom = settings.quiet_from ?? 22,
     qTo = settings.quiet_to ?? 8;
   const lead = LEAD[settings.bill_reminder_days ?? 3] ?? "3 days";
+  const liveCards = cards.filter((c) => !c.archived_at);
+  const remindCards = liveCards.filter((c) => c.reminders).length;
 
   const allow = async () => {
     setAskError(null);
@@ -229,6 +234,13 @@ export default function NotifSection({
                       [
                         ["push_bills", "Bill reminders", `${lead} before each bill, at 9:00 am`],
                         [
+                          "push_cards",
+                          "Card bills",
+                          liveCards.length
+                            ? `3 days before and on the due date, at 9:00 am · ${remindCards} of ${liveCards.length} cards`
+                            : "Add a card in Credit cards to get these",
+                        ],
+                        [
                           "push_weekly",
                           "Weekly summary",
                           "Mondays at 9:00 am: last week’s spending and what’s safe now",
@@ -244,7 +256,12 @@ export default function NotifSection({
                           <span className="text-sm font-semibold">{label}</span>
                           <span className="text-[13px] text-pretty text-muted">{sub}</span>
                         </div>
-                        <Switch on={on(k)} onToggle={() => set({ [k]: !on(k) })} label={label} />
+                        <Switch
+                          on={on(k)}
+                          onToggle={() => set({ [k]: !on(k) })}
+                          label={label}
+                          disabled={k === "push_cards" && !liveCards.length}
+                        />
                       </div>
                     ))}
                     <div className="flex flex-wrap items-center gap-x-3.5 gap-y-2.5 rounded-b-[13px] border-t border-line bg-tile-2 px-4 py-3.5">

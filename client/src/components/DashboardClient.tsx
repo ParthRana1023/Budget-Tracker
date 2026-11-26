@@ -33,10 +33,12 @@ import Budgets from "./dashboard/Budgets";
 import Goals from "./dashboard/Goals";
 import BillsRecurring from "./dashboard/BillsRecurring";
 import Ledger from "./dashboard/Ledger";
+import CardBills from "./dashboard/CardBills";
 import {
   LINK_BUTTON,
   type Category,
   type Contribution,
+  type CreditCard,
   type Goal,
   type IncomeSource,
   type RecurringItem,
@@ -49,6 +51,7 @@ import WindfallDialog from "./dashboard/popups/WindfallDialog";
 import EditEntryDialog from "./dashboard/popups/EditEntryDialog";
 import CategoriesDialog from "./dashboard/popups/CategoriesDialog";
 import RecurringDialog from "./dashboard/popups/RecurringDialog";
+import CardBillDialog from "./dashboard/popups/CardBillDialog";
 import type { PopupContext } from "./dashboard/popups/context";
 import ReportsView from "./ReportsView";
 
@@ -104,6 +107,7 @@ interface DashboardClientProps {
   initialSavingsGoals: Goal[];
   initialContributions: Contribution[];
   initialRecurringItems: RecurringItem[];
+  initialCards: CreditCard[];
   /** "reports" for /dashboard?view=reports; a phone page for /ledger, /more, /bills, /budgets, /goals. */
   initialView?: View;
   /** Opens Log expense on arrival (/dashboard?add=expense, the installed app's shortcut). */
@@ -129,6 +133,7 @@ export default function DashboardClient(props: DashboardClientProps) {
   const [goals, setGoals] = useState(props.initialSavingsGoals);
   const [contributions, setContributions] = useState(props.initialContributions);
   const [recurringItems, setRecurringItems] = useState(props.initialRecurringItems);
+  const [cards, setCards] = useState(props.initialCards);
   const [notesOff, setNotesOff] = useState<string[]>([]);
   const [fxNote, setFxNote] = useState<
     { kind: "stale"; date: string } | { kind: "updated"; rates: Array<[string, number]> } | null
@@ -146,6 +151,8 @@ export default function DashboardClient(props: DashboardClientProps) {
   const [editing, setEditing] = useState<Tx | null>(null);
   const [windfallId, setWindfallId] = useState<string | null>(null);
   const [editingItem, setEditingItem] = useState<RecurringItem | null>(null);
+  /** "Card bill paid": the card tapped, or null for the most urgent one. */
+  const [payCard, setPayCard] = useState<{ cardId: string | null } | null>(null);
   const openExpense = (prefill: ExpensePrefill = {}) => setExpense(prefill);
   const openIncome = (expected = false) => setIncome({ expected });
 
@@ -171,6 +178,11 @@ export default function DashboardClient(props: DashboardClientProps) {
             : {},
       );
       window.history.replaceState(null, "", "/dashboard"); // a reload shouldn't reopen it
+    }
+    // A tapped card bill reminder: ?modal=payCard&card=<card>, the sheet filled in for it.
+    if (q.get("modal") === "payCard" && cards.some((c) => !c.archived_at)) {
+      setPayCard({ cardId: q.get("card") });
+      window.history.replaceState(null, "", "/dashboard");
     }
     setSyncedAt(new Date());
   }, []);
@@ -367,15 +379,16 @@ export default function DashboardClient(props: DashboardClientProps) {
 
   const refreshData = async () => {
     const supabase = createClient();
-    const [cat, tx, inc, goal, contrib, rec] = await Promise.all([
+    const [cat, tx, inc, goal, contrib, rec, card] = await Promise.all([
       supabase.from("categories").select("*").eq("user_id", userId).order("name"),
       supabase.from("transactions").select(TX_SELECT).eq("user_id", userId).order("date", { ascending: false }),
       supabase.from("income_sources").select("*").eq("user_id", userId),
       supabase.from("savings_goals").select("*").eq("user_id", userId),
       supabase.from("goal_contributions").select("id, goal_id, amount, date").eq("user_id", userId),
       supabase.from("recurring_items").select("*").eq("user_id", userId),
+      supabase.from("credit_cards").select("*").eq("user_id", userId).order("created_at"),
     ]);
-    const failedQuery = [cat, tx, inc, goal, contrib, rec].find((r) => r.error);
+    const failedQuery = [cat, tx, inc, goal, contrib, rec, card].find((r) => r.error);
     if (failedQuery) {
       reportClientError("dashboard_refresh_failed", { ...errorFields(failedQuery.error), userId });
       setLoadFailed(true);
@@ -389,6 +402,7 @@ export default function DashboardClient(props: DashboardClientProps) {
     setGoals(goal.data as Goal[]);
     setContributions(contrib.data as Contribution[]);
     setRecurringItems(rec.data as RecurringItem[]);
+    setCards(card.data as CreditCard[]);
     return true;
   };
 
@@ -534,6 +548,7 @@ export default function DashboardClient(props: DashboardClientProps) {
     categories,
     transactions: txs,
     recurringItems,
+    cards,
     goals,
     held,
     previewSafe: (extra, removeId) =>
@@ -612,6 +627,7 @@ export default function DashboardClient(props: DashboardClientProps) {
             recurringItems={recurringItems}
             today={today}
             onChanged={refreshData}
+            cards={cards}
             convertedNote={
               switched && switchRate && txs.some((t) => t.recorded_currency)
                 ? `Before ${shortDate(switched.on)}, amounts are converted from ${switched.from} at today’s rate (${rateEquation(switched.from, switchRate)}).`
@@ -749,6 +765,12 @@ export default function DashboardClient(props: DashboardClientProps) {
                       </button>
                     )}
                   </section>
+                  <CardBills
+                    cards={cards}
+                    entries={txs}
+                    today={today}
+                    onPay={(id) => setPayCard({ cardId: id ?? null })}
+                  />
                 </div>
               </>
             )}
@@ -813,6 +835,7 @@ export default function DashboardClient(props: DashboardClientProps) {
                 <Ledger
                   entries={model.cycleTransactions as Tx[]}
                   byId={model.byId}
+                  cards={cards}
                   today={today}
                   onEdit={(t) => setEditing(transactions.find((x) => x.id === t.id) ?? t)}
                   onExport={exportCsv}
@@ -867,6 +890,7 @@ export default function DashboardClient(props: DashboardClientProps) {
       {editing && <EditEntryDialog ctx={popupCtx} entry={editing} onClose={() => setEditing(null)} />}
       {categoriesOpen && <CategoriesDialog ctx={popupCtx} onClose={() => setCategoriesOpen(false)} />}
       {editingItem && <RecurringDialog ctx={popupCtx} item={editingItem} onClose={() => setEditingItem(null)} />}
+      {payCard && <CardBillDialog ctx={popupCtx} cardId={payCard.cardId} onClose={() => setPayCard(null)} />}
     </div>
   );
 }

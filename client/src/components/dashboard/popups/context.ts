@@ -1,6 +1,6 @@
 import type { buildCycleModel } from "@/lib/cycleModel.mjs";
 import type { PayDayEntry } from "@/lib/periods.mjs";
-import type { Category, Goal, IncomeSource, RecurringItem, Tx } from "../types";
+import type { Category, CreditCard, Goal, IncomeSource, RecurringItem, Tx } from "../types";
 
 /** What every dashboard popup needs from the dashboard. */
 export type PopupContext = {
@@ -13,6 +13,8 @@ export type PopupContext = {
   categories: Category[];
   transactions: Tx[];
   recurringItems: RecurringItem[];
+  /** Credit cards, archived ones included (their entries keep pointing at them). */
+  cards: CreditCard[];
   goals: Goal[];
   held: IncomeSource[];
   /** Safe to spend if `extra` were added and `removeId` (an entry being edited) taken out. */

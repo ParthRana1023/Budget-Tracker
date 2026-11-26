@@ -15,6 +15,7 @@ import {
   AmountField,
   FIELD,
   Labeled,
+  CardPicker,
   MethodPicker,
   Preview,
   SAVE_FAILED,
@@ -52,7 +53,10 @@ export default function EditEntryDialog({
     note: entry.note ?? "",
     payee: entry.payee ?? "",
     method: entry.payment_method ?? null,
+    cardId: entry.card_id ?? ctx.cards.find((c) => !c.archived_at)?.id ?? null,
   });
+  const liveCards = ctx.cards.filter((c) => !c.archived_at || c.id === entry.card_id);
+  const cardId = form.method === "credit_card" ? form.cardId : null;
   const [confirming, setConfirming] = useState(false);
   const originalMinor = cur ? toMinor(parseFloat(form.amount) || 0, cur) : null;
   // A foreign entry's base amount follows the saved rate, unless typed over (bank fees).
@@ -82,6 +86,7 @@ export default function EditEntryDialog({
       .update({
         payee: entry.payee ?? null,
         payment_method: entry.payment_method ?? null,
+        card_id: entry.card_id ?? null,
         ...(cur && { original_amount: entry.original_amount }),
       })
       .eq("id", entry.id);
@@ -104,11 +109,17 @@ export default function EditEntryDialog({
         const unchanged =
           payee === (entry.payee ?? null) &&
           form.method === (entry.payment_method ?? null) &&
+          cardId === (entry.card_id ?? null) &&
           originalMinor === (cur ? Number(entry.original_amount) : null);
         if (r.error || !isExpense || unchanged) return r;
         return supabase
           .from("transactions")
-          .update({ payee, payment_method: form.method, ...(cur && { original_amount: originalMinor }) })
+          .update({
+            payee,
+            payment_method: form.method,
+            card_id: cardId,
+            ...(cur && { original_amount: originalMinor }),
+          })
           .eq("id", entry.id);
       },
       async () => {
@@ -134,6 +145,7 @@ export default function EditEntryDialog({
           category_id: entry.category_id,
           payee: entry.payee ?? null,
           payment_method: entry.payment_method ?? null,
+          card_id: entry.card_id ?? null,
           original_amount: entry.original_amount ?? null,
           original_currency: entry.original_currency ?? null,
           fx_rate: entry.fx_rate ?? null,
@@ -239,6 +251,9 @@ export default function EditEntryDialog({
           onChange={(method) => set({ method })}
           hint="Tracking only: it doesn’t change any numbers."
         />
+      )}
+      {isExpense && form.method === "credit_card" && (
+        <CardPicker id="ed-card" cards={liveCards} value={form.cardId} onChange={(cardId) => set({ cardId })} />
       )}
       {confirming ? (
         <div

@@ -15,7 +15,7 @@ export async function loadSettingsPage(): Promise<SettingsPageData> {
 
   // Entries only feed the Categories popup ("spent this cycle"); a cycle is at most ~2 months.
   const since = addDaysStr(toLocalDateString(), -70);
-  const [settings, categories, recurring, transactions] = await Promise.all([
+  const [settings, categories, recurring, transactions, cards] = await Promise.all([
     supabase.from("user_settings").select(SETTINGS_SELECT).eq("user_id", user.id).maybeSingle(),
     supabase.from("categories").select("*").eq("user_id", user.id).order("name"),
     supabase.from("recurring_items").select("*").eq("user_id", user.id).order("created_at"),
@@ -25,8 +25,9 @@ export async function loadSettingsPage(): Promise<SettingsPageData> {
       .eq("user_id", user.id)
       .gte("date", since)
       .order("date", { ascending: false }),
+    supabase.from("credit_cards").select("*").eq("user_id", user.id).order("created_at"),
   ]);
-  const failed = [settings, categories, recurring, transactions].find((r) => r.error);
+  const failed = [settings, categories, recurring, transactions, cards].find((r) => r.error);
   if (failed) throw new Error(`Could not load your settings: ${failed.error!.message}`);
   // No plan yet: set one up first. Same rule as the Dashboard (app/dashboard/page.tsx).
   const s = settings.data;
@@ -44,6 +45,7 @@ export async function loadSettingsPage(): Promise<SettingsPageData> {
     categories: categories.data ?? [],
     recurringItems: recurring.data ?? [],
     transactions: transactions.data ?? [],
+    cards: cards.data ?? [],
   };
 }
 

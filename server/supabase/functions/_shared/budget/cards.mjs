@@ -99,32 +99,54 @@ export function cardStatus(card, entries, today) {
           : daysToDue <= DUE_SOON_DAYS
             ? "soon"
             : "due";
-  return { id: card.id, name: card.name, owed, statement, statementDate: closed, dueDate, daysToDue, status,
-    opening, spend, spendCount, paid, payments };
+  return {
+    id: card.id,
+    name: card.name,
+    owed,
+    statement,
+    statementDate: closed,
+    dueDate,
+    daysToDue,
+    status,
+    opening,
+    spend,
+    spendCount,
+    paid,
+    payments,
+  };
 }
 
 /**
  * The card's last `count` bills, oldest first: each closed statement that asked for money and
- * whose due date has passed (or that's already paid). On time = a payment logged after the
- * statement closed and on or before its due date, or the bill already covered by then.
+ * whose due date has passed (or that's already paid). state: "on_time" = a payment logged after
+ * the statement closed and on or before its due date, or the bill already covered by then;
+ * "late" = paid only after the due date; "none" = no payment logged since.
  * @param {Card} card @param {Entry[]} entries @param {string} today @param {number} [count]
- * @returns {Array<{ statementDate: string, dueDate: string, amount: number, onTime: boolean }>}
+ * @returns {Array<{ statementDate: string, dueDate: string, amount: number, onTime: boolean, state: "on_time" | "late" | "none" }>}
  */
 export function cardHistory(card, entries, today, count = 6) {
   const own = entries.filter((t) => isCardSpend(t, card.id) || isCardPayment(t, card.id));
-  const total = (/** @type {(t: Entry) => boolean} */ keep) => own.filter(keep).reduce((s, t) => s + Number(t.amount), 0);
-  const spentBy = (/** @type {string} */ d) => Number(card.opening_balance ?? 0) + total((t) => t.type === "expense" && t.date <= d);
+  const total = (/** @type {(t: Entry) => boolean} */ keep) =>
+    own.filter(keep).reduce((s, t) => s + Number(t.amount), 0);
+  const spentBy = (/** @type {string} */ d) =>
+    Number(card.opening_balance ?? 0) + total((t) => t.type === "expense" && t.date <= d);
   const paidBy = (/** @type {string} */ d) => total((t) => t.type === "card_payment" && t.date <= d);
   const first = own.reduce((m, t) => (t.date < m ? t.date : m), today);
 
   const bills = [];
-  for (let close = lastOn(today, card.statement_day); bills.length < count && close >= first; close = lastOn(addDay(close, -1), card.statement_day)) {
+  for (
+    let close = lastOn(today, card.statement_day);
+    bills.length < count && close >= first;
+    close = lastOn(addDay(close, -1), card.statement_day)
+  ) {
     const due = nextOn(close, card.due_day);
     const amount = spentBy(close) - paidBy(close);
     if (amount <= 0) continue;
     const covered = paidBy(due) >= spentBy(close);
     const paidInWindow = own.some((t) => t.type === "card_payment" && t.date > close && t.date <= due);
-    if (due <= today || covered) bills.push({ statementDate: close, dueDate: due, amount, onTime: covered || paidInWindow });
+    const onTime = covered || paidInWindow;
+    const state = onTime ? "on_time" : own.some((t) => t.type === "card_payment" && t.date > due) ? "late" : "none";
+    if (due <= today || covered) bills.push({ statementDate: close, dueDate: due, amount, onTime, state });
   }
   return bills.reverse();
 }
