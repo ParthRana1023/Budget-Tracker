@@ -65,20 +65,36 @@ export const thisCycleStart = (schedule, today) => cycleFor(parseLocalDate(today
 export const savePreferences = (supabase, changes) => supabase.rpc("update_preferences", { p_changes: changes });
 
 /**
- * Settings › Credit card (lib/cardBalance.mjs). `null` turns the tracker off.
+ * Settings › Credit cards (lib/cards.mjs): add a card (no `id`) or edit one. Returns the card's id.
+ * Errors use the handoff's copy for a missing or duplicate name.
  * @param {any} supabase
- * @param {{ statementDay: number, dueDay: number, since: string, opening?: number, remindDays?: number | null } | null} card
- *   days 1-31; since 'YYYY-MM-DD'; opening in minor units; remindDays 1-10 or null
- * @returns {Promise<{ error: any }>}
+ * @param {{ id?: string, name: string, statementDay: number, dueDay: number, opening?: number, reminders?: boolean }} card
+ *   days 1-28 or 31 (last day); opening in minor units of the base currency
+ * @returns {Promise<{ id: string | null, error: any }>}
  */
-export const saveCardTracker = (supabase, card) =>
-  supabase.rpc("set_card_tracker", {
-    p_statement_day: card?.statementDay ?? null,
-    p_due_day: card?.dueDay ?? null,
-    p_tracking_since: card?.since ?? null,
-    p_opening_balance: card?.opening ?? 0,
-    p_remind_days: card?.remindDays ?? null,
-  });
+export async function saveCard(supabase, card) {
+  const name = card.name.trim();
+  if (!name) return { id: null, error: { message: "Give the card a name so you can tell it apart." } };
+  const row = {
+    name,
+    statement_day: card.statementDay,
+    due_day: card.dueDay,
+    opening_balance: card.opening ?? 0,
+    reminders: card.reminders ?? true,
+  };
+  const table = supabase.from("credit_cards");
+  const { data, error } = await (card.id ? table.update(row).eq("id", card.id) : table.insert(row)).select("id").single();
+  if (error?.code === "23505") return { id: null, error: { ...error, message: "You already have a card with this name." } };
+  return { id: data?.id ?? null, error };
+}
+
+/**
+ * Remove a card: archived, so its purchases and payments stay in history but it's no longer
+ * tracked as owed.
+ * @param {any} supabase @param {string} id @returns {Promise<{ error: any }>}
+ */
+export const archiveCard = (supabase, id) =>
+  supabase.from("credit_cards").update({ archived_at: new Date().toISOString() }).eq("id", id);
 
 /**
  * "Apply from when?": save salary, payday and save-first % together, from this cycle or the

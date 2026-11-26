@@ -10,8 +10,8 @@
 -- What it covers: onboarding, plan history (save % raised last cycle), fixed bills and
 -- recurring items with payment methods, a foreign-currency (USD) subscription and purchase,
 -- salary over three cycles, a windfall split to a goal and the reserve, a reserve-paid bill,
--- income on hold, goals with and without a target date and one in USD, credit card tracker
--- settings with an opening balance and card bill payments.
+-- income on hold, goals with and without a target date and one in USD, a credit card with an
+-- opening balance and card bill payments.
 
 begin;
 
@@ -43,6 +43,7 @@ begin
   delete from public.transactions where user_id = v_user;
   delete from public.savings_goals where user_id = v_user;
   delete from public.recurring_items where user_id = v_user;
+  delete from public.credit_cards where user_id = v_user;
   delete from public.categories where user_id = v_user;
   delete from public.plan_changes where user_id = v_user;
   delete from public.notification_log where user_id = v_user;
@@ -80,13 +81,15 @@ begin
   insert into public.plan_changes (user_id, field, from_value, to_value, applies, effective_from, created_at)
   values (v_user, 'save_pct', 15, 20, 'next', c0 - interval '1 month', now() - interval '40 days');
 
-  -- Settings: 20% now, preferences, credit card tracker (statement 20th, due 5th, opening ₹12,500).
+  -- Settings: 20% now, preferences.
   update public.user_settings
      set savings_pct = 20, onboarded_at = now() - interval '2 months', display_name = 'Demo',
-         theme = 'system', number_format = 'indian', bill_reminder_days = 3,
-         card_statement_day = 20, card_due_day = 5, card_tracking_since = c0 - interval '2 months',
-         card_opening_balance = 1250000, card_remind_days = 3, updated_at = now()
+         theme = 'system', number_format = 'indian', bill_reminder_days = 3, updated_at = now()
    where user_id = v_user;
+  -- One credit card (statement 20th, due 5th, opening ₹12,500). With one card, every
+  -- credit-card entry and card payment below is tagged with it (set_entry_card).
+  insert into public.credit_cards (user_id, name, statement_day, due_day, opening_balance, created_at)
+  values (v_user, 'HDFC Regalia', 20, 5, 1250000, now() - interval '2 months');
 
   -- ---------------------------------------------------------------- recurring
   insert into recurring_items (user_id, name, amount, type, income_type, day_of_month, starts_on)

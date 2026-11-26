@@ -5,7 +5,7 @@ import {
   billPush,
   billsDueOn,
   cardPush,
-  cardReminder,
+  cardReminders,
   channels,
   inTodaysBase,
   isQuiet,
@@ -75,11 +75,14 @@ test("channels: email needs a sender and the switch, push needs a device and the
   assert.deepEqual(channels(s, { emailReady: true, pushReady: true, devices: 1 }), {
     bills: { email: true, push: true },
     weekly: { email: false, push: false },
+    cards: { push: true },
   });
   assert.deepEqual(channels(s, { emailReady: false, pushReady: true, devices: 0 }), {
     bills: { email: false, push: false },
     weekly: { email: false, push: false },
+    cards: { push: false },
   });
+  assert.equal(channels({ ...s, push_cards: false }, { emailReady: true, pushReady: true, devices: 1 }).cards.push, false);
   assert.equal(channels(s, { emailReady: true, pushReady: false, devices: 2 }).bills.push, false, "no VAPID keys");
   assert.equal(
     channels({ ...s, notify_due: false }, { emailReady: true, pushReady: true, devices: 1 }).bills.email,
@@ -175,25 +178,30 @@ test("a week across a base switch: older entries in today's base, at the rate ro
   );
 });
 
-test("card reminder: card_remind_days before the due day, only when the statement is unpaid", () => {
-  const s = {
-    card_statement_day: 20,
-    card_due_day: 5,
-    card_tracking_since: "2026-10-01",
-    card_opening_balance: 0,
-    card_remind_days: 3,
-  };
-  const spend = [{ type: "expense", payment_method: "credit_card", amount: 1800000, date: "2026-11-10" }];
-  const r = cardReminder(s, spend, "2026-12-02");
-  assert.deepEqual(r, { ref: "card:2026-12-05", amount: 1800000, due: "2026-12-05" });
-  assert.equal(cardReminder(s, spend, "2026-12-01"), null, "not 3 days before");
-  assert.equal(cardReminder({ ...s, card_remind_days: null }, spend, "2026-12-02"), null, "reminder off");
-  const paid = [...spend, { type: "card_payment", amount: 1800000, date: "2026-11-30" }];
-  assert.equal(cardReminder(s, paid, "2026-12-02"), null, "already paid");
+test("card bill reminders: 3 days before and on the due day, per card, only while the bill is unpaid", () => {
+  const cards = [
+    { id: "c1", name: "HDFC Regalia", statement_day: 20, due_day: 18, opening_balance: 0, reminders: true },
+    { id: "c2", name: "Axis Ace", statement_day: 20, due_day: 18, opening_balance: 0, reminders: false },
+    { id: "c3", name: "Old", statement_day: 20, due_day: 18, opening_balance: 900000, archived_at: "2026-11-01" },
+  ];
+  const spend = [
+    { type: "expense", payment_method: "credit_card", card_id: "c1", amount: 1800000, date: "2026-11-10" },
+    { type: "expense", payment_method: "credit_card", card_id: "c2", amount: 500000, date: "2026-11-10" },
+  ];
+  const [r] = cardReminders(cards, spend, "2026-12-15");
+  assert.deepEqual(r, { ref: "card:c1:2026-12-18:3", cardId: "c1", name: "HDFC Regalia", amount: 1800000, due: "2026-12-18", days: 3 });
+  assert.equal(cardReminders(cards, spend, "2026-12-15").length, 1, "reminders off and archived cards left out");
+  assert.equal(cardReminders(cards, spend, "2026-12-16").length, 0, "not 2 days before");
+  assert.equal(cardReminders(cards, spend, "2026-12-18")[0].ref, "card:c1:2026-12-18:0", "on the day");
+  const paid = [...spend, { type: "card_payment", card_id: "c1", amount: 1800000, date: "2026-12-14" }];
+  assert.deepEqual(cardReminders(cards, paid, "2026-12-15"), [], "already paid");
   assert.deepEqual(cardPush(r, "INR"), {
-    title: "Card bill due 5 Dec",
-    body: "₹18,000.00 on this statement. Tap to record the payment.",
-    url: "/dashboard",
-    tag: "card-2026-12",
+    title: "Card bill due in 3 days",
+    body: "₹18,000.00 on HDFC Regalia is due Fri, 18 Dec. Mark it paid once it’s done.",
+    url: "/dashboard?modal=payCard&card=c1",
+    tag: "card-c1-2026-12-18",
+    actions: [{ action: "paid", title: "Mark paid" }],
   });
+  assert.equal(cardPush({ ...r, days: 0 }, "INR").title, "Card bill due today");
+  assert.match(cardPush({ ...r, days: 0 }, "INR").body, / is due today\./);
 });

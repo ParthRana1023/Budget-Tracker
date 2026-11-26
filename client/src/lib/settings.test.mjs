@@ -10,7 +10,8 @@ import {
   payDayStatus,
   pendingPlan,
   planHistory,
-  saveCardTracker,
+  saveCard,
+  archiveCard,
   savePreferences,
 } from "./settings.mjs";
 
@@ -70,20 +71,46 @@ test("applyPlan starts at this cycle or the next one; savePreferences sends only
   ]);
 });
 
-test("saveCardTracker sends every field; null turns the tracker off", async () => {
-  const sb = fakeSupabase();
-  await saveCardTracker(sb, { statementDay: 20, dueDay: 5, since: "2026-11-01", opening: 1250000, remindDays: 3 });
-  await saveCardTracker(sb, { statementDay: 31, dueDay: 28, since: "2026-11-01" });
-  await saveCardTracker(sb, null);
-  const call = (s, d, since, o, r) => [
-    "set_card_tracker",
-    { p_statement_day: s, p_due_day: d, p_tracking_since: since, p_opening_balance: o, p_remind_days: r },
-  ];
-  assert.deepEqual(sb.calls, [
-    call(20, 5, "2026-11-01", 1250000, 3),
-    call(31, 28, "2026-11-01", 0, null),
-    call(null, null, null, 0, null),
+test("saveCard adds or edits a card, with the handoff's name errors; archiveCard archives", async () => {
+  const calls = [];
+  let result = { data: { id: "c9" }, error: null };
+  const query = {
+    insert: (row) => (calls.push(["insert", row]), query),
+    update: (row) => (calls.push(["update", row]), query),
+    eq: (k, v) => (calls.push(["eq", k, v]), query),
+    select: () => query,
+    single: async () => result,
+  };
+  const sb = { from: (t) => (calls.push(["from", t]), query) };
+
+  assert.deepEqual(await saveCard(sb, { name: "  HDFC Regalia ", statementDay: 20, dueDay: 31, opening: 1250000 }), {
+    id: "c9",
+    error: null,
+  });
+  await saveCard(sb, { id: "c9", name: "HDFC", statementDay: 1, dueDay: 18, reminders: false });
+  assert.deepEqual(calls, [
+    ["from", "credit_cards"],
+    ["insert", { name: "HDFC Regalia", statement_day: 20, due_day: 31, opening_balance: 1250000, reminders: true }],
+    ["from", "credit_cards"],
+    ["update", { name: "HDFC", statement_day: 1, due_day: 18, opening_balance: 0, reminders: false }],
+    ["eq", "id", "c9"],
   ]);
+
+  assert.equal(
+    (await saveCard(sb, { name: " ", statementDay: 1, dueDay: 1 })).error.message,
+    "Give the card a name so you can tell it apart.",
+  );
+  result = { data: null, error: { code: "23505", message: "duplicate key" } };
+  assert.equal(
+    (await saveCard(sb, { name: "HDFC", statementDay: 1, dueDay: 1 })).error.message,
+    "You already have a card with this name.",
+  );
+
+  calls.length = 0;
+  archiveCard(sb, "c9");
+  assert.equal(calls[1][0], "update");
+  assert.match(calls[1][1].archived_at, /^\d{4}-\d{2}-\d{2}T/);
+  assert.deepEqual(calls[2], ["eq", "id", "c9"]);
 });
 
 test("export fetches every page, not just the first 1000 rows", async () => {

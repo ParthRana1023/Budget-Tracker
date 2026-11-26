@@ -16,7 +16,7 @@ import {
   billPush,
   billsDueOn,
   cardPush,
-  cardReminder,
+  cardReminders,
   channels,
   isQuiet,
   localParts,
@@ -67,7 +67,7 @@ Deno.serve(async (req) => {
     .from("user_settings")
     .select(
       // The plan columns and history feed the weekly summary's safe to spend (same maths as the Dashboard).
-      "user_id, currency, email_notifications, weekly_summary, notify_due, push_bills, push_weekly, bill_reminder_days, quiet_hours_on, quiet_from, quiet_to, timezone, take_home_pay, savings_pct, month_start_day, card_statement_day, card_due_day, card_tracking_since, card_opening_balance, card_remind_days, plan_changes(field, from_value, to_value, applies, effective_from, superseded_at, created_at)",
+      "user_id, currency, email_notifications, weekly_summary, notify_due, push_bills, push_weekly, bill_reminder_days, quiet_hours_on, quiet_from, quiet_to, timezone, take_home_pay, savings_pct, month_start_day, push_cards, plan_changes(field, from_value, to_value, applies, effective_from, superseded_at, created_at)",
     )
     .or(filters.join(","));
   if (error) return Response.json({ error: error.message }, { status: 500 });
@@ -130,28 +130,34 @@ Deno.serve(async (req) => {
           }
           if (on.bills.push) sent += await push(subs, billPush(bill, days, due, s.currency));
         }
+      }
 
-        // Credit card bill: goes out with bill reminders, card_remind_days before the due day.
-        if (s.card_remind_days && s.card_tracking_since) {
-          const { data: card, error: cardError } = await db
-            .from("transactions")
-            .select("type, amount, date, payment_method, base_currency")
-            .eq("user_id", s.user_id)
-            .gte("date", s.card_tracking_since)
-            .or("type.eq.card_payment,payment_method.eq.credit_card");
-          if (cardError) throw cardError;
-          const entries = inTodaysBase(card ?? [], s.currency, [...(cats.data ?? []), ...(items.data ?? [])]);
-          const r = cardReminder(s, entries, local.date);
-          if (r && (await claim("bill", r.ref))) {
-            if (billEmail) {
-              await sendEmail(
-                to,
-                `Card bill due on ${r.due}`,
-                `${money(r.amount, s.currency)} is on this card statement, due on ${r.due}. Record the payment on your dashboard when you pay: ${env("APP_URL")}/dashboard`,
-              );
-              sent++;
-            }
-            if (on.bills.push) sent += await push(subs, cardPush(r, s.currency));
+      // Card bills (push only): 3 days before and on each card's due day, for cards with reminders on.
+      if (on.cards.push) {
+        const { data: cards, error: cardsError } = await db
+          .from("credit_cards")
+          .select("id, name, statement_day, due_day, opening_balance, reminders, archived_at")
+          .eq("user_id", s.user_id)
+          .is("archived_at", null)
+          .eq("reminders", true);
+        if (cardsError) throw cardsError;
+        if (cards?.length) {
+          const [entries, items, cats] = await Promise.all([
+            db
+              .from("transactions")
+              .select("type, amount, date, payment_method, card_id, base_currency")
+              .eq("user_id", s.user_id)
+              .in(
+                "card_id",
+                cards.map((c) => c.id),
+              ),
+            db.from("recurring_items").select("original_currency, fx_rate, fx_date").eq("user_id", s.user_id),
+            db.from("categories").select("original_currency, fx_rate, fx_date").eq("user_id", s.user_id),
+          ]);
+          if (entries.error) throw entries.error;
+          const inBase = inTodaysBase(entries.data ?? [], s.currency, [...(cats.data ?? []), ...(items.data ?? [])]);
+          for (const r of cardReminders(cards, inBase, local.date)) {
+            if (await claim("bill", r.ref)) sent += await push(subs, cardPush(r, s.currency));
           }
         }
       }

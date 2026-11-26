@@ -4,7 +4,7 @@
 // user's base currency.
 
 import { buildCycleModel } from "../_shared/budget/cycleModel.mjs";
-import { cardBalance } from "../_shared/budget/cardBalance.mjs";
+import { cardStatus, DUE_SOON_DAYS } from "../_shared/budget/cards.mjs";
 import { cycleFor, paySchedule } from "../_shared/budget/periods.mjs";
 
 /**
@@ -123,7 +123,8 @@ export const WEEKLY_HOUR = 9;
 /**
  * Which channels each kind goes out on this run. Email needs the user's switch and a configured
  * sender; push needs the user's per-kind switch and at least one subscribed device.
- * @param {{ email_notifications?: boolean, weekly_summary?: boolean, notify_due?: boolean, push_bills?: boolean, push_weekly?: boolean }} s
+ * Card bills are push only (handoff v4).
+ * @param {{ email_notifications?: boolean, weekly_summary?: boolean, notify_due?: boolean, push_bills?: boolean, push_weekly?: boolean, push_cards?: boolean }} s
  * @param {{ emailReady: boolean, pushReady: boolean, devices: number }} ctx
  */
 export function channels(s, { emailReady, pushReady, devices }) {
@@ -131,6 +132,7 @@ export function channels(s, { emailReady, pushReady, devices }) {
   return {
     bills: { email: emailReady && !!s.email_notifications && !!s.notify_due, push: push && s.push_bills !== false },
     weekly: { email: emailReady && !!s.weekly_summary, push: push && s.push_weekly !== false },
+    cards: { push: push && s.push_cards !== false },
   };
 }
 
@@ -161,31 +163,46 @@ export function billPush(bill, days, due, currency = "INR") {
 }
 
 /**
- * The credit card reminder due today, or null: the tracker and its reminder are on, something is
- * owed on the statement, and the due date is exactly `card_remind_days` away. `ref` makes it one
- * per statement (notification_log, kind "bill").
- * @param {any} settings user_settings row (card_* columns)
- * @param {Array<{ type: string, amount: number | string, date: string, payment_method?: string | null }>} entries in today's base
+ * Card bill reminders due today (handoff v4, Push States): one per card in use with reminders on,
+ * DUE_SOON_DAYS (3) days before the due date and on the day itself, while its statement still
+ * asks for money. `ref` makes each one go out once (notification_log, kind "bill").
+ * @param {import("../_shared/budget/cards.mjs").Card[]} cards
+ * @param {import("../_shared/budget/cards.mjs").Entry[]} entries card spend and payments, in today's base
  * @param {string} today 'YYYY-MM-DD' (user's local date)
- * @returns {{ ref: string, amount: number, due: string } | null}
+ * @returns {Array<{ ref: string, cardId: string, name: string, amount: number, due: string, days: number }>}
  */
-export function cardReminder(settings, entries, today) {
-  const days = settings?.card_remind_days;
-  if (!days) return null;
-  const b = cardBalance({ transactions: entries, settings, today });
-  if (!b || b.statement <= 0 || b.dueDate !== addDays(today, days)) return null;
-  return { ref: `card:${b.dueDate}`, amount: b.statement, due: b.dueDate };
+export function cardReminders(cards, entries, today) {
+  return cards
+    .filter((c) => !c.archived_at && c.reminders !== false)
+    .map((c) => cardStatus(c, entries, today))
+    .filter((s) => s.statement > 0 && (s.daysToDue === DUE_SOON_DAYS || s.daysToDue === 0))
+    .map((s) => ({
+      ref: `card:${s.id}:${s.dueDate}:${s.daysToDue}`,
+      cardId: s.id,
+      name: s.name,
+      amount: s.statement,
+      due: s.dueDate,
+      days: s.daysToDue,
+    }));
 }
 
+const WEEKDAY = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
 /**
- * Lock-screen text for the card reminder (plans/v4 design prompt).
- * @param {{ amount: number, due: string }} r from cardReminder @param {string} [currency]
+ * Lock-screen text for a card bill reminder (handoff v4, Push States). Tapping opens the "Card
+ * bill paid" sheet filled in for that card; Android also shows "Mark paid", which does the same.
+ * The tag makes the on-the-day reminder replace the 3-day one.
+ * @param {{ cardId: string, name: string, amount: number, due: string, days: number }} r from cardReminders
+ * @param {string} [currency]
  */
 export const cardPush = (r, currency = "INR") => ({
-  title: `Card bill due ${dayMonth(r.due)}`,
-  body: `${money(r.amount, currency)} on this statement. Tap to record the payment.`,
-  url: "/dashboard",
-  tag: `card-${r.due.slice(0, 7)}`,
+  title: `Card bill due ${r.days === 0 ? "today" : `in ${r.days} days`}`,
+  body: `${money(r.amount, currency)} on ${r.name} is due ${
+    r.days === 0 ? "today" : `${WEEKDAY[new Date(`${r.due}T00:00:00Z`).getUTCDay()]}, ${dayMonth(r.due)}`
+  }. Mark it paid once it’s done.`,
+  url: `/dashboard?modal=payCard&card=${r.cardId}`,
+  tag: `card-${r.cardId}-${r.due}`,
+  actions: [{ action: "paid", title: "Mark paid" }],
 });
 
 /**

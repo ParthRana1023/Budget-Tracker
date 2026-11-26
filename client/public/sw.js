@@ -62,7 +62,7 @@ self.addEventListener("fetch", (event) => {
 
 // ---------------------------------------------------------------- Web Push
 // Payload from send-notifications or /api/push/test: { title, body, url, tag, actions? }.
-// The only action, "Record it" on bill reminders, opens the same page as tapping the notification.
+// Actions ("Record it" on bill reminders, "Mark paid" on card bills) open the same page as tapping.
 self.addEventListener("push", (event) => {
   let data = {};
   try {

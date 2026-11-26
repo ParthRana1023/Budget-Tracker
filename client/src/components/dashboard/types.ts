@@ -19,7 +19,7 @@ export interface Category {
 
 export interface Tx {
   id: string;
-  /** card_payment: paying the credit card bill, a transfer (never spending; lib/cardBalance.mjs). */
+  /** card_payment: a card bill marked paid, a transfer (never spending; lib/cards.mjs). */
   type: "expense" | "income" | "savings_transfer" | "reserve_transfer" | "card_payment";
   amount: number;
   date: string;
@@ -31,6 +31,8 @@ export interface Tx {
   payee?: string | null;
   /** How an expense was paid (lib/paymentMethods.mjs); null = not recorded. Tracking only. */
   payment_method?: PaymentMethod | null;
+  /** The card on credit-card spend and card payments (credit_cards.id); null otherwise. */
+  card_id?: string | null;
   /** A foreign entry: what was typed (minor units of original_currency), the cycle's rate and its date. */
   original_amount?: number | null;
   original_currency?: string | null;
@@ -114,14 +116,22 @@ export interface Settings {
   quiet_from?: number;
   quiet_to?: number;
   timezone?: string;
-  /** Credit card tracker (lib/cardBalance.mjs): statement, due day and tracking date set together, or none (off). */
-  card_statement_day?: number | null;
-  card_due_day?: number | null;
-  card_tracking_since?: string | null;
-  /** Owed on card_tracking_since, in the base currency. */
-  card_opening_balance?: number;
-  /** Push/email this many days before the due day; null = no reminder. */
-  card_remind_days?: number | null;
+  /** Card bill reminders (push only): 3 days before and on each card's due day. */
+  push_cards?: boolean;
+}
+
+/** A credit card (credit_cards; lib/cards.mjs). Removing one archives it. */
+export interface CreditCard {
+  id: string;
+  name: string;
+  /** Days of the month: 1-28, or 31 = the month's last day. */
+  statement_day: number;
+  due_day: number;
+  /** Owed before the user started logging, in minor units of the base currency. */
+  opening_balance: number;
+  reminders: boolean;
+  created_at?: string;
+  archived_at: string | null;
 }
 
 /** Small pill buttons used across the dashboard cards. */
