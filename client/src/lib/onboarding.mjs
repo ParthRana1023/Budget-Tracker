@@ -1,7 +1,7 @@
 // Onboarding answers -> complete_onboarding() payload (design handoff, Onboarding).
 // The form keeps rupee strings; the database takes paise. "Nothing blocks": anything
 // that would make the save fail (blank or repeated names) is fixed up here instead.
-import { toMinor } from "./money.mjs";
+import { inr, toMinor } from "./money.mjs";
 
 export const ONBOARDING_CATEGORIES = [
   "Groceries",
@@ -91,4 +91,37 @@ export function onboardingPayload(s) {
 export function monthsToGoal(target, salary, pct) {
   const perCycle = (salary * pct) / 100;
   return target > 0 && perCycle > 0 ? Math.ceil(target / perCycle) : null;
+}
+
+/**
+ * The goal step's pace line (handoff v4 §3). Whole units of one currency; `by` is YYYY-MM or "" (no
+ * end date), `today` YYYY-MM-DD. Null when there's no target yet. `warn` when the pace is more than
+ * the savings set in step 2.
+ * @param {number} target @param {number} save @param {string} by @param {string} today
+ * @returns {{ text: string, warn: boolean } | null}
+ */
+export function goalPace(target, save, by, today) {
+  if (!(target > 0)) return null;
+  const $ = (/** @type {number} */ whole) => inr(toMinor(whole));
+  if (!by) {
+    return {
+      text: save
+        ? `No deadline. At your full savings of ${$(save)} a month, you’d get there in about ${Math.ceil(target / save)} months.`
+        : "No deadline. Add money whenever you like.",
+      warn: false,
+    };
+  }
+  const months = (+by.slice(0, 4) - +today.slice(0, 4)) * 12 + (+by.slice(5, 7) - +today.slice(5, 7));
+  if (months < 1) return null;
+  const per = Math.ceil(target / months);
+  if (!save) return { text: `That’s ${$(per)} a month for ${months} months.`, warn: false };
+  if (per > save)
+    return {
+      text: `That’s ${$(per)} a month, ${$(per - save)} more than you’re saving. Push the date out, lower the target, or raise your savings.`,
+      warn: true,
+    };
+  return {
+    text: `That’s ${$(per)} a month for ${months} months, ${Math.round((per / save) * 100)}% of what you save.`,
+    warn: false,
+  };
 }

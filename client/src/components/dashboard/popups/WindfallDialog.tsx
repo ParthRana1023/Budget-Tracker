@@ -29,8 +29,13 @@ export default function WindfallDialog({
   onClose: () => void;
 }) {
   const { model, today, period } = ctx;
-  // Every goal that can take money (not a main goal with sub-goals); finished ones are marked.
+  // Every goal that can take money (not a main goal with sub-goals): single goals first, then each
+  // main goal as a heading over its sub-goals (handoff v4 §2).
   const openGoals = ctx.goals.filter((g) => canTakeMoney(g, ctx.goals));
+  const plain = openGoals.filter((g) => !g.parent_id);
+  const groups = ctx.goals
+    .filter((g) => !g.parent_id && !canTakeMoney(g, ctx.goals))
+    .map((g) => ({ g, subs: openGoals.filter((x) => x.parent_id === g.id) }));
   const split = (total: number, [a, b]: [number, number]) => {
     const s = Math.round(total * a),
       r = Math.round(total * b);
@@ -39,7 +44,7 @@ export default function WindfallDialog({
   const first = ctx.held.find((h) => h.id === incomeId) ?? ctx.held[0];
   const { form, set, dirty, error, setError, busy, save } = usePopupForm({
     id: first?.id ?? "",
-    goalId: openGoals[0]?.id ?? "",
+    goalId: (plain[0] ?? groups[0]?.subs[0])?.id ?? "",
     ...split(Number(first?.amount ?? 0), [0.5, 0.3]),
   });
   const h = ctx.held.find((x) => x.id === form.id);
@@ -185,10 +190,19 @@ export default function WindfallDialog({
             className="h-[42px] w-full min-w-0 rounded-xl border border-line-2 bg-tile-2 px-3.5 text-[15px] text-ink outline-none focus:border-lime"
           >
             {openGoals.length === 0 && <option value="">No goals yet</option>}
-            {openGoals.map((g) => (
+            {plain.map((g) => (
               <option key={g.id} value={g.id}>
                 {g.name}
               </option>
+            ))}
+            {groups.map(({ g, subs }) => (
+              <optgroup key={g.id} label={g.name}>
+                {subs.map((x) => (
+                  <option key={x.id} value={x.id}>
+                    {x.name}
+                  </option>
+                ))}
+              </optgroup>
             ))}
           </select>
         </div>

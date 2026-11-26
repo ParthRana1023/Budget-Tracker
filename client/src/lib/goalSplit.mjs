@@ -31,7 +31,11 @@ export function shareOut(total, weights) {
  * @returns {number[] | null}
  */
 export function splitShares(total, mode, targets, custom = []) {
-  if (mode === "equal") return shareOut(total, targets.map(() => 1));
+  if (mode === "equal")
+    return shareOut(
+      total,
+      targets.map(() => 1),
+    );
   if (mode === "target") return shareOut(total, targets);
   const ok =
     custom.length === targets.length &&
@@ -82,3 +86,19 @@ export const splitGoal = (supabase, goalId, subGoals, plan) =>
     p_sub_goals: subGoals.map((g, i) => ({ ...g, saved_before: plan.savedBefore[i] ?? 0 })),
     p_contributions: plan.contributions,
   });
+
+/**
+ * Undo for splitGoal: the sub-goals' money goes back onto the goal, with its own target again.
+ * @param {any} supabase @param {string} goalId @param {number} target @param {number | null} [original]
+ */
+export const unsplitGoal = (supabase, goalId, target, original = null) =>
+  supabase.rpc("unsplit_goal", { p_goal_id: goalId, p_target_amount: target, p_original_amount: original });
+
+/**
+ * Deletes a goal with its sub-goals; `data` is what was removed, for restoreRows (Undo).
+ * @param {any} supabase @param {string} goalId
+ */
+export const deleteGoal = (supabase, goalId) => supabase.rpc("delete_goal", { p_goal_id: goalId });
+
+/** @param {any} supabase @param {unknown} rows a snapshot from deleteGoal */
+export const restoreRows = (supabase, rows) => supabase.rpc("restore_rows", { p_rows: rows });

@@ -42,7 +42,7 @@ test.describe("Dashboard", () => {
     await expect(goal).toContainText("₹25,000.00 of ₹1,00,000.00");
     await expect(goal).toContainText("25%");
     // No target month chosen: an open-ended goal, with no monthly figure or on-track bar.
-    await expect(goal).toContainText("No target date");
+    await expect(goal).toContainText("No end date");
     await expect(goal).not.toContainText("a month");
 
     await goal.getByRole("button", { name: "Add money to Emergency fund" }).click();
@@ -56,9 +56,86 @@ test.describe("Dashboard", () => {
     const renamed = page.locator('[data-testid="goal-row"][data-name="Rainy day"]');
     await expect(renamed).toBeVisible();
 
-    await renamed.getByRole("button", { name: "Delete Rainy day" }).click();
+    await renamed.getByRole("button", { name: "Rainy day options" }).click();
+    await page.getByRole("menuitem", { name: "Delete goal" }).click();
     await page.getByRole("dialog").getByRole("button", { name: "Delete goal" }).click();
     await expect(renamed).toHaveCount(0);
+    // Undo puts it back with its money.
+    await page
+      .getByRole("status")
+      .filter({ hasText: "Deleted Rainy day" })
+      .getByRole("button", { name: "Undo" })
+      .click();
+    await expect(renamed).toContainText("₹30,000.00 of ₹1,00,000.00");
+  });
+
+  test("goals: sub-goals, split a goal that holds money, Undo, delete by typing its name", async ({ page }) => {
+    test.setTimeout(90_000);
+    await setUpAccount(page);
+    await show(page, "Goals");
+    const toast = (text: string) => page.getByRole("status").filter({ hasText: text });
+
+    // A goal with nothing in it gets sub-goals one at a time.
+    await page.getByRole("button", { name: "New goal" }).click();
+    let dialog = page.getByRole("dialog");
+    await dialog.getByLabel("Goal name").fill("House");
+    await dialog.getByLabel("Target amount").fill("500000");
+    await dialog.getByRole("button", { name: "Create goal" }).click();
+    const house = page.locator('[data-testid="goal-row"][data-name="House"]');
+    await house.getByRole("button", { name: "House options" }).click();
+    await page.getByRole("menuitem", { name: "Add sub-goal" }).click();
+    dialog = page.getByRole("dialog");
+    await expect(dialog).toContainText("Part of House");
+    await dialog.getByLabel("Goal name").fill("Deposit");
+    await dialog.getByLabel("Target amount").fill("300000");
+    await dialog.getByRole("button", { name: "Add sub-goal" }).click();
+    await expect(toast("Added Deposit to House")).toBeVisible();
+    await expect(house).toContainText("Total of 1 sub-goal");
+    await expect(house.getByRole("button", { name: "Add money to House" })).toHaveCount(0);
+    await expect(house.getByRole("button", { name: "Hide 1 sub-goal" })).toHaveAttribute("aria-expanded", "true");
+
+    // A goal that already holds money is split, and the money is shared out.
+    await page.getByRole("button", { name: "New goal" }).click();
+    dialog = page.getByRole("dialog");
+    await dialog.getByLabel("Goal name").fill("Holiday");
+    await dialog.getByLabel("Target amount").fill("60000");
+    await dialog.getByLabel(/Already saved/).fill("10000");
+    await dialog.getByRole("button", { name: "Create goal" }).click();
+    const holiday = page.locator('[data-testid="goal-row"][data-name="Holiday"]');
+    await holiday.getByRole("button", { name: "Holiday options" }).click();
+    await page.getByRole("menuitem", { name: /Split into sub-goals/ }).click();
+    dialog = page.getByRole("dialog");
+    await expect(dialog.getByRole("heading", { name: "Split Holiday" })).toBeVisible();
+    await dialog.getByLabel("Name").first().fill("Flights");
+    await dialog.getByLabel("Target").first().fill("40000");
+    await dialog.getByLabel("Name").nth(1).fill("Hotel");
+    await dialog.getByLabel("Target").nth(1).fill("20000");
+    await dialog.getByRole("radio", { name: /I’ll choose/ }).click();
+    await dialog.getByRole("button", { name: "Put all ₹10,000.00 into Flights" }).click();
+    await expect(dialog.getByRole("status")).toContainText("All placed");
+    await dialog.getByRole("button", { name: "Split goal" }).click();
+    await expect(toast("Split Holiday into 2 sub-goals · ₹10,000.00 shared out")).toBeVisible();
+    await expect(page.locator('[data-testid="sub-goal-row"][data-name="Flights"]')).toContainText(
+      "₹10,000.00 of ₹40,000.00",
+    );
+    await expect(holiday).toContainText("₹10,000.00 of ₹60,000.00");
+
+    // Undo the split: one goal again, with its money.
+    await toast("Split Holiday").getByRole("button", { name: "Undo" }).click();
+    await expect(page.locator('[data-testid="sub-goal-row"][data-name="Flights"]')).toHaveCount(0);
+    await expect(holiday).toContainText("₹10,000.00 of ₹60,000.00");
+
+    // Deleting a main goal with sub-goals needs its name typed.
+    await house.getByRole("button", { name: "House options" }).click();
+    await page.getByRole("menuitem", { name: "Delete goal" }).click();
+    dialog = page.getByRole("dialog");
+    await expect(dialog).toContainText("Deposit");
+    await dialog.getByRole("button", { name: "Delete goal" }).click();
+    await expect(dialog.getByRole("alert")).toHaveText("Type “House” to confirm.");
+    await dialog.getByLabel("Type “House” to confirm").fill("house");
+    await dialog.getByRole("button", { name: "Delete goal" }).click();
+    await expect(toast("Deleted House and 1 sub-goal")).toBeVisible();
+    await expect(house).toHaveCount(0);
   });
 
   test("a goal form checks its fields and asks before discarding", async ({ page }) => {

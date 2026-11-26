@@ -1,7 +1,7 @@
 "use client";
 
-// Five-step setup for a new account (design handoff, Onboarding). Every step can be
-// skipped; the answers are saved together by complete_onboarding() on the last step.
+// Six-step setup for a new account (design handoff, Onboarding; v4 §3 adds the Goal step). Every
+// step can be skipped; the answers are saved together by complete_onboarding() on the last step.
 
 import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
@@ -13,11 +13,14 @@ import {
   ONBOARDING_CATEGORIES,
   clampDay,
   digits,
+  goalPace,
   keptBills,
   onboardingPayload,
 } from "@/lib/onboarding.mjs";
 import { PAYDAY_OPTIONS } from "@/lib/settings.mjs";
-import { currencySymbol, inr as money, toMinor } from "@/lib/money.mjs";
+import { currencySymbol, inr as money, showTyped, toMinor } from "@/lib/money.mjs";
+import { monthLabel } from "@/lib/cycle.mjs";
+import { toLocalDateString } from "@/lib/periods.mjs";
 import { errorFields, reportClientError } from "@/lib/log.mjs";
 
 const STEPS: Array<[eyebrow: string, title: string, em: string, lede: string]> = [
@@ -34,19 +37,25 @@ const STEPS: Array<[eyebrow: string, title: string, em: string, lede: string]> =
     "This comes out the day your salary lands, before anything counts as safe to spend.",
   ],
   [
-    "Step 3 · Fixed bills",
+    "Step 3 · Goal",
+    "What are you",
+    "saving for?",
+    "One goal is enough to start. It’s paid from the savings you just set, and you can add more goals later.",
+  ],
+  [
+    "Step 4 · Fixed bills",
     "What’s",
     "already spoken for?",
     "Rent, EMIs, insurance, utilities. Fill in the ones you know. Anything left blank is skipped, and you can add it later.",
   ],
   [
-    "Step 4 · Flexible spending",
+    "Step 5 · Flexible spending",
     "Where the rest",
     "usually goes.",
     "Pick the categories you use. Only add a limit where you’re sure of it. After a few months of entries, SaveFirst suggests limits from what you actually spend.",
   ],
   [
-    "Step 5 · Ready",
+    "Step 6 · Ready",
     "Your first cycle",
     "starts today.",
     "Here’s how your salary splits. You can adjust any of this from the dashboard.",
@@ -57,6 +66,17 @@ const STEPS: Array<[eyebrow: string, title: string, em: string, lede: string]> =
 const inr = (whole: number) => money(toMinor(whole));
 const FIELD =
   "rounded-[10px] border border-line-2 bg-tile-2 text-[15px] text-ink outline-none focus:border-lime focus-visible:outline-none";
+
+/** Handoff v4 §3 presets, in whole units of the base currency (always INR at sign-up). */
+const GOAL_PRESETS: Array<[string, string]> = [
+  ["Emergency fund", "100000"],
+  ["Holiday", "60000"],
+  ["New phone", "40000"],
+  ["Something else", ""],
+];
+const NO_GOAL = { preset: -1, name: "", amt: "", dated: true, by: "" };
+const LABEL = "eyebrow leading-4";
+const INPUT48 = `${FIELD} h-12 w-full min-w-0 px-3.5 focus:shadow-[0_0_0_3px_var(--lime-soft)]`;
 
 type Bill = { name: string; amt: string; due: string };
 type Cat = { name: string; limit: string; on: boolean };
@@ -72,12 +92,25 @@ export default function Onboarding() {
   const [pct, setPct] = useState(30);
   const [bills, setBills] = useState<Bill[]>(DEFAULT_BILLS);
   const [cats, setCats] = useState<Cat[]>(ONBOARDING_CATEGORIES.map((name, i) => ({ name, limit: "", on: i < 5 })));
+  const [goal, setGoal] = useState(NO_GOAL);
+  const today = toLocalDateString(new Date());
+  const [ty, tm] = today.split("-").map(Number);
+  const minMonth = `${tm === 12 ? ty + 1 : ty}-${String((tm % 12) + 1).padStart(2, "0")}`;
 
   const sal = +salary || 0;
   const save = Math.round((sal * pct) / 100);
   const billTotal = bills.reduce((a, b) => a + (+b.amt || 0), 0);
   const safe = sal - save - billTotal;
   const flexPlan = cats.filter((c) => c.on).reduce((a, c) => a + (+c.limit || 0), 0);
+  const gAmt = +goal.amt || 0,
+    gBy = goal.dated ? goal.by : "";
+  /** null = nothing entered (skip); false = half-filled (blocks Continue). */
+  const goalOk = !goal.name.trim() && !goal.amt ? null : !!goal.name.trim() && gAmt > 0;
+  const pace = goalPace(gAmt, save, gBy, today);
+  const patchGoal = (p: Partial<typeof goal>) => {
+    setErr("");
+    setGoal((g) => ({ ...g, ...p }));
+  };
   const w = (v: number) => `${((Math.max(0, v) / Math.max(sal, 1)) * 100).toFixed(1)}%`;
 
   const go = (to: number) => {
@@ -97,17 +130,25 @@ export default function Onboarding() {
   const next = async (e: FormEvent) => {
     e.preventDefault();
     if (busy) return;
-    if (step === 2) {
+    if (step === 2 && goalOk === false) return setErr("Add a target amount, or skip this step for now.");
+    if (step === 3) {
       const kept = keptBills(bills);
       setBills(kept.length ? kept : [{ name: "", amt: "", due: "" }]);
     }
-    if (step < 4) return go(step + 1);
+    if (step < 5) return go(step + 1);
 
     setBusy(true);
     setErr("");
     const { error } = await createClient().rpc(
       "complete_onboarding",
-      onboardingPayload({ salary, payDay, pct, bills, cats }),
+      onboardingPayload({
+        salary,
+        payDay,
+        pct,
+        bills,
+        cats,
+        ...(goalOk && { goal: { name: goal.name, target: goal.amt, by: gBy } }),
+      }),
     );
     if (error) {
       reportClientError("onboarding_save_failed", { ...errorFields(error) });
@@ -121,10 +162,14 @@ export default function Onboarding() {
   const patchBill = (i: number, p: Partial<Bill>) => setBills((bs) => bs.map((b, j) => (j === i ? { ...b, ...p } : b)));
   const patchCat = (i: number, p: Partial<Cat>) => setCats((cs) => cs.map((c, j) => (j === i ? { ...c, ...p } : c)));
   const [eyebrow, title, em, lede] = STEPS[step];
-  const empty = (step === 0 && !sal) || (step === 2 && !billTotal) || (step === 3 && !cats.some((c) => c.on));
+  const empty =
+    (step === 0 && !sal) ||
+    (step === 2 && goalOk === null) ||
+    (step === 3 && !billTotal) ||
+    (step === 4 && !cats.some((c) => c.on));
   const nextLabel = busy
     ? "Opening dashboard…"
-    : step === 4
+    : step === 5
       ? "Open my dashboard"
       : empty
         ? "Skip for now"
@@ -133,30 +178,35 @@ export default function Onboarding() {
   const summary: Array<[string, string, string]> = [
     ["Take-home pay", sal ? inr(sal) : "Add later", sal ? "var(--ink)" : "var(--muted)"],
     [`Savings · ${pct}%`, sal ? `−${inr(save)}` : "—", sal ? "var(--ink)" : "var(--muted)"],
+    [
+      goalOk ? `Goal · ${goal.name.trim()}` : "Goal",
+      goalOk ? `${inr(gAmt)}${gBy ? ` by ${monthLabel(`${gBy}-01`)}` : ""}` : "Add later",
+      goalOk ? "var(--ink)" : "var(--muted)",
+    ],
     ["Fixed bills", billTotal ? `−${inr(billTotal)}` : "None yet", billTotal ? "var(--ink)" : "var(--muted)"],
     ["Safe to spend", sal ? inr(safe) : "—", !sal ? "var(--muted)" : safe < 0 ? "var(--danger)" : "var(--lime-text)"],
     ["Flexible limits you set", flexPlan ? inr(flexPlan) : "Suggested later", "var(--muted)"],
   ];
-  const overNote = (safe < 0 && sal > 0) || (step >= 3 && flexPlan > safe && safe > 0);
+  const overNote = (safe < 0 && sal > 0) || (step >= 4 && flexPlan > safe && safe > 0);
 
   return (
     <div className="flex min-h-screen w-full flex-col">
       <header className="mx-auto flex h-16 w-full max-w-[1200px] items-center gap-4 border-b border-line px-6">
         <Logo size={28} />
-        <span className="tabular ml-auto text-[13px] text-muted">Step {step + 1} of 5</span>
+        <span className="tabular ml-auto text-[13px] text-muted">Step {step + 1} of 6</span>
       </header>
       <div className="mx-auto w-full max-w-[1200px] px-6">
         <div
           role="progressbar"
           aria-label="Setup progress"
           aria-valuemin={1}
-          aria-valuemax={5}
+          aria-valuemax={6}
           aria-valuenow={step + 1}
           className="h-[3px] overflow-hidden rounded-full bg-track"
         >
           <div
             className="h-full bg-lime transition-[width] duration-500 ease-soft"
-            style={{ width: `${((step + 1) / 5) * 100}%` }}
+            style={{ width: `${((step + 1) / 6) * 100}%` }}
           />
         </div>
       </div>
@@ -268,6 +318,128 @@ export default function Onboarding() {
 
           {step === 2 && (
             <>
+              <div role="radiogroup" aria-label="Goal presets" className="flex flex-wrap gap-2">
+                {GOAL_PRESETS.map(([label, amt], i) => {
+                  const on = goal.preset === i;
+                  return (
+                    <button
+                      key={label}
+                      type="button"
+                      role="radio"
+                      aria-checked={on}
+                      onClick={() => patchGoal({ preset: i, name: amt ? label : "", amt: amt || goal.amt })}
+                      className="h-10 cursor-pointer rounded-full border px-4 text-sm font-semibold whitespace-nowrap transition-[border-color,background] duration-200"
+                      style={{
+                        borderColor: on ? "var(--lime)" : "var(--line-2)",
+                        background: on ? "var(--lime-soft)" : "transparent",
+                        color: on ? "var(--lime-text)" : "var(--ink)",
+                      }}
+                    >
+                      {label}
+                    </button>
+                  );
+                })}
+              </div>
+              <div className="flex flex-col gap-2">
+                <label htmlFor="ob-gn" className={LABEL}>
+                  Goal name
+                </label>
+                <input
+                  id="ob-gn"
+                  type="text"
+                  maxLength={60}
+                  value={goal.name}
+                  onChange={(e) => patchGoal({ name: e.target.value })}
+                  placeholder="e.g. Wedding, laptop, house deposit"
+                  className={INPUT48}
+                />
+              </div>
+              <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,200px),1fr))] gap-3.5">
+                <div className="flex min-w-0 flex-col gap-2">
+                  <label htmlFor="ob-gt" className={LABEL}>
+                    Target amount
+                  </label>
+                  <div className="relative flex">
+                    <span className="absolute top-0 left-3.5 flex h-12 items-center text-muted">
+                      {currencySymbol()}
+                    </span>
+                    <input
+                      id="ob-gt"
+                      type="text"
+                      inputMode="numeric"
+                      value={showTyped(goal.amt)}
+                      onChange={(e) => patchGoal({ amt: digits(e.target.value, 8) })}
+                      placeholder="0"
+                      className={`${INPUT48} tabular pl-8 font-semibold`}
+                    />
+                  </div>
+                </div>
+                <div className="flex min-w-0 flex-col gap-2">
+                  <span id="ob-gb-l" className={LABEL}>
+                    Target month
+                  </span>
+                  <div
+                    role="radiogroup"
+                    aria-labelledby="ob-gb-l"
+                    className="flex h-12 gap-0.5 rounded-xl border border-line-2 p-[3px]"
+                  >
+                    {(
+                      [
+                        ["By a month", true],
+                        ["No end date", false],
+                      ] as const
+                    ).map(([label, v]) => (
+                      <button
+                        key={label}
+                        type="button"
+                        role="radio"
+                        aria-checked={goal.dated === v}
+                        onClick={() => patchGoal({ dated: v })}
+                        className="min-w-0 flex-1 cursor-pointer rounded-[9px] border-0 text-[13px] font-semibold whitespace-nowrap transition-[background,color] duration-200"
+                        style={{
+                          background: goal.dated === v ? "var(--ink)" : "transparent",
+                          color: goal.dated === v ? "var(--bg)" : "var(--ink-2)",
+                        }}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+              {goal.dated && (
+                <div className="flex flex-col gap-2">
+                  <label htmlFor="ob-gb" className={LABEL}>
+                    Save it by
+                  </label>
+                  <input
+                    id="ob-gb"
+                    type="month"
+                    min={minMonth}
+                    value={goal.by}
+                    onChange={(e) => patchGoal({ by: e.target.value })}
+                    className={`${INPUT48} block appearance-none`}
+                  />
+                </div>
+              )}
+              {pace && (
+                <p
+                  role="status"
+                  aria-live="polite"
+                  className="m-0 rounded-xl px-4 py-3.5 text-[15px] text-pretty"
+                  style={{
+                    background: pace.warn ? "var(--warn-soft)" : "var(--tile-2)",
+                    color: pace.warn ? "var(--warn)" : "var(--ink)",
+                  }}
+                >
+                  {pace.text}
+                </p>
+              )}
+            </>
+          )}
+
+          {step === 3 && (
+            <>
               <div className="flex flex-col border-t border-line-2">
                 {bills.map((b, i) => (
                   <div key={i} className="flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-line py-3">
@@ -323,7 +495,7 @@ export default function Onboarding() {
             </>
           )}
 
-          {step === 3 && (
+          {step === 4 && (
             <div className="grid grid-cols-[repeat(auto-fill,minmax(min(100%,210px),1fr))] gap-2">
               {cats.map((c, i) => (
                 <div
@@ -368,7 +540,7 @@ export default function Onboarding() {
             </div>
           )}
 
-          {step === 4 && (
+          {step === 5 && (
             <div className="flex flex-col border-t border-line-2">
               {summary.map(([label, value, color]) => (
                 <div key={label} className="flex items-baseline justify-between gap-3 border-b border-line py-3.5">
@@ -387,6 +559,18 @@ export default function Onboarding() {
             </span>
           )}
           <div className="flex flex-wrap gap-2.5 pt-1.5">
+            {step === 2 && goalOk !== null && (
+              <button
+                type="button"
+                onClick={() => {
+                  setGoal(NO_GOAL);
+                  go(3);
+                }}
+                className="order-2 h-[50px] min-w-[180px] cursor-pointer rounded-full border border-line-2 bg-transparent px-[22px] text-[15px] font-semibold hover:border-ink-2"
+              >
+                Skip for now
+              </button>
+            )}
             {step > 0 && (
               <button
                 type="button"

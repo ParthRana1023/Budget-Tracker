@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { clampDay, monthsToGoal, onboardingPayload } from "./onboarding.mjs";
+import { inr, toMinor } from "./money.mjs";
+import { clampDay, goalPace, monthsToGoal, onboardingPayload } from "./onboarding.mjs";
 
 const base = { salary: "", payDay: "", pct: 30, bills: [], cats: [] };
 
@@ -75,11 +76,14 @@ test("first goal: sent only when named with a target; rupees become paise; month
   assert.equal("p_goal" in onboardingPayload(base), false, "step skipped");
   assert.equal("p_goal" in onboardingPayload({ ...base, goal: { name: "  ", target: "5000", by: "" } }), false);
   assert.equal("p_goal" in onboardingPayload({ ...base, goal: { name: "Trip", target: "", by: "" } }), false);
-  assert.deepEqual(onboardingPayload({ ...base, goal: { name: " Emergency fund ", target: "300000", by: "" } }).p_goal, {
-    name: "Emergency fund",
-    target: 30000000,
-    target_date: null,
-  });
+  assert.deepEqual(
+    onboardingPayload({ ...base, goal: { name: " Emergency fund ", target: "300000", by: "" } }).p_goal,
+    {
+      name: "Emergency fund",
+      target: 30000000,
+      target_date: null,
+    },
+  );
   assert.deepEqual(onboardingPayload({ ...base, goal: { name: "Trip", target: "60000.5", by: "2027-06" } }).p_goal, {
     name: "Trip",
     target: 6000050,
@@ -93,4 +97,22 @@ test("months to a goal at the chosen save %", () => {
   assert.equal(monthsToGoal(68000, 85000, 0), null, "nothing saved: no estimate");
   assert.equal(monthsToGoal(68000, 0, 20), null, "no salary yet");
   assert.equal(monthsToGoal(0, 85000, 20), null, "no target");
+});
+
+test("goal step pace line: dated, undated, faster than savings", () => {
+  const today = "2026-11-26",
+    $ = (/** @type {number} */ n) => inr(toMinor(n));
+  assert.equal(goalPace(0, 20000, "2027-06", today), null, "no target yet");
+  assert.deepEqual(goalPace(60000, 20000, "2027-05", today), {
+    text: `That’s ${$(10000)} a month for 6 months, 50% of what you save.`,
+    warn: false,
+  });
+  assert.equal(goalPace(60000, 5000, "2027-05", today)?.warn, true, "₹10,000 a month is more than ₹5,000 saved");
+  assert.match(goalPace(60000, 5000, "2027-05", today)?.text ?? "", new RegExp(`${$(5000)} more than you’re saving`));
+  assert.deepEqual(goalPace(100000, 30000, "", today), {
+    text: `No deadline. At your full savings of ${$(30000)} a month, you’d get there in about 4 months.`,
+    warn: false,
+  });
+  assert.equal(goalPace(100000, 0, "", today)?.text, "No deadline. Add money whenever you like.");
+  assert.equal(goalPace(60000, 0, "2027-05", today)?.text, `That’s ${$(10000)} a month for 6 months.`);
 });

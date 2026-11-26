@@ -25,7 +25,7 @@ export async function signUpFreshUser(page: Page): Promise<string> {
 
   // A new account is sent to onboarding before it sees the dashboard.
   await page.waitForURL("**/onboarding", { timeout: 20_000 });
-  await expect(page.getByText("Step 1 of 5")).toBeVisible();
+  await expect(page.getByText("Step 1 of 6")).toBeVisible();
   return email;
 }
 
@@ -35,8 +35,8 @@ export const onboardingNext = (page: Page) =>
 
 /** Skip every onboarding step and land on the dashboard. */
 export async function skipOnboarding(page: Page) {
-  for (let step = 1; step <= 4; step++) {
-    await expect(page.getByText(`Step ${step} of 5`)).toBeVisible();
+  for (let step = 1; step <= 5; step++) {
+    await expect(page.getByText(`Step ${step} of 6`)).toBeVisible();
     await onboardingNext(page).click();
   }
   await page.getByRole("button", { name: "Open my dashboard" }).click();
